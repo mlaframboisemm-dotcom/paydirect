@@ -228,6 +228,28 @@ async function loadSecretsFromSecretManager() {
   }
 }
 
+function loadWorkspaceSecretFiles() {
+  const workspaceSecretFiles = [
+    { envName: 'SOVEREIGN_ENCRYPTION_KEY', fileName: 'sovereign_encryption_key.txt' },
+    { envName: 'JWT_SECRET', fileName: 'jwt_secret.txt' },
+    { envName: 'SOVEREIGN_ADMIN_EMAILS', fileName: 'sovereign_admin_emails.txt' }
+  ];
+
+  for (const { envName, fileName } of workspaceSecretFiles) {
+    if (process.env[envName] && String(process.env[envName]).trim().length > 0) {
+      continue;
+    }
+
+    const filePath = path.join(process.cwd(), fileName);
+    if (fs.existsSync(filePath)) {
+      const fileValue = fs.readFileSync(filePath, 'utf8').trim();
+      if (fileValue) {
+        process.env[envName] = fileValue;
+      }
+    }
+  }
+}
+
 function normalizeCredentialEnvAliases() {
   const aliases: Array<{ target: string; candidates: string[] }> = [
     {
@@ -296,6 +318,7 @@ async function initializeRuntimeSecrets() {
     logSystemEvent('WARNING', { message: 'Runtime secret bootstrap failed', error: error?.message || 'unknown error' });
   }
 
+  loadWorkspaceSecretFiles();
   normalizeCredentialEnvAliases();
 
   if (IS_PRODUCTION) {
