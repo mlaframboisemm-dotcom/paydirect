@@ -3391,14 +3391,14 @@ async function sendETransferEmail(email: string, subject: string, htmlContent: s
     return;
   }
 
-  // In production, fail fast if no provider is configured when emails are enabled
+  // In production, bypass sending if no provider is configured when emails are enabled
   if (IS_PRODUCTION && gateway.routeEmailsEnabled) {
     const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     const mailerConfigured = Boolean(mailersendApiKey && mailerSend);
     if (!smtpConfigured && !mailerConfigured) {
-      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production.';
-      logSystemEvent('ERROR', { message: errMsg, environment: 'production' });
-      throw new Error(errMsg);
+      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production. Bypassing email transmission.';
+      logSystemEvent('WARNING', { message: errMsg, environment: 'production' });
+      return;
     }
   }
 
