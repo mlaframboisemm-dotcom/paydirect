@@ -6875,7 +6875,7 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       response_type: 'code',
       client_id: process.env.FAPI_CLIENT_ID || 'sovereigns_hub',
       redirect_uri: process.env.FAPI_REDIRECT_URI || 'http://localhost:3000/?action=finalize_interac',
-      scope: 'openid',
+      scope: bankId === 'tangerine' ? 'accounts transfers identity' : 'openid',
       state: jti,
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
       client_assertion: clientAssertion
@@ -6952,7 +6952,7 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       response_type: 'code',
       client_id: process.env.FAPI_CLIENT_ID || 'sovereigns_hub',
       redirect_uri: callbackUri,
-      scope: 'openid',
+      scope: bankId === 'tangerine' ? 'accounts transfers identity' : 'openid',
       state,
       nonce,
       code_challenge: pkce.challenge,
