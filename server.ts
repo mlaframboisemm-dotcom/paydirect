@@ -36,6 +36,7 @@ import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAt
 import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, logSystemEvent, logProviderEvent, logDatabaseEvent } from './src/lib/logger.js';
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
+import bankRegistryJson from './config/BankRegistry.json';
 
 function loadEnvironment() {
   const envPath = path.join(process.cwd(), '.env');
@@ -49,6 +50,18 @@ function loadEnvironment() {
   } else {
     dotenv.config();
   }
+}
+
+function getBankRegistry(): Record<string, any> {
+  try {
+    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
+    if (fs.existsSync(registryPath)) {
+      return JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    }
+  } catch (e) {
+    console.warn('Failed to read config/BankRegistry.json from disk, using bundled fallback:', e);
+  }
+  return bankRegistryJson;
 }
 
 loadEnvironment();
@@ -6801,12 +6814,7 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       return res.status(400).json({ error: 'INVALID_BANK', message: 'bankId string is required.' });
     }
 
-    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
-    if (!fs.existsSync(registryPath)) {
-      return res.status(500).json({ error: 'BANK_REGISTRY_MISSING', message: 'Bank registry not found on server.' });
-    }
-
-    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const registry = getBankRegistry();
     const bank = registry[bankId];
     if (!bank) {
       return res.status(400).json({ error: 'UNKNOWN_BANK', message: `Unknown bankId: ${bankId}` });
@@ -6925,11 +6933,7 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       console.warn('Rate limiter failed:', getErrorMessage(e));
     }
 
-    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
-    if (!fs.existsSync(registryPath)) {
-      return res.status(500).json({ error: 'BANK_REGISTRY_MISSING' });
-    }
-    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const registry = getBankRegistry();
     const bank = registry[bankId];
     if (!bank) return res.status(400).json({ error: 'UNKNOWN_BANK' });
 
@@ -7141,8 +7145,7 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
     // If we received an authorization code earlier in ESCROW, perform token exchange
     if ((transfer.authCode || transfer.authorization_code) && transfer.status === 'AWAITING_AUTHENTICATION') {
       try {
-        const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
-        const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, 'utf8')) : {};
+        const registry = getBankRegistry();
         const bank = registry[String(selected_bank_key || transfer.selected_bank_key || transfer.bankId || '').toLowerCase()];
 
         // Attempt token exchange if bank token endpoint is known
