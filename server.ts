@@ -36,7 +36,21 @@ import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, log
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
 
-dotenv.config();
+function loadEnvironment() {
+  const envPath = path.join(process.cwd(), '.env');
+  const fallbackEnvPath = path.join(process.cwd(), '.env.example');
+
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  } else if (fs.existsSync(fallbackEnvPath)) {
+    console.warn('Warning: .env not found, loading .env.example as fallback.');
+    dotenv.config({ path: fallbackEnvPath });
+  } else {
+    dotenv.config();
+  }
+}
+
+loadEnvironment();
 console.log("Callback URI:", process.env.FAPI_CALLBACK_URI);
 
 // Strip out placeholders so fallback mock mode works correctly in development
