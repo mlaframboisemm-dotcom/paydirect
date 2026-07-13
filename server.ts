@@ -28,6 +28,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import sqlite3 from 'sqlite3';
 import { getKilnBridge } from './server/kiln-bridge';
+import { tangerineCallbackHandler, getTangerineBalance, withdrawFromTangerine, depositToTangerine } from './src/tangerineIntegration';
 import { createStructuredLogger } from './src/lib/structured-logger.js';
 import { sanitizeError, sanitizeString } from './src/lib/error-sanitizer.js';
 import { validateRequest, ValidationSchema } from './src/lib/input-validator.js';
@@ -7429,6 +7430,44 @@ async function startServer() {
       }
     }, 50000); // 50 seconds
   }
+
+  // Tangerine Open Banking OAuth Integration routes
+  app.get("/api/v1/interac/callback", tangerineCallbackHandler);
+
+  // Example balance endpoint
+  app.get("/api/tangerine/balance", requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user?.id || "demo-user-id";
+      const balance = await getTangerineBalance(userId);
+      res.json({ balance });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Example withdraw endpoint
+  app.post("/api/tangerine/withdraw", requireAuth, express.json(), async (req: any, res: any) => {
+    try {
+      const userId = req.user?.id || "demo-user-id";
+      const { amount, destination } = req.body;
+      const result = await withdrawFromTangerine(userId, amount, destination);
+      res.json({ result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Example deposit endpoint
+  app.post("/api/tangerine/deposit", requireAuth, express.json(), async (req: any, res: any) => {
+    try {
+      const userId = req.user?.id || "demo-user-id";
+      const { amount, source } = req.body;
+      const result = await depositToTangerine(userId, amount, source);
+      res.json({ result });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
