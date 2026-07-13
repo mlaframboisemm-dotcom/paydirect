@@ -504,6 +504,32 @@
       "lockedAt": "2026-07-11T06:30:18.350Z"
     },
     {
+      "id": "wallet_eth_sub1",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "assetSymbol": "ETH",
+      "balance": 0.0,
+      "publicAddressEthereum": "0x1d43d0Ca9bc9F7c1E3f50FB7e313f2bDf4505cEc",
+      "publicAddressBitcoin": "",
+      "identityLocked": false,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "",
+      "lockedAt": "2026-07-12T14:27:00.000Z"
+    },
+    {
+      "id": "wallet_eth_sub2",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "assetSymbol": "ETH",
+      "balance": 0.0,
+      "publicAddressEthereum": "0x4EF712ebCcB9cc5c40E83f5212AeD028Ed4210B2",
+      "publicAddressBitcoin": "",
+      "identityLocked": false,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "",
+      "lockedAt": "2026-07-12T14:27:00.000Z"
+    },
+    {
       "id": "wallet-user_0a9ad97e-eca7-49e3-9d66-75fae1820086-usd",
       "userId": "user_0a9ad97e-eca7-49e3-9d66-75fae1820086",
       "assetSymbol": "USD",
@@ -2210,6 +2236,24 @@
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
       "timestamp": 1783844253548,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_0f7338e3-3220-4049-91f3-a688b4b77701",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1783859253851,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_aa4cecf1-a158-4721-8af1-42db26519c98",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1783859253857,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
