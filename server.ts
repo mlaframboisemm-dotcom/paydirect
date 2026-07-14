@@ -4773,14 +4773,6 @@ function getRequestToken(req: any): string | null {
     return cookieToken;
   }
 
-  if (IS_PRODUCTION) {
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      console.warn('[AUTH] Rejecting Authorization header in production: cookie-based session required.');
-    }
-    return null;
-  }
-
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.split(' ')[1];
@@ -6801,9 +6793,16 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
     }
 
     const registry = getBankRegistry();
-    const bank = registry[bankId];
-    if (!bank) {
+    const rawBank = registry[bankId];
+    if (!rawBank) {
       return res.status(400).json({ error: 'UNKNOWN_BANK', message: `Unknown bankId: ${bankId}` });
+    }
+
+    const bank = { ...rawBank };
+    if (bank.authUrl && bank.authUrl.includes('localhost:3000')) {
+      const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
+      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      bank.authUrl = bank.authUrl.replace('http://localhost:3000', `${protocol}://${requestHost}`);
     }
 
     const operation = String(req.body.operation_type || 'WITHDRAWAL').toUpperCase();
