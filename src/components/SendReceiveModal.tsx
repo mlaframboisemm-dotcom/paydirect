@@ -44,7 +44,7 @@ export default function SendReceiveModal({
 
   if (!isOpen) return null;
 
-  const currentCoin = coins.find((c) => c.symbol === (action === 'send' ? sendSymbol : receiveSymbol)) || coins[0];
+  const currentCoin = coins.find((c) => c.symbol === (action === 'send' ? sendSymbol : receiveSymbol)) || coins[0] || { symbol: 'BTC', name: 'Bitcoin', price: 64200.00, color: '#F7931A' };
   const currentHolding = holdings.find((h) => h.symbol === sendSymbol) || { symbol: sendSymbol, amount: 0 };
 
   // Calculate fiat to crypto conversion

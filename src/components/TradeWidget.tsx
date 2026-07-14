@@ -52,9 +52,9 @@ export default function TradeWidget({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const selectedCoin = coins.find((c) => c.symbol === selectedCoinSymbol) || coins[0];
-  const fromCoin = coins.find((c) => c.symbol === convertFromSymbol) || coins[0];
-  const toCoin = coins.find((c) => c.symbol === convertToSymbol) || coins[1];
+  const selectedCoin = coins.find((c) => c.symbol === selectedCoinSymbol) || coins[0] || { symbol: 'BTC', name: 'Bitcoin', price: 64200.00, color: '#F7931A' };
+  const fromCoin = coins.find((c) => c.symbol === convertFromSymbol) || coins[0] || { symbol: 'BTC', name: 'Bitcoin', price: 64200.00, color: '#F7931A' };
+  const toCoin = coins.find((c) => c.symbol === convertToSymbol) || coins[1] || { symbol: 'ETH', name: 'Ethereum', price: 3350.00, color: '#0052FF' };
 
   const currentHolding = holdings.find((h) => h.symbol === selectedCoinSymbol) || { symbol: selectedCoinSymbol, amount: 0 };
   const fromHolding = holdings.find((h) => h.symbol === convertFromSymbol) || { symbol: convertFromSymbol, amount: 0 };

@@ -170,5 +170,13 @@
     "createdAt": "2026-07-12T03:07:29.484Z",
     "expiresAt": 1783912049469,
     "verifiedAt": "2026-07-12T03:07:29.494Z"
+  },
+  "e2e-1783967932744@example.com": {
+    "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
+    "email": "e2e-1783967932744@example.com",
+    "tokenHash": "9e0be17f41edc961dfc71a2b78e5e29104f601e5f8e598bfb1fb62ea3b6a5bd5",
+    "createdAt": "2026-07-13T18:38:55.205Z",
+    "expiresAt": 1784054335202,
+    "verifiedAt": "2026-07-13T18:38:55.470Z"
   }
 }
