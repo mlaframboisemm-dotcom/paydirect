@@ -7519,6 +7519,14 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+    // SPA fallback for development mode - serve index.html for non-API routes
+    app.get('*', (req, res) => {
+      // Don't serve SPA for API routes
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+      res.redirect('/');
+    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
