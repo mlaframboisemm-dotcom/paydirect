@@ -4760,6 +4760,26 @@ function generateRandomAddress(): string {
 // COINBASE UI API ADAPTER LAYER
 // =========================================================================
 
+function getRequestHost(req: any): string {
+  const forwardedHost = req.headers['x-forwarded-host'];
+  if (forwardedHost && typeof forwardedHost === 'string') {
+    return forwardedHost.split(',')[0].trim();
+  }
+  const host = req.headers.host;
+  if (host && typeof host === 'string' && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+    return host;
+  }
+  return 'www.pay.sovereigns.ca';
+}
+
+function getRequestProtocol(req: any): string {
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  if (forwardedProto && typeof forwardedProto === 'string') {
+    return forwardedProto.split(',')[0].trim();
+  }
+  return req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+}
+
 function getCookieValue(req: any, cookieName: string): string | null {
   const header = req.headers?.cookie;
   if (!header || typeof header !== 'string') return null;
@@ -6801,8 +6821,8 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
 
     const bank = { ...rawBank };
     if (bank.authUrl && bank.authUrl.includes('localhost:3000')) {
-      const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const requestHost = getRequestHost(req);
+      const protocol = getRequestProtocol(req);
       bank.authUrl = bank.authUrl.replace('http://localhost:3000', `${protocol}://${requestHost}`);
     }
 
@@ -6867,8 +6887,8 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
     const redirectUrl = (() => {
       let redirect = process.env.FAPI_REDIRECT_URI || 'http://localhost:3000/?action=finalize_interac';
       if (redirect.includes('localhost:3000')) {
-        const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const requestHost = getRequestHost(req);
+        const protocol = getRequestProtocol(req);
         redirect = redirect.replace('http://localhost:3000', `${protocol}://${requestHost}`);
       }
       return redirect;
@@ -6936,8 +6956,8 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
 
     const bank = { ...rawBank };
     if (bank.authUrl && bank.authUrl.includes('localhost:3000')) {
-      const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const requestHost = getRequestHost(req);
+      const protocol = getRequestProtocol(req);
       bank.authUrl = bank.authUrl.replace('http://localhost:3000', `${protocol}://${requestHost}`);
     }
 
@@ -6971,8 +6991,8 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
     const callbackUri = (() => {
       let callback = process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/withdraw/callback`;
       if (callback.includes('localhost')) {
-        const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        const requestHost = getRequestHost(req);
+        const protocol = getRequestProtocol(req);
         callback = callback.replace(/http:\/\/localhost:\d+/, `${protocol}://${requestHost}`).replace(/http:\/\/localhost/, `${protocol}://${requestHost}`);
       }
       return callback;
@@ -7017,8 +7037,8 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   const getFrontendUrl = (targetUri?: string) => {
     let target = targetUri || process.env.FAPI_FRONTEND_REDIRECT || 'http://localhost:3000/?action=finalize_interac';
     if (target.includes('localhost:3000')) {
-      const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-      const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+      const requestHost = getRequestHost(req);
+      const protocol = getRequestProtocol(req);
       target = target.replace('http://localhost:3000', `${protocol}://${requestHost}`);
     }
     return target;
@@ -7117,8 +7137,8 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
     return res.status(400).json({ error: "Target financial institution unrecognized by clearing registry." });
   }
 
-  const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const requestHost = getRequestHost(req);
+  const protocol = getRequestProtocol(req);
   const callbackBase = process.env.FAPI_CALLBACK_URI || `${protocol}://${requestHost}/api/v1/interac/callback`;
   const secure_transport_url = `${base_portal_uri}?client_id=sovereigns_hub&redirect_uri=${encodeURIComponent(`${callbackBase}?transfer_id=${transfer_id}`)}`;
   
@@ -7127,8 +7147,8 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
   const { transfer_id, code } = req.query || {};
-  const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+  const requestHost = getRequestHost(req);
+  const protocol = getRequestProtocol(req);
   res.redirect(`${protocol}://${requestHost}/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
 });
 
@@ -7481,8 +7501,8 @@ async function startServer() {
   // Tangerine Open Banking OAuth Integration routes
   app.get("/api/banking/tangerine/auth", (req: any, res: any) => {
     const transferId = req.query.state || req.query.transfer_id || `tg-${crypto.randomBytes(8).toString('hex')}`;
-    const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
-    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const requestHost = getRequestHost(req);
+    const protocol = getRequestProtocol(req);
     const origin = `${protocol}://${requestHost}`;
     
     const tangerineAuthBase = "https://secure.tangerine.ca/oauth/authorize";
