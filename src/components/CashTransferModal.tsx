@@ -37,7 +37,7 @@ function buildApiUrl(path: string): string {
   if (typeof window !== 'undefined') {
     // Electron/file:// renderers cannot resolve relative /api routes.
     if (window.location.protocol === 'file:') {
-      return `http://localhost:3000${normalized}`;
+      return `https://www.pay.sovereigns.ca${normalized}`;
     }
     if (window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}${normalized}`;
