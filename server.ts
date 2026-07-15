@@ -7005,7 +7005,8 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       state,
       nonce,
       code_challenge: pkce.challenge,
-      code_challenge_method: 'S256'
+      code_challenge_method: 'S256',
+      bank_key: bankId
     };
 
     const authorizationUrl = buildAuthorizationUrl(bank, params);

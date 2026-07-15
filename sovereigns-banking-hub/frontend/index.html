@@ -1125,6 +1125,18 @@
             
             await sleep(600);
             
+            const params = new URLSearchParams(window.location.search);
+            const redirectUri = params.get('redirect_uri');
+            const state = params.get('state');
+
+            if (redirectUri && state) {
+                const code = `MOCK_CODE_${mfaCode}`;
+                const redirectTarget = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
+                closeWebviewModal();
+                window.location.href = redirectTarget;
+                return;
+            }
+
             try {
                 // Call finalize API endpoint in the FastAPI backend
                 const finalRes = await fetch(`${API_ROUTE}/interac/finalize`, {
@@ -1183,7 +1195,50 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        window.onload = populateBankListMatrix;
+        function getCapitalizedBankKey(key) {
+            if (!key) return "";
+            const lower = key.toLowerCase();
+            if (lower === 'rbc') return 'RBC';
+            if (lower === 'td') return 'TD';
+            if (lower === 'scotiabank') return 'Scotiabank';
+            if (lower === 'bmo') return 'BMO';
+            if (lower === 'cibc') return 'CIBC';
+            if (lower === 'tangerine') return 'Tangerine';
+            if (lower === 'desjardins') return 'Desjardins';
+            if (lower === 'nationalbank') return 'NationalBank';
+            if (lower === 'simplii') return 'Simplii';
+            if (lower === 'vancity') return 'Vancity';
+            if (lower === 'meridian') return 'Meridian';
+            if (lower === 'atb') return 'ATB';
+            if (lower === 'coastcapital') return 'CoastCapital';
+            return key;
+        }
+
+        function handleQueryParametersOnLoad() {
+            populateBankListMatrix();
+            
+            const params = new URLSearchParams(window.location.search);
+            const state = params.get('state');
+            const redirectUri = params.get('redirect_uri');
+            const bankKeyRaw = params.get('bank_key');
+            
+            if (state && redirectUri && bankKeyRaw) {
+                const bankKey = getCapitalizedBankKey(bankKeyRaw);
+                const bankInfo = CANADIAN_FINANCIAL_NODES[bankKey];
+                if (bankInfo) {
+                    currentSessionTransferId = state;
+                    activeSelectedBankKey = bankKey;
+                    activeSelectedBankName = bankInfo.name;
+                    currentOperationType = "WITHDRAWAL";
+                    
+                    setTimeout(() => {
+                        openWebviewSimulator(bankKey, state);
+                    }, 300);
+                }
+            }
+        }
+
+        window.onload = handleQueryParametersOnLoad;
     </script>
 </body>
 </html>
