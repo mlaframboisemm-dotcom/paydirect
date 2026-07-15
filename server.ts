@@ -6967,7 +6967,15 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       fxRateSource: String(fxRateSource || 'server-accepted')
     });
 
-    const callbackUri = (process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/withdraw/callback`);
+    const callbackUri = (() => {
+      let callback = process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/withdraw/callback`;
+      if (callback.includes('localhost')) {
+        const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
+        const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+        callback = callback.replace(/http:\/\/localhost:\d+/, `${protocol}://${requestHost}`).replace(/http:\/\/localhost/, `${protocol}://${requestHost}`);
+      }
+      return callback;
+    })();
     const params = {
       response_type: 'code',
       client_id: process.env.FAPI_CLIENT_ID || 'sovereigns_hub',
