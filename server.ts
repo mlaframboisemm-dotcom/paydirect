@@ -36,7 +36,6 @@ import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAt
 import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, logSystemEvent, logProviderEvent, logDatabaseEvent } from './src/lib/logger.js';
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
-import { tangerineCallbackHandler } from './src/tangerineIntegration';
 
 dotenv.config();
 console.log("Callback URI:", process.env.FAPI_CALLBACK_URI);
@@ -7165,10 +7164,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 });
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
-  const { state, transfer_id, code } = req.query || {};
-  if (state) {
-    return tangerineCallbackHandler(req, res);
-  }
+  const { transfer_id, code } = req.query || {};
   res.redirect(`/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
 });
 
