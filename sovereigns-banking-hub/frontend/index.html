@@ -1145,7 +1145,9 @@
                     currentSessionTransferId = state;
                     activeSelectedBankKey = bankKey;
                     activeSelectedBankName = bankInfo.name;
-                    currentOperationType = "WITHDRAWAL";
+                    const operationRaw = params.get('operation') || "WITHDRAWAL";
+                    currentOperationType = operationRaw.toUpperCase();
+                    swapOperationType(currentOperationType);
                     
                     if (bankKey === "Tangerine") {
                         const requestHost = window.location.host;

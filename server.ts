@@ -6957,7 +6957,9 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       scope: 'openid',
       state: jti,
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-      client_assertion: clientAssertion
+      client_assertion: clientAssertion,
+      bank_key: bankId,
+      operation: 'DEPOSIT'
     });
 
     const authorizationUrl = `${bank.authUrl}?${params.toString()}`;
@@ -7035,7 +7037,9 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       state,
       nonce,
       code_challenge: pkce.challenge,
-      code_challenge_method: 'S256'
+      code_challenge_method: 'S256',
+      bank_key: bankId,
+      operation: 'WITHDRAWAL'
     };
 
     const authorizationUrl = buildAuthorizationUrl(bank, params);
