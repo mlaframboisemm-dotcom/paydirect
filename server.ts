@@ -712,6 +712,7 @@ const mailersendApiKey = process.env.MAILERSEND_API_KEY || process.env.API_KEY;
 const mailerSend = mailersendApiKey ? new MailerSend({ apiKey: mailersendApiKey }) : null;
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Initialize centralized logging system
