@@ -24,7 +24,7 @@ function buildApiUrl(path: string): string {
   }
   if (typeof window !== 'undefined') {
     if (window.location.protocol === 'file:') {
-      return `https://www.pay.sovereigns.ca${normalized}`;
+      return `http://localhost:3000${normalized}`;
     }
     if (window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}${normalized}`;
