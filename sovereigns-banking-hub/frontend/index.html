@@ -747,6 +747,15 @@
                 </div>
             </div>
 
+            <!-- GATEWAY SIMULATION TOGGLE -->
+            <div class="toggle-switch-container">
+                <span class="switch-label-desc">🚀 Run via In-App Simulated OAuth Webview</span>
+                <label class="switch-control">
+                    <input type="checkbox" id="simulator-mode-checkbox" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <button class="btn-submit" onclick="initiateSecureGatewaySession()">
                 <span>Authorize Interbank Settlement</span>
                 <span style="font-size:12px;">→</span>
@@ -810,41 +819,7 @@
 
             <!-- WORKSPACE INTERFACE -->
             <div class="webview-content" id="webview-interactive-body">
-                <!-- Tangerine Specific Landing Phase -->
-                <div id="webview-step-landing" style="display: none; text-align: center; padding: 10px 0;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">🍊</div>
-                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px; color: #ff6600;">Welcome to Tangerine</h3>
-                    <p style="font-size: 12px; color: #9ca3af; margin-bottom: 24px;">Forward Banking. Securely connect your account to sovereigns_hub.</p>
-                    <button class="webview-button" style="background-color: #ff6600; color: white;" onclick="goToTangerineLoginId()">Log In</button>
-                </div>
-
-                <!-- Tangerine Specific User ID / Card Phase -->
-                <div id="webview-step-login-id" style="display: none;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <h3 style="font-size: 16px; font-weight: 700; color: #ff6600;">Sign In</h3>
-                        <p style="font-size: 12px; color: #9ca3af;">Enter your Username or Card Number</p>
-                    </div>
-                    <div class="webview-form-group">
-                        <label class="webview-lbl">Login Name or Card Number</label>
-                        <input type="text" class="webview-input" id="webview-user-id-input" placeholder="Enter username/card number" style="border-color: #ff6600;">
-                    </div>
-                    <button class="webview-button" style="background-color: #ff6600; color: white;" onclick="goToTangerinePassword()">Next</button>
-                </div>
-
-                <!-- Tangerine Specific Password Phase -->
-                <div id="webview-step-login-password" style="display: none;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <h3 style="font-size: 16px; font-weight: 700; color: #ff6600;">Enter Password</h3>
-                        <p style="font-size: 12px; color: #9ca3af;">Verify your identity to authenticate connection</p>
-                    </div>
-                    <div class="webview-form-group">
-                        <label class="webview-lbl">Security Password</label>
-                        <input type="password" class="webview-input" id="webview-password-input" placeholder="••••••••••••" style="border-color: #ff6600;">
-                    </div>
-                    <button class="webview-button" style="background-color: #ff6600; color: white;" onclick="goToTangerineMFA()">Sign In</button>
-                </div>
-
-                <!-- Default Login Phase -->
+                <!-- Login Phase -->
                 <div id="webview-step-login">
                     <div style="text-align: center; margin-bottom: 20px;">
                         <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Sign In to Approve Escrow</h3>
@@ -954,7 +929,7 @@
         async function initiateSecureGatewaySession() {
             const amount = parseFloat(document.getElementById("tx-amount").value);
             const answer = document.getElementById("security-answer").value.trim().toLowerCase();
-            const useSimulator = true;
+            const useSimulator = document.getElementById("simulator-mode-checkbox").checked;
 
             if (!amount || isNaN(amount) || amount <= 0) {
                 return alert("Input Validation Error: Specify a legitimate remittance value.");
@@ -1005,11 +980,11 @@
                 }
 
             } catch (err) { 
-                alert(`Network connection error: Could not contact gateway backend. Make sure the FastAPI server is running on http://127.0.0.1:8000.`); 
+                alert(`Network connection error: Could not contact gateway backend at ${API_ROUTE}. Please check your network connection or server status.`); 
             }
         }
 
-        // --- SECURE OAUTH WEBVIEW PORTAL CONTROLLER ---
+        // --- SIMULATED OAUTH WEBVIEW MODAL CONTROLLER ---
         function openWebviewSimulator(bankKey, transferId) {
             const bankInfo = CANADIAN_FINANCIAL_NODES[bankKey];
             const modal = document.getElementById("webview-modal-overlay");
@@ -1022,73 +997,17 @@
             bankNameEl.textContent = bankInfo.name;
             loginSubtitle.textContent = `Connect to sovereigns_hub securely using your ${bankInfo.name} credentials.`;
             
-            // Reset all modal page displays
-            document.getElementById("webview-step-landing").style.display = "none";
-            document.getElementById("webview-step-login-id").style.display = "none";
-            document.getElementById("webview-step-login-password").style.display = "none";
-            document.getElementById("webview-step-login").style.display = "none";
+            // Reset modal pages
+            document.getElementById("webview-step-login").style.display = "block";
             document.getElementById("webview-step-mfa").style.display = "none";
             document.getElementById("webview-step-processing").style.display = "none";
-            
-            // Reset input values
             document.getElementById("webview-mfa-code").value = "";
-            document.getElementById("webview-user-id-input").value = "";
-            document.getElementById("webview-password-input").value = "";
-            document.getElementById("webview-user-id").value = "sovereign_executive";
-            document.getElementById("webview-password").value = "••••••••••••••";
-            
-            // Reset MFA titles/descriptions back to default
-            const mfaTitle = document.querySelector("#webview-step-mfa h3");
-            const mfaDesc = document.querySelector("#webview-step-mfa p");
-            mfaTitle.textContent = "Multi-Factor Authentication";
-            mfaTitle.style.color = "";
-            mfaDesc.textContent = "Enter the 6-digit confirmation key pushed to your secure hardware node.";
-
-            if (bankKey === "Tangerine") {
-                // Show Tangerine landing screen first
-                document.getElementById("webview-step-landing").style.display = "block";
-            } else {
-                // Show default login screen
-                document.getElementById("webview-step-login").style.display = "block";
-            }
             
             modal.classList.add("active");
         }
 
         function closeWebviewModal() {
             document.getElementById("webview-modal-overlay").classList.remove("active");
-        }
-
-        // Tangerine Custom Flow Page Transitions
-        function goToTangerineLoginId() {
-            document.getElementById("webview-step-landing").style.display = "none";
-            document.getElementById("webview-step-login-id").style.display = "block";
-        }
-
-        function goToTangerinePassword() {
-            const userId = document.getElementById("webview-user-id-input").value.trim();
-            if (!userId) return alert("Please enter your Username or Card Number.");
-            document.getElementById("webview-step-login-id").style.display = "none";
-            document.getElementById("webview-step-login-password").style.display = "block";
-        }
-
-        function goToTangerineMFA() {
-            const password = document.getElementById("webview-password-input").value;
-            if (!password) return alert("Please enter your security password.");
-            
-            document.getElementById("webview-step-login-password").style.display = "none";
-            document.getElementById("webview-step-mfa").style.display = "block";
-            
-            // Customize MFA screen specifically for Tangerine
-            const mfaTitle = document.querySelector("#webview-step-mfa h3");
-            const mfaDesc = document.querySelector("#webview-step-mfa p");
-            mfaTitle.textContent = "Security Verification";
-            mfaTitle.style.color = "#ff6600";
-            mfaDesc.textContent = "We've sent a 6-digit Security PIN to your registered mobile number.";
-            
-            // Generate simulated PIN
-            const randomCode = Math.floor(100000 + Math.random() * 900000);
-            document.getElementById("webview-mfa-code").value = randomCode;
         }
 
         function submitWebviewLogin() {
@@ -1125,18 +1044,6 @@
             
             await sleep(600);
             
-            const params = new URLSearchParams(window.location.search);
-            const redirectUri = params.get('redirect_uri');
-            const state = params.get('state');
-
-            if (redirectUri && state) {
-                const code = `MOCK_CODE_${mfaCode}`;
-                const redirectTarget = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
-                closeWebviewModal();
-                window.location.href = redirectTarget;
-                return;
-            }
-
             try {
                 // Call finalize API endpoint in the FastAPI backend
                 const finalRes = await fetch(`${API_ROUTE}/interac/finalize`, {
@@ -1195,50 +1102,7 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        function getCapitalizedBankKey(key) {
-            if (!key) return "";
-            const lower = key.toLowerCase();
-            if (lower === 'rbc') return 'RBC';
-            if (lower === 'td') return 'TD';
-            if (lower === 'scotiabank') return 'Scotiabank';
-            if (lower === 'bmo') return 'BMO';
-            if (lower === 'cibc') return 'CIBC';
-            if (lower === 'tangerine') return 'Tangerine';
-            if (lower === 'desjardins') return 'Desjardins';
-            if (lower === 'nationalbank') return 'NationalBank';
-            if (lower === 'simplii') return 'Simplii';
-            if (lower === 'vancity') return 'Vancity';
-            if (lower === 'meridian') return 'Meridian';
-            if (lower === 'atb') return 'ATB';
-            if (lower === 'coastcapital') return 'CoastCapital';
-            return key;
-        }
-
-        function handleQueryParametersOnLoad() {
-            populateBankListMatrix();
-            
-            const params = new URLSearchParams(window.location.search);
-            const state = params.get('state');
-            const redirectUri = params.get('redirect_uri');
-            const bankKeyRaw = params.get('bank_key');
-            
-            if (state && redirectUri && bankKeyRaw) {
-                const bankKey = getCapitalizedBankKey(bankKeyRaw);
-                const bankInfo = CANADIAN_FINANCIAL_NODES[bankKey];
-                if (bankInfo) {
-                    currentSessionTransferId = state;
-                    activeSelectedBankKey = bankKey;
-                    activeSelectedBankName = bankInfo.name;
-                    currentOperationType = "WITHDRAWAL";
-                    
-                    setTimeout(() => {
-                        openWebviewSimulator(bankKey, state);
-                    }, 300);
-                }
-            }
-        }
-
-        window.onload = handleQueryParametersOnLoad;
+        window.onload = populateBankListMatrix;
     </script>
 </body>
 </html>

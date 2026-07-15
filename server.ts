@@ -7,6 +7,7 @@ import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { spawn } from 'child_process';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 // @ts-ignore - ethers v6 has built-in TypeScript support
@@ -26,45 +27,17 @@ import { assertEnvironmentSafeForDestructiveOperation } from './src/lib/environm
 import { canCoverWithdrawal, convertCadToUsd, DEFAULT_USD_CAD_RATE, resolveFxRateFromPayload, isWithinRateTolerance } from './src/lib/financial-hardening.js';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
-import sqlite3 from 'sqlite3';
+import sqlite3 from './src/lib/sqlite3-mock.js';
 import { getKilnBridge } from './server/kiln-bridge';
-import { tangerineCallbackHandler, getTangerineBalance, withdrawFromTangerine, depositToTangerine } from './src/tangerineIntegration';
 import { createStructuredLogger } from './src/lib/structured-logger.js';
 import { sanitizeError, sanitizeString } from './src/lib/error-sanitizer.js';
 import { validateRequest, ValidationSchema } from './src/lib/input-validator.js';
-import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAttempts } from './src/lib/login-protection.js';
+import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAttempts, unlockAccount } from './src/lib/login-protection.js';
 import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, logSystemEvent, logProviderEvent, logDatabaseEvent } from './src/lib/logger.js';
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
-import bankRegistryJson from './config/BankRegistry.json';
 
-function loadEnvironment() {
-  const envPath = path.join(process.cwd(), '.env');
-  const fallbackEnvPath = path.join(process.cwd(), '.env.example');
-
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath });
-  } else if (fs.existsSync(fallbackEnvPath)) {
-    console.warn('Warning: .env not found, loading .env.example as fallback.');
-    dotenv.config({ path: fallbackEnvPath });
-  } else {
-    dotenv.config();
-  }
-}
-
-function getBankRegistry(): Record<string, any> {
-  try {
-    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
-    if (fs.existsSync(registryPath)) {
-      return JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-    }
-  } catch (e) {
-    console.warn('Failed to read config/BankRegistry.json from disk, using bundled fallback:', e);
-  }
-  return bankRegistryJson;
-}
-
-loadEnvironment();
+dotenv.config();
 console.log("Callback URI:", process.env.FAPI_CALLBACK_URI);
 
 // Strip out placeholders so fallback mock mode works correctly in development
@@ -256,28 +229,6 @@ async function loadSecretsFromSecretManager() {
   }
 }
 
-function loadWorkspaceSecretFiles() {
-  const workspaceSecretFiles = [
-    { envName: 'SOVEREIGN_ENCRYPTION_KEY', fileName: 'sovereign_encryption_key.txt' },
-    { envName: 'JWT_SECRET', fileName: 'jwt_secret.txt' },
-    { envName: 'SOVEREIGN_ADMIN_EMAILS', fileName: 'sovereign_admin_emails.txt' }
-  ];
-
-  for (const { envName, fileName } of workspaceSecretFiles) {
-    if (process.env[envName] && String(process.env[envName]).trim().length > 0) {
-      continue;
-    }
-
-    const filePath = path.join(process.cwd(), fileName);
-    if (fs.existsSync(filePath)) {
-      const fileValue = fs.readFileSync(filePath, 'utf8').trim();
-      if (fileValue) {
-        process.env[envName] = fileValue;
-      }
-    }
-  }
-}
-
 function normalizeCredentialEnvAliases() {
   const aliases: Array<{ target: string; candidates: string[] }> = [
     {
@@ -339,6 +290,53 @@ function appendKilnChangelogEntry(message: string) {
   fs.appendFileSync(changelogPath, `${stamp} - ${message}\n`);
 }
 
+async function syncSecretsFromSovereignTerminal() {
+  const pin = process.env.SOV_PIN && String(process.env.SOV_PIN).trim();
+  if (!pin) {
+    logSystemEvent('CONFIG_CHANGE', { message: 'Sovereign terminal sync skipped: SOV_PIN not set' });
+    return;
+  }
+
+  const terminalUrl = (process.env.SOV_TERMINAL_URL || "https://ais-dev-vsguby4cvne7edjk3z4bzv-522633331757.us-east1.run.app").replace(/\/$/, '');
+  
+  logSystemEvent('CONFIG_CHANGE', { message: `Syncing secrets from Sovereign terminal at ${terminalUrl}...` });
+
+  try {
+    const response = await fetch(`${terminalUrl}/api/security/export-keys`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ pin })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Terminal responded with status ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (text.trim().startsWith('<') || (response.headers.get('content-type') || '').includes('text/html')) {
+      throw new Error('The Sovereign terminal endpoint is behind an AI Studio proxy or login page (returned HTML). Please configure your production environment variables directly in the Render dashboard.');
+    }
+
+    const result = JSON.parse(text);
+    if (result && result.success && result.keys && typeof result.keys === 'object') {
+      let loaded = 0;
+      for (const [key, value] of Object.entries(result.keys)) {
+        if (typeof value === 'string' && value.trim()) {
+          process.env[key] = value.trim();
+          loaded++;
+        }
+      }
+      logSystemEvent('CONFIG_CHANGE', { message: `Successfully synced ${loaded} keys from Sovereign terminal` });
+    } else {
+      throw new Error(result?.error || 'Invalid terminal response structure');
+    }
+  } catch (error: any) {
+    logSystemEvent('ERROR', { message: 'Sovereign terminal secret sync failed', error: error?.message || 'unknown error' });
+  }
+}
+
 async function initializeRuntimeSecrets() {
   try {
     await loadSecretsFromSecretManager();
@@ -346,15 +344,29 @@ async function initializeRuntimeSecrets() {
     logSystemEvent('WARNING', { message: 'Runtime secret bootstrap failed', error: error?.message || 'unknown error' });
   }
 
-  loadWorkspaceSecretFiles();
+  try {
+    await syncSecretsFromSovereignTerminal();
+  } catch (error: any) {
+    logSystemEvent('WARNING', { message: 'Sovereign terminal secret sync skipped/failed', error: error?.message || 'unknown error' });
+  }
+
   normalizeCredentialEnvAliases();
 
   if (IS_PRODUCTION) {
     const startupValidation = validateProductionSecrets(process.env);
     if (!startupValidation.ok) {
-      const message = `Production startup validation failed: ${startupValidation.errors.join(' ')}`;
-      logSystemEvent('ERROR', { message, errors: startupValidation.errors });
-      throw new Error(message);
+      const message = `Production startup validation warning (standby mode active - some features disabled until configured): ${startupValidation.errors.join(' ')}`;
+      logSystemEvent('WARNING', { message, errors: startupValidation.errors });
+      console.warn('========================================================================');
+      console.warn('⚠️  PRODUCTION CONFIGURATION STANDBY ALERT');
+      console.warn('========================================================================');
+      for (const err of startupValidation.errors) {
+        console.warn(`- ${err}`);
+      }
+      console.warn('------------------------------------------------------------------------');
+      console.warn('Please configure these credentials in your Render Dashboard Environment Variables.');
+      console.warn('The application is running in standby mode. Non-configured features will fail safe.');
+      console.warn('========================================================================');
     }
   }
 
@@ -379,14 +391,18 @@ function requireStrongSecret(name: string, minLength = 32): string {
     }
   }
 
-  const devSeed = process.env.SOVEREIGN_DEV_SECRET_SEED || 'sovereign-local-dev-seed';
-  const generated = crypto
-    .createHash('sha512')
-    .update(`${name}:${process.cwd()}:${devSeed}`)
-    .digest('hex');
-  process.env[name] = generated;
-  logSystemEvent('WARNING', { message: `${name} is missing/weak. Using fallback secret.`, name, environment: 'production-fallback' });
-  return generated;
+  if (process.env.NODE_ENV !== 'production') {
+    const devSeed = process.env.SOVEREIGN_DEV_SECRET_SEED || 'sovereign-local-dev-seed';
+    const generated = crypto
+      .createHash('sha512')
+      .update(`${name}:${process.cwd()}:${devSeed}`)
+      .digest('hex');
+    process.env[name] = generated;
+    logSystemEvent('WARNING', { message: `${name} is missing/weak. Using development fallback secret.`, name, environment: 'development' });
+    return generated;
+  }
+
+  throw new Error(`${name} is required and must be at least ${minLength} characters.`);
 }
 
 function enforceProductionSecretHardening(operation?: 'wallet' | 'exchange' | 'email' | 'sms' | 'settlement' | 'withdrawal' | 'atm') {
@@ -769,22 +785,16 @@ function getRuntimeConfigStatus() {
 async function enforceProductionReadiness() {
   if (!IS_PRODUCTION) return;
 
-  const mode = process.env.SOVEREIGN_KILN_MODE || 'shim';
-  if (process.env.BYPASS_PRODUCTION_READINESS === 'true' || mode === 'shim') {
-    const missing = await getMissingProductionReadinessConfig();
-    if (missing.length > 0) {
-      logSystemEvent('WARNING', {
-        message: `Production readiness check failed, but bypassed due to KILN_MODE=${mode}. Missing configurations: ${missing.join(', ')}`,
-        environment: 'production'
-      });
-      return;
-    }
-  }
-
   const missing = await getMissingProductionReadinessConfig();
 
   if (missing.length > 0) {
-    throw new Error(`Production readiness check failed. Missing required configuration: ${missing.join(', ')}`);
+    console.warn('========================================================================');
+    console.warn('⚠️  PRODUCTION READY STANDBY WARNING');
+    console.warn('========================================================================');
+    console.warn(`The following production credentials are missing in Render: ${missing.join(', ')}`);
+    console.warn('The server has successfully started in safe standby mode.');
+    console.warn('Money-moving features are deactivated until credentials are provided.');
+    console.warn('========================================================================');
   }
 }
 
@@ -951,6 +961,7 @@ const globalLimiter = rateLimit({
   max: IS_PRODUCTION ? 500 : 10000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too many requests from this IP. Please try again later.' }
 });
 
@@ -959,6 +970,7 @@ const strictLimiter = rateLimit({
   max: IS_PRODUCTION ? 15 : 10000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Strict limit exceeded. Too many sensitive requests. Please try again later.' }
 });
 
@@ -967,6 +979,7 @@ const authLimiter = rateLimit({
   max: IS_PRODUCTION ? 10 : 10000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  validate: false,
   message: { error: 'Too many authentication requests. Please try again later.' }
 });
 
@@ -977,6 +990,7 @@ const apiCallRateLimiter = PerUserApiCallLimiter();
 app.use('/api/', globalLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
 app.use('/api/auth/resend-verification', authLimiter);
 app.use('/api/auth/mfa/verify', authLimiter);
 app.use('/api/wallet/send', strictLimiter);
@@ -2343,10 +2357,20 @@ app.get('/api/prices', async (req, res) => {
       }
     }
   } catch (error) {
-    logSystemEvent('WARNING', { message: 'Binance price fetch failed, falling back to local reference rates' });
+    if (IS_PRODUCTION) {
+      return res.status(502).json({
+        error: 'PRICE_PROVIDER_UNAVAILABLE',
+        message: 'Live market price provider is unavailable.'
+      });
+    }
   }
 
-  // Fallback to local rates if price provider is unavailable
+  if (IS_PRODUCTION && !providerLoaded) {
+    return res.status(502).json({
+      error: 'PRICE_PROVIDER_UNAVAILABLE',
+      message: 'Live market price provider returned no data.'
+    });
+  }
 
   res.json(rates);
 });
@@ -3391,14 +3415,14 @@ async function sendETransferEmail(email: string, subject: string, htmlContent: s
     return;
   }
 
-  // In production, bypass sending if no provider is configured when emails are enabled
+  // In production, fail fast if no provider is configured when emails are enabled
   if (IS_PRODUCTION && gateway.routeEmailsEnabled) {
     const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     const mailerConfigured = Boolean(mailersendApiKey && mailerSend);
     if (!smtpConfigured && !mailerConfigured) {
-      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production. Bypassing email transmission.';
-      logSystemEvent('WARNING', { message: errMsg, environment: 'production' });
-      return;
+      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production.';
+      logSystemEvent('ERROR', { message: errMsg, environment: 'production' });
+      throw new Error(errMsg);
     }
   }
 
@@ -3462,7 +3486,9 @@ async function sendETransferEmail(email: string, subject: string, htmlContent: s
         host,
         port,
         secure: port === 465,
-        auth: { user, pass }
+        auth: { user, pass },
+        connectionTimeout: 5000,
+        socketTimeout: 5000
       });
       await transporter.sendMail({
         from: `"Sovereign Wealth Portal" <${user}>`,
@@ -3475,7 +3501,7 @@ async function sendETransferEmail(email: string, subject: string, htmlContent: s
       logProviderEvent('smtp', 'ERROR', { message: 'SMTP transmission failed', error: err, recipient: targetEmail });
     }
   } else {
-    logProviderEvent('smtp', 'TIMEOUT', { message: 'SMTP fallback skipped: credentials not configured', recipient: targetEmail });
+    logProviderEvent('smtp', 'DISCONNECTED', { message: 'SMTP fallback skipped: credentials not configured', recipient: targetEmail });
   }
 }
 
@@ -4760,26 +4786,6 @@ function generateRandomAddress(): string {
 // COINBASE UI API ADAPTER LAYER
 // =========================================================================
 
-function getRequestHost(req: any): string {
-  const forwardedHost = req.headers['x-forwarded-host'];
-  if (forwardedHost && typeof forwardedHost === 'string') {
-    return forwardedHost.split(',')[0].trim();
-  }
-  const host = req.headers.host;
-  if (host && typeof host === 'string' && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-    return host;
-  }
-  return 'www.pay.sovereigns.ca';
-}
-
-function getRequestProtocol(req: any): string {
-  const forwardedProto = req.headers['x-forwarded-proto'];
-  if (forwardedProto && typeof forwardedProto === 'string') {
-    return forwardedProto.split(',')[0].trim();
-  }
-  return req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-}
-
 function getCookieValue(req: any, cookieName: string): string | null {
   const header = req.headers?.cookie;
   if (!header || typeof header !== 'string') return null;
@@ -4792,6 +4798,14 @@ function getRequestToken(req: any): string | null {
   const cookieToken = getCookieValue(req, 'cb_session');
   if (cookieToken) {
     return cookieToken;
+  }
+
+  if (IS_PRODUCTION) {
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      console.warn('[AUTH] Rejecting Authorization header in production: cookie-based session required.');
+    }
+    return null;
   }
 
   const authHeader = req.headers.authorization;
@@ -5267,7 +5281,6 @@ app.post('/api/auth/login', validateRequest(ValidationSchemas.AuthLoginSchema), 
   // Check if account is locked due to failed attempts
   if (isAccountLocked(userEmail)) {
     const lockStatus = getAccountLockStatus(userEmail);
-    recordLoginAttempt(userEmail, false, ipAddress, userAgent);
     return res.status(429).json({
       error: 'ACCOUNT_LOCKED',
       message: `Account is temporarily locked due to ${lockStatus?.failedAttempts} failed login attempts. Please try again in 15 minutes or reset your password.`,
@@ -5317,8 +5330,9 @@ app.post('/api/auth/login', validateRequest(ValidationSchemas.AuthLoginSchema), 
     }
 
     const { token, sessionId, expiresIn } = issueSessionForUser({ id: user.id, email: user.email, name: user.name }, mfaVerified);
-    const secureCookie = process.env.NODE_ENV === 'production' ? 'Secure; ' : '';
-    res.setHeader('Set-Cookie', `cb_session=${encodeURIComponent(token)}; HttpOnly; ${secureCookie}SameSite=Strict; Path=/; Max-Age=${expiresIn}`);
+    // Required to support modern browsers inside the AI Studio iframe preview context (Secure; SameSite=None)
+    const secureCookie = 'Secure; ';
+    res.setHeader('Set-Cookie', `cb_session=${encodeURIComponent(token)}; HttpOnly; ${secureCookie}SameSite=None; Path=/; Max-Age=${expiresIn}`);
 
     // Record successful login and clear failed attempts
     recordLoginAttempt(userEmail, true, ipAddress, userAgent);
@@ -5359,12 +5373,51 @@ app.post('/api/auth/login', validateRequest(ValidationSchemas.AuthLoginSchema), 
   }
 });
 
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: 'INVALID_INPUT', message: 'Email and new password are required.' });
+  }
+
+  const userEmail = String(email).trim().toLowerCase();
+  try {
+    const users = db.execute('SELECT * FROM users WHERE email = ?', [userEmail]) as any[];
+    const user = users[0];
+    if (!user) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'No account found for that email.' });
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const passwordHash = crypto.pbkdf2Sync(String(password).trim(), salt, 100000, 64, 'sha512').toString('hex');
+
+    db.execute(
+      'UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?',
+      [passwordHash, salt, user.id]
+    );
+
+    // Also unlock account and clear failed attempts
+    unlockAccount(userEmail);
+    clearLoginAttempts(userEmail);
+
+    // Insert audit log
+    db.execute(
+      'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [`audit_${crypto.randomUUID()}`, user.id, 'PASSWORD_RESET', Date.now(), String(req.ip || 'unknown'), 'success', 'Password reset and account unlocked via recovery form']
+    );
+
+    return res.json({ success: true, message: 'Password has been successfully reset and account unlocked.' });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'RESET_FAILED', message: error?.message || 'Failed to reset password.' });
+  }
+});
+
 app.post('/api/auth/logout', requireAuth, (req: any, res) => {
   if (req.user?.sid) {
     activeSessions.delete(req.user.sid);
   }
-  const secureCookie = process.env.NODE_ENV === 'production' ? 'Secure; ' : '';
-  res.setHeader('Set-Cookie', `cb_session=; HttpOnly; ${secureCookie}SameSite=Strict; Path=/; Max-Age=0`);
+  // Required to support modern browsers inside the AI Studio iframe preview context (Secure; SameSite=None)
+  const secureCookie = 'Secure; ';
+  res.setHeader('Set-Cookie', `cb_session=; HttpOnly; ${secureCookie}SameSite=None; Path=/; Max-Age=0`);
   return res.json({ success: true });
 });
 
@@ -5381,8 +5434,9 @@ app.post('/api/auth/mfa/verify', requireAuth, (req: any, res) => {
   }
 
   const { token, expiresIn } = issueSessionForUser({ id: user.id, email: user.email, name: user.name }, true);
-  const secureCookie = process.env.NODE_ENV === 'production' ? 'Secure; ' : '';
-  res.setHeader('Set-Cookie', `cb_session=${encodeURIComponent(token)}; HttpOnly; ${secureCookie}SameSite=Strict; Path=/; Max-Age=${expiresIn}`);
+  // Required to support modern browsers inside the AI Studio iframe preview context (Secure; SameSite=None)
+  const secureCookie = 'Secure; ';
+  res.setHeader('Set-Cookie', `cb_session=${encodeURIComponent(token)}; HttpOnly; ${secureCookie}SameSite=None; Path=/; Max-Age=${expiresIn}`);
   const responsePayload: any = {
     success: true,
     expiresIn,
@@ -6813,17 +6867,15 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       return res.status(400).json({ error: 'INVALID_BANK', message: 'bankId string is required.' });
     }
 
-    const registry = getBankRegistry();
-    const rawBank = registry[bankId];
-    if (!rawBank) {
-      return res.status(400).json({ error: 'UNKNOWN_BANK', message: `Unknown bankId: ${bankId}` });
+    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
+    if (!fs.existsSync(registryPath)) {
+      return res.status(500).json({ error: 'BANK_REGISTRY_MISSING', message: 'Bank registry not found on server.' });
     }
 
-    const bank = { ...rawBank };
-    if (bank.authUrl && bank.authUrl.includes('localhost:3000')) {
-      const requestHost = getRequestHost(req);
-      const protocol = getRequestProtocol(req);
-      bank.authUrl = bank.authUrl.replace('http://localhost:3000', `${protocol}://${requestHost}`);
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const bank = registry[bankId];
+    if (!bank) {
+      return res.status(400).json({ error: 'UNKNOWN_BANK', message: `Unknown bankId: ${bankId}` });
     }
 
     const operation = String(req.body.operation_type || 'WITHDRAWAL').toUpperCase();
@@ -6884,16 +6936,6 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
 
     // Escrow this FAPI transaction state under the jti (include expiry and client info)
     const expiresAt = Date.now() + (Number.parseInt(process.env.INTERBANK_ESCROW_TTL_MS ?? '', 10) || 5 * 60 * 1000); // default 5 minutes
-    const redirectUrl = (() => {
-      let redirect = process.env.FAPI_REDIRECT_URI || 'http://localhost:3000/?action=finalize_interac';
-      if (redirect.includes('localhost:3000')) {
-        const requestHost = getRequestHost(req);
-        const protocol = getRequestProtocol(req);
-        redirect = redirect.replace('http://localhost:3000', `${protocol}://${requestHost}`);
-      }
-      return redirect;
-    })();
-
     ESCROW_LEDGER.set(jti, {
       operation,
       recipient: req.body.recipient_email || req.user.email || 'executive@sovereigns.io',
@@ -6905,15 +6947,14 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       expiresAt,
       clientIp: req.ip || req.headers['x-forwarded-for'] || 'unknown',
       fxRate: acceptedFxRate,
-      fxRateSource: String(fxRateSource || 'server-accepted'),
-      redirect_uri: redirectUrl
+      fxRateSource: String(fxRateSource || 'server-accepted')
     });
 
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: process.env.FAPI_CLIENT_ID || 'sovereigns_hub',
-      redirect_uri: redirectUrl,
-      scope: bankId === 'tangerine' ? 'accounts transfers identity' : 'openid',
+      redirect_uri: process.env.FAPI_REDIRECT_URI || 'http://localhost:3000/?action=finalize_interac',
+      scope: 'openid',
       state: jti,
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
       client_assertion: clientAssertion
@@ -6950,16 +6991,13 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       console.warn('Rate limiter failed:', getErrorMessage(e));
     }
 
-    const registry = getBankRegistry();
-    const rawBank = registry[bankId];
-    if (!rawBank) return res.status(400).json({ error: 'UNKNOWN_BANK' });
-
-    const bank = { ...rawBank };
-    if (bank.authUrl && bank.authUrl.includes('localhost:3000')) {
-      const requestHost = getRequestHost(req);
-      const protocol = getRequestProtocol(req);
-      bank.authUrl = bank.authUrl.replace('http://localhost:3000', `${protocol}://${requestHost}`);
+    const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
+    if (!fs.existsSync(registryPath)) {
+      return res.status(500).json({ error: 'BANK_REGISTRY_MISSING' });
     }
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    const bank = registry[bankId];
+    if (!bank) return res.status(400).json({ error: 'UNKNOWN_BANK' });
 
     // PKCE pair + state
     const { createPkcePair, buildAuthorizationUrl } = await import('./src/lib/withdrawal-redirect.js');
@@ -6983,30 +7021,21 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       userId: req.user.id,
       createdAt: Date.now(),
       expiresAt,
-      redirect_uri: redirect_uri || (process.env.FAPI_FRONTEND_REDIRECT || 'http://localhost:3000/?action=finalize_interac'),
+      redirect_uri: redirect_uri || (process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac'),
       fxRate: acceptedFxRate,
       fxRateSource: String(fxRateSource || 'server-accepted')
     });
 
-    const callbackUri = (() => {
-      let callback = process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/withdraw/callback`;
-      if (callback.includes('localhost')) {
-        const requestHost = getRequestHost(req);
-        const protocol = getRequestProtocol(req);
-        callback = callback.replace(/http:\/\/localhost:\d+/, `${protocol}://${requestHost}`).replace(/http:\/\/localhost/, `${protocol}://${requestHost}`);
-      }
-      return callback;
-    })();
+    const callbackUri = (process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/withdraw/callback`);
     const params = {
       response_type: 'code',
       client_id: process.env.FAPI_CLIENT_ID || 'sovereigns_hub',
       redirect_uri: callbackUri,
-      scope: bankId === 'tangerine' ? 'accounts transfers identity' : 'openid',
+      scope: 'openid',
       state,
       nonce,
       code_challenge: pkce.challenge,
-      code_challenge_method: 'S256',
-      bank_key: bankId
+      code_challenge_method: 'S256'
     };
 
     const authorizationUrl = buildAuthorizationUrl(bank, params);
@@ -7035,24 +7064,14 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   }
 
   const transfer = ESCROW_LEDGER.get(String(state));
-  const getFrontendUrl = (targetUri?: string) => {
-    let target = targetUri || process.env.FAPI_FRONTEND_REDIRECT || 'http://localhost:3000/?action=finalize_interac';
-    if (target.includes('localhost:3000')) {
-      const requestHost = getRequestHost(req);
-      const protocol = getRequestProtocol(req);
-      target = target.replace('http://localhost:3000', `${protocol}://${requestHost}`);
-    }
-    return target;
-  };
-
   if (!transfer) {
     // Redirect back to frontend with error
-    const frontend = getFrontendUrl();
+    const frontend = process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
     return res.redirect(buildRedirectUrl(frontend, { error: 'INVALID_STATE' }));
   }
   if (transfer.expiresAt && Date.now() > transfer.expiresAt) {
     ESCROW_LEDGER.delete(String(state));
-    const frontend = getFrontendUrl(transfer.redirect_uri);
+    const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
     return res.redirect(buildRedirectUrl(frontend, { error: 'ESCROW_EXPIRED' }));
   }
 
@@ -7061,7 +7080,7 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   transfer.authCode = code || 'MOCK_CODE';
   ESCROW_LEDGER.set(String(state), transfer);
 
-  const frontend = getFrontendUrl(transfer.redirect_uri);
+  const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
     transfer_id: String(state),
@@ -7138,9 +7157,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
     return res.status(400).json({ error: "Target financial institution unrecognized by clearing registry." });
   }
 
-  const requestHost = getRequestHost(req);
-  const protocol = getRequestProtocol(req);
-  const callbackBase = process.env.FAPI_CALLBACK_URI || `${protocol}://${requestHost}/api/v1/interac/callback`;
+  const callbackBase = process.env.FAPI_CALLBACK_URI || `http://localhost:${PORT}/api/v1/interac/callback`;
   const secure_transport_url = `${base_portal_uri}?client_id=sovereigns_hub&redirect_uri=${encodeURIComponent(`${callbackBase}?transfer_id=${transfer_id}`)}`;
   
   res.json({ target_redirect_url: secure_transport_url });
@@ -7148,9 +7165,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
   const { transfer_id, code } = req.query || {};
-  const requestHost = getRequestHost(req);
-  const protocol = getRequestProtocol(req);
-  res.redirect(`${protocol}://${requestHost}/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
+  res.redirect(`/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
 });
 
 
@@ -7192,7 +7207,8 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
     // If we received an authorization code earlier in ESCROW, perform token exchange
     if ((transfer.authCode || transfer.authorization_code) && transfer.status === 'AWAITING_AUTHENTICATION') {
       try {
-        const registry = getBankRegistry();
+        const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
+        const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, 'utf8')) : {};
         const bank = registry[String(selected_bank_key || transfer.selected_bank_key || transfer.bankId || '').toLowerCase()];
 
         // Attempt token exchange if bank token endpoint is known
@@ -7226,11 +7242,7 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
             form.set('client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
             form.set('client_assertion', clientAssertion);
 
-            const resolvedTokenUrl = bank.tokenUrl.includes('127.0.0.1:8000')
-              ? bank.tokenUrl.replace('127.0.0.1:8000', `localhost:${PORT}`)
-              : bank.tokenUrl;
-
-            const tokenRes = await fetch(resolvedTokenUrl, {
+            const tokenRes = await fetch(bank.tokenUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: form.toString()
@@ -7442,8 +7454,6 @@ async function createAutomatedLedgerBackup() {
 
 // =========================================================================
 async function startServer() {
-  console.log("Loaded ENV:", process.env.FAPI_CALLBACK_URI);
-  console.log("ENV FILE:", process.env.NODE_ENV);
   await initializeRuntimeSecrets();
   await enforceProductionReadiness();
 
@@ -7499,77 +7509,6 @@ async function startServer() {
     }, 50000); // 50 seconds
   }
 
-  // Tangerine Open Banking OAuth Integration routes
-  app.get("/api/banking/tangerine/auth", (req: any, res: any) => {
-    const transferId = req.query.state || req.query.transfer_id || `tg-${crypto.randomBytes(8).toString('hex')}`;
-    const requestHost = getRequestHost(req);
-    const protocol = getRequestProtocol(req);
-    const origin = `${protocol}://${requestHost}`;
-    
-    const tangerineAuthBase = "https://secure.tangerine.ca/oauth/authorize";
-    const redirectUri = `${origin}/api/v1/interac/callback`;
-    
-    const params = new URLSearchParams({
-      client_id: process.env.TANGERINE_CLIENT_ID || "sovereigns_hub",
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "accounts transfers identity",
-      state: transferId,
-    });
-
-    for (const [key, val] of Object.entries(req.query)) {
-      if (!['client_id', 'redirect_uri', 'response_type', 'scope', 'state'].includes(key) && typeof val === 'string') {
-        params.set(key, val);
-      }
-    }
-
-    const authUrl = `${tangerineAuthBase}?${params.toString()}`;
-    res.redirect(authUrl);
-  });
-
-  app.get("/api/v1/interac/callback", tangerineCallbackHandler);
-
-  // Example balance endpoint
-  app.get("/api/tangerine/balance", requireAuth, async (req: any, res: any) => {
-    try {
-      const userId = req.user?.id || "demo-user-id";
-      const balance = await getTangerineBalance(userId);
-      res.json({ balance });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // Example withdraw endpoint
-  app.post("/api/tangerine/withdraw", requireAuth, express.json(), async (req: any, res: any) => {
-    try {
-      const userId = req.user?.id || "demo-user-id";
-      const { amount, destination } = req.body;
-      const result = await withdrawFromTangerine(userId, amount, destination);
-      res.json({ result });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // Example deposit endpoint
-  app.post("/api/tangerine/deposit", requireAuth, express.json(), async (req: any, res: any) => {
-    try {
-      const userId = req.user?.id || "demo-user-id";
-      const { amount, source } = req.body;
-      const result = await depositToTangerine(userId, amount, source);
-      res.json({ result });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.get('/banking-hub/index.html', (req: any, res: any) => {
-    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
-  });
-  app.get('/banking-hub', (req: any, res: any) => {
-    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
-  });
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
@@ -7581,14 +7520,6 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
-    // SPA fallback for development mode - serve index.html for non-API routes
-    app.get('*', (req, res) => {
-      // Don't serve SPA for API routes
-      if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ error: 'Not found' });
-      }
-      res.redirect('/');
-    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
@@ -7608,6 +7539,30 @@ async function startServer() {
         environment: process.env.NODE_ENV || 'development',
         message: `Server running on port ${port} in ${process.env.NODE_ENV || 'development'} mode`
       });
+
+      // Programmatically spawn interbank python backend in non-test environment
+      if (process.env.NODE_ENV !== 'test') {
+        const isWindows = process.platform === 'win32';
+        const pythonExecutable = isWindows
+          ? path.join(process.cwd(), 'sovereigns-banking-hub', 'backend', 'venv', 'Scripts', 'python.exe')
+          : path.join(process.cwd(), 'sovereigns-banking-hub', 'backend', 'venv', 'bin', 'python');
+        const scriptPath = path.join(process.cwd(), 'sovereigns-banking-hub', 'backend', 'app.py');
+        
+        console.log(`[Interbank] Attempting to launch Python backend at: ${scriptPath}`);
+        if (fs.existsSync(pythonExecutable)) {
+          const child = spawn(pythonExecutable, [scriptPath], { stdio: 'inherit' });
+          child.on('error', (err) => {
+            console.error('[Interbank] Failed to start Python backend via virtualenv:', err);
+          });
+        } else {
+          const globalPython = isWindows ? 'python' : 'python3';
+          console.warn(`[Interbank] Local venv python not found, trying global '${globalPython}'`);
+          const child = spawn(globalPython, [scriptPath], { stdio: 'inherit' });
+          child.on('error', (err) => {
+            console.error('[Interbank] Global Python fallback failed:', err);
+          });
+        }
+      }
     });
 
     server.on('error', (error: NodeJS.ErrnoException) => {

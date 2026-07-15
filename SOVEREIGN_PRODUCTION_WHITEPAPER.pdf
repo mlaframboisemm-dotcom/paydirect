@@ -1,5 +1,5 @@
 %PDF-1.3
-%ºß¬à
+%ï¿½ß¬ï¿½
 3 0 obj
 <</Type /Page
 /Parent 1 0 R
@@ -97,13 +97,13 @@ BT
 (To guarantee institutional-grade privacy, the terminal implements a Multi-Tenant) Tj
 T* (Relational Schema with strict cryptographic boundaries. User signups are fully) Tj
 T* (sandboxed:) Tj
-T* (• User Credentials: Passwords are salted and hashed using cryptographically secure) Tj
+T* (ï¿½ User Credentials: Passwords are salted and hashed using cryptographically secure) Tj
 T* (algorithms. Session JSON Web Tokens \(JWT\) are tied to a unique browser cookie) Tj
 T* (with security guards.) Tj
-T* (• Isolated Wallets: Each registered profile possesses isolated, dynamically) Tj
+T* (ï¿½ Isolated Wallets: Each registered profile possesses isolated, dynamically) Tj
 T* (generated wallet addresses for multiple assets \(USD, USDC, ETH, etc.\). Cross-tenant) Tj
 T* (address lookups are strictly prohibited under the ledger schema.) Tj
-T* (• Tenant Audit Trail: Every login, transfer, swap, or voucher claiming event is) Tj
+T* (ï¿½ Tenant Audit Trail: Every login, transfer, swap, or voucher claiming event is) Tj
 T* (recorded in user-scoped logs, which are encrypted using your master signing key,) Tj
 T* (preventing administrative privilege escalation.) Tj
 ET
@@ -126,9 +126,9 @@ BT
 56.6929133858267775 291.9687401574802834 Td
 (Operational transparency is maintained through a dual-channel messaging pipeline) Tj
 T* (\(Nodemailer SMTP & MailerSend API\):) Tj
-T* (• Real-time Transfer Alerts: Instant notifications are dispatched to your registered) Tj
+T* (ï¿½ Real-time Transfer Alerts: Instant notifications are dispatched to your registered) Tj
 T* (address upon deposit, swap, withdrawal, or claim events.) Tj
-T* (• Verification Codes: Multi-factor authentication \(MFA\) challenges generate) Tj
+T* (ï¿½ Verification Codes: Multi-factor authentication \(MFA\) challenges generate) Tj
 T* (temporary secure passcodes, requiring explicit verification before executing any) Tj
 T* (high-value ledger updates.) Tj
 ET
@@ -238,11 +238,11 @@ BT
 56.6929133858267775 405.3545669291337958 Td
 (To achieve frictionless, fire-and-forget reliability, the terminal integrates two) Tj
 T* (automated background daemons:) Tj
-T* (• Watchdog Reconciliation Loop: Runs asynchronously in the background. It) Tj
+T* (ï¿½ Watchdog Reconciliation Loop: Runs asynchronously in the background. It) Tj
 T* (continuously monitors the on-chain consensus state against the local database. If) Tj
 T* (any database balance drift or entry mismatch is detected, it automatically triggers a) Tj
 T* (Global Re-index, healing the drift instantly.) Tj
-T* (• Intelligent Rail Selection \(Dynamic Failover\): If the primary Coinbase API) Tj
+T* (ï¿½ Intelligent Rail Selection \(Dynamic Failover\): If the primary Coinbase API) Tj
 T* (experiences connection drops or latency spikes, the routing engine automatically) Tj
 T* (redirects execution to the secondary Kraken OTC rail.) Tj
 ET
@@ -319,9 +319,9 @@ BT
 0.067 0.094 0.153 rg
 56.6929133858267775 660.4726771653542983 Td
 (The pinnacle of the terminal's operational security is the hardware proximity gate:) Tj
-T* (• Hardware Handshake: The CriticalOperationEnforcer integrates with your Tesla) Tj
+T* (ï¿½ Hardware Handshake: The CriticalOperationEnforcer integrates with your Tesla) Tj
 T* (TSL-3 hardware unit on the 8GHz Ultra-Wideband \(UWB\) frequency.) Tj
-T* (• Proximity Authority: Physical proximity to the terminal acts as your cryptographic) Tj
+T* (ï¿½ Proximity Authority: Physical proximity to the terminal acts as your cryptographic) Tj
 T* (signature. When UWB presence is active, manual MFA/password inputs are) Tj
 T* (bypassed \(Zero-Touch Auth\). If the terminal is physically moved away or the UWB) Tj
 T* (signal drops, the system fails closed instantly, blocking all execution.) Tj

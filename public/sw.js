@@ -1,20 +1,17 @@
-const CACHE_NAME = 'sovereign-wealth-cache-v1';
+const CACHE_NAME = 'sovereign-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/src/main.tsx',
+  '/src/index.css',
   '/manifest.json',
-  '/icon.svg',
-  '/main.js',
-  '/main.tsx',
-  '/index.css'
+  '/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('[PWA Service Worker] Cache addAll skipped during install (some files may load dynamically):', err);
-      });
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
   self.skipWaiting();
@@ -22,11 +19,11 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
           }
         })
       );
@@ -35,48 +32,27 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Securely logging API requests and response status codes
-function logSecureApiFlow(request, response, error = null) {
-  const url = new URL(request.url);
-  // Only log API routes to follow transaction and auth flows
-  if (!url.pathname.startsWith('/api/')) return;
-
-  // Sanitize URL query parameters to avoid logging tokens or authorization codes
-  const sanitizedUrl = url.origin + url.pathname + (url.search ? '?***' : '');
-  const method = request.method;
-
-  if (error) {
-    console.error(`[PWA Audit Logger] [BREAK DETECTED] Path: ${method} ${sanitizedUrl} - Error: ${error.message || error}`);
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
     return;
   }
-
-  const status = response ? response.status : 'unknown';
-  if (response && !response.ok) {
-    console.warn(`[PWA Audit Logger] [BREAK DETECTED] Path: ${method} ${sanitizedUrl} - Status: ${status}`);
-  } else {
-    console.log(`[PWA Audit Logger] [FLOW OK] Path: ${method} ${sanitizedUrl} - Status: ${status}`);
-  }
-}
-
-self.addEventListener('fetch', (event) => {
-  // Only apply custom fetch logger / cache fallback, ignore chrome-extension URLs
-  if (event.request.url.startsWith('chrome-extension://')) return;
-
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        logSecureApiFlow(event.request, response);
-        return response;
-      })
-      .catch((err) => {
-        logSecureApiFlow(event.request, null, err);
-        // Fallback to cache for static resources if network fails
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          throw err;
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
         });
-      })
+        return response;
+      }).catch(() => {
+        // Fallback for offline if necessary
+      });
+    })
   );
 });

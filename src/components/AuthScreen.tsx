@@ -39,6 +39,7 @@ export default function AuthScreen({
   onTriggerEmail
 }: AuthScreenProps) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -56,6 +57,34 @@ export default function AuthScreen({
     e.preventDefault();
     if (!email || !password) {
       showToast('Please fill out all credentials.', 'error');
+      return;
+    }
+
+    if (isResetPassword) {
+      setIsLoading(true);
+      setLoadingStep('Authorizing password reset and clearing security lockouts...');
+      try {
+        const response = await fetch(buildApiUrl('/api/auth/reset-password'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          showToast(result?.message || result?.error || 'Password reset failed.', 'error');
+          return;
+        }
+
+        showToast('Password successfully reset and account lockout has been cleared! You can now sign in.', 'success');
+        setIsResetPassword(false);
+        setPassword('');
+      } catch (err: any) {
+        showToast(err?.message || 'Password reset failed.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -174,9 +203,11 @@ export default function AuthScreen({
           </div>
           <h2 className="text-2xl font-black text-[#0052FF] tracking-tight">coinbase</h2>
           <p className="text-xs text-gray-500 font-medium max-w-xs">
-            {isSignUp 
-              ? 'Create your ultra-secure Coinbase financial vault and isolate your portfolio assets' 
-              : 'Sign in to access your on-chain assets, developer connect credentials, and bank pipelines'}
+            {isResetPassword
+              ? 'Reset your secure password and clear any active login lockout restrictions'
+              : isSignUp 
+                ? 'Create your ultra-secure Coinbase financial vault and isolate your portfolio assets' 
+                : 'Sign in to access your on-chain assets, developer connect credentials, and bank pipelines'}
           </p>
         </div>
 
@@ -237,7 +268,9 @@ export default function AuthScreen({
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Secure Password</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                {isResetPassword ? 'New Secure Password' : 'Secure Password'}
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                 <input
@@ -258,7 +291,7 @@ export default function AuthScreen({
               </div>
             </div>
 
-            {!isSignUp && (
+            {!isSignUp && !isResetPassword && (
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">MFA Code (If Enabled)</label>
                 <input
@@ -328,7 +361,7 @@ export default function AuthScreen({
               disabled={isSignUp && !agreedToTerms}
               className="w-full py-3.5 bg-[#0052FF] hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer flex items-center justify-center space-x-1"
             >
-              <span>{isSignUp ? 'Verify & Create Coinbase Vault' : 'Secure Account Sign In'}</span>
+              <span>{isResetPassword ? 'Reset Password & Unlock Account' : isSignUp ? 'Verify & Create Coinbase Vault' : 'Secure Account Sign In'}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>
@@ -336,16 +369,41 @@ export default function AuthScreen({
 
         {/* Auth Mode Toggle */}
         <div className="mt-6 border-t border-gray-100 pt-4 flex flex-col space-y-3.5 text-center">
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setLocalStateAndErrors();
-            }}
-            className="text-xs font-bold text-[#0052FF] hover:underline cursor-pointer"
-          >
-            {isSignUp ? 'Already have a secure vault? Sign In' : 'Need an isolated financial account? Sign Up'}
-          </button>
+          {isResetPassword ? (
+            <button
+              onClick={() => {
+                setIsResetPassword(false);
+                setLocalStateAndErrors();
+              }}
+              className="text-xs font-bold text-[#0052FF] hover:underline cursor-pointer"
+            >
+              Remember your password? Sign In
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setLocalStateAndErrors();
+                }}
+                className="text-xs font-bold text-[#0052FF] hover:underline cursor-pointer"
+              >
+                {isSignUp ? 'Already have a secure vault? Sign In' : 'Need an isolated financial account? Sign Up'}
+              </button>
 
+              {!isSignUp && (
+                <button
+                  onClick={() => {
+                    setIsResetPassword(true);
+                    setLocalStateAndErrors();
+                  }}
+                  className="text-xs font-medium text-gray-500 hover:text-[#0052FF] hover:underline cursor-pointer"
+                >
+                  Forgot Password or Account Locked? Reset & Unlock
+                </button>
+              )}
+            </>
+          )}
         </div>
 
       </div>

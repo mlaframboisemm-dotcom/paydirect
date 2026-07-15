@@ -25,9 +25,9 @@
     "tokenUrl": "http://127.0.0.1:8000/api/v1/interac/finalize"
   },
   "tangerine": {
-    "issuer": "https://secure.tangerine.ca",
-    "authUrl": "http://localhost:3000/api/banking/tangerine/auth",
-    "tokenUrl": "https://secure.tangerine.ca/oauth/token"
+    "issuer": "https://fapi.tangerine.ca",
+    "authUrl": "http://localhost:3000/banking-hub/index.html",
+    "tokenUrl": "http://127.0.0.1:8000/api/v1/interac/finalize"
   },
   "desjardins": {
     "issuer": "https://fapi.desjardins.com",

@@ -1,6 +1,4 @@
 import assert from 'assert';
-import fs from 'fs';
-import path from 'path';
 import { validateProductionSecrets, validateLiveOperationConfig } from '../src/lib/production-config.js';
 
 function run() {
@@ -50,13 +48,6 @@ function run() {
     MARSHALL_WALLET_PRIVATE_KEY: 'c'.repeat(64)
   }, 'wallet');
   assert.equal(walletOk.ok, true);
-
-  const workspaceSecretFiles = [
-    path.join(process.cwd(), 'sovereign_encryption_key.txt'),
-    path.join(process.cwd(), 'jwt_secret.txt')
-  ];
-  const workspaceSecretFilesExist = workspaceSecretFiles.every((filePath) => fs.existsSync(filePath));
-  assert.equal(workspaceSecretFilesExist, true, 'expected workspace secret files to be present for runtime bootstrap');
 
   console.log('production secret validation tests passed');
 }

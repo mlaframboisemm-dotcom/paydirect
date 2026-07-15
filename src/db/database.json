@@ -474,22 +474,6 @@
       "kycTaxId": "",
       "kycPhone": "",
       "kycVerifiedAt": ""
-    },
-    {
-      "id": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
-      "name": "Live Test",
-      "email": "e2e-1783967932744@example.com",
-      "passwordHash": "87e5096623ff8bde8eae039f023318bac1f67f71169df74a96482fc7bcded3b43ffea0ce5a0ffa2947e282ac41c93be16e70552462de5a03f6b58d10cc0f87c0",
-      "salt": "a421b7183b601148976b91d7608a2f94",
-      "twoFactorSecret": "F5LQDPAWAXZHLFMCSCE3ZIEK",
-      "twoFactorEnabled": false,
-      "kycLevel": 1,
-      "citizenship": "US",
-      "identityLocked": true,
-      "productionMode": "live",
-      "blockchainLinked": true,
-      "lockedToEmail": "e2e-1783967932744@example.com",
-      "lockedAt": "2026-07-13T18:38:53.267Z"
     }
   ],
   "wallets": [
@@ -518,32 +502,6 @@
       "blockchainLinked": true,
       "lockedToEmail": "",
       "lockedAt": "2026-07-11T06:30:18.350Z"
-    },
-    {
-      "id": "wallet_eth_sub1",
-      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
-      "assetSymbol": "ETH",
-      "balance": 0,
-      "publicAddressEthereum": "0x1d43d0Ca9bc9F7c1E3f50FB7e313f2bDf4505cEc",
-      "publicAddressBitcoin": "",
-      "identityLocked": false,
-      "productionMode": "live",
-      "blockchainLinked": true,
-      "lockedToEmail": "",
-      "lockedAt": "2026-07-12T14:27:00.000Z"
-    },
-    {
-      "id": "wallet_eth_sub2",
-      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
-      "assetSymbol": "ETH",
-      "balance": 0,
-      "publicAddressEthereum": "0x4EF712ebCcB9cc5c40E83f5212AeD028Ed4210B2",
-      "publicAddressBitcoin": "",
-      "identityLocked": false,
-      "productionMode": "live",
-      "blockchainLinked": true,
-      "lockedToEmail": "",
-      "lockedAt": "2026-07-12T14:27:00.000Z"
     },
     {
       "id": "wallet-user_0a9ad97e-eca7-49e3-9d66-75fae1820086-usd",
@@ -752,19 +710,6 @@
       "blockchainLinked": true,
       "lockedToEmail": "e2e-1783825648997@example.com",
       "lockedAt": "2026-07-12T03:07:29.459Z"
-    },
-    {
-      "id": "wallet-user_d7558da7-a8de-43e9-a92a-4f095ada88bc-usd",
-      "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
-      "assetSymbol": "USD",
-      "balance": 0,
-      "publicAddressEthereum": "",
-      "publicAddressBitcoin": "",
-      "identityLocked": true,
-      "productionMode": "live",
-      "blockchainLinked": true,
-      "lockedToEmail": "e2e-1783967932744@example.com",
-      "lockedAt": "2026-07-13T18:38:54.493Z"
     }
   ],
   "transactions": [
@@ -2243,83 +2188,65 @@
       "details": "Login successful with MFA verification"
     },
     {
-      "id": "audit_aeeb7919-a8ee-4d5c-8ad8-d42ceb9d5cfb",
+      "id": "audit_b2cd00f4-85f9-4bbd-a5fa-0377a8f04ca0",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
-      "timestamp": 1783838614024,
+      "timestamp": 1783871255117,
       "ipAddress": "127.0.0.1",
       "status": "failure",
       "details": "Password verification failed"
     },
     {
-      "id": "audit_05eefc13-306f-4777-8720-946bbc6329d7",
+      "id": "audit_a78d2845-f2eb-434a-a326-2b06dc744f18",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1783844253532,
+      "timestamp": 1783871262244,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
     },
     {
-      "id": "audit_92191ec9-53f0-4a83-81f5-49c0c6d4b7eb",
+      "id": "audit_a26c9ffa-97fb-4a43-baae-5818cc0d0e14",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
-      "timestamp": 1783844253548,
+      "timestamp": 1783871262246,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
     },
     {
-      "id": "audit_0f7338e3-3220-4049-91f3-a688b4b77701",
+      "id": "audit_298c85a4-fd60-4ae0-bd79-fbe5fd697d0e",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1783859253851,
+      "timestamp": 1783871872991,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
     },
     {
-      "id": "audit_aa4cecf1-a158-4721-8af1-42db26519c98",
+      "id": "audit_2d5f5500-5ac3-4353-ac24-6693a777a7e5",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
-      "timestamp": 1783859253857,
-      "ipAddress": "127.0.0.1",
+      "timestamp": 1783871872994,
+      "ipAddress": "169.254.169.126",
       "status": "success",
       "details": "Login successful with MFA verification"
     },
     {
-      "id": "audit_2ccca6bf-9901-44c0-ad11-f479c52b7f5c",
-      "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
+      "id": "audit_e8779e6d-0637-46c2-a47e-f8f6203503a6",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1783967934069,
+      "timestamp": 1783912651609,
       "ipAddress": "system",
       "status": "success",
-      "details": "Account identity locked for e2e-1783967932744@example.com in live production mode."
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
     },
     {
-      "id": "audit_45ae5332-b833-42de-bc15-b21e3234a2d4",
-      "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
-      "action": "REGISTER",
-      "timestamp": 1783967934940,
-      "ipAddress": "127.0.0.1",
-      "status": "success",
-      "details": "Self-service registration completed for e2e-1783967932744@example.com"
-    },
-    {
-      "id": "audit_52c920d4-c1fd-46fd-ac16-a41007cf776d",
-      "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
-      "action": "IDENTITY_LOCKED",
-      "timestamp": 1783967936742,
-      "ipAddress": "system",
-      "status": "success",
-      "details": "Account identity locked for e2e-1783967932744@example.com in live production mode."
-    },
-    {
-      "id": "audit_86ed6fd8-0821-46af-83bd-e65839e2026b",
-      "userId": "user_d7558da7-a8de-43e9-a92a-4f095ada88bc",
+      "id": "audit_506aadc3-c6ec-4dc6-8f5b-c1c00523212f",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
-      "timestamp": 1783967937052,
-      "ipAddress": "127.0.0.1",
+      "timestamp": 1783912651612,
+      "ipAddress": "169.254.169.126",
       "status": "success",
       "details": "Login successful with MFA verification"
     }
