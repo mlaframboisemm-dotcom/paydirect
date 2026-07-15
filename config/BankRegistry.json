@@ -26,7 +26,7 @@
   },
   "tangerine": {
     "issuer": "https://secure.tangerine.ca",
-    "authUrl": "https://secure.tangerine.ca/oauth/authorize",
+    "authUrl": "http://localhost:3000/api/banking/tangerine/auth",
     "tokenUrl": "https://secure.tangerine.ca/oauth/token"
   },
   "desjardins": {

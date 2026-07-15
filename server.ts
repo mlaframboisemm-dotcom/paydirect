@@ -7470,6 +7470,33 @@ async function startServer() {
   }
 
   // Tangerine Open Banking OAuth Integration routes
+  app.get("/api/banking/tangerine/auth", (req: any, res: any) => {
+    const transferId = req.query.state || req.query.transfer_id || `tg-${crypto.randomBytes(8).toString('hex')}`;
+    const requestHost = req.headers.host || 'www.pay.sovereigns.ca';
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const origin = `${protocol}://${requestHost}`;
+    
+    const tangerineAuthBase = "https://secure.tangerine.ca/oauth/authorize";
+    const redirectUri = `${origin}/api/v1/interac/callback`;
+    
+    const params = new URLSearchParams({
+      client_id: process.env.TANGERINE_CLIENT_ID || "sovereigns_hub",
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "accounts transfers identity",
+      state: transferId,
+    });
+
+    for (const [key, val] of Object.entries(req.query)) {
+      if (!['client_id', 'redirect_uri', 'response_type', 'scope', 'state'].includes(key) && typeof val === 'string') {
+        params.set(key, val);
+      }
+    }
+
+    const authUrl = `${tangerineAuthBase}?${params.toString()}`;
+    res.redirect(authUrl);
+  });
+
   app.get("/api/v1/interac/callback", tangerineCallbackHandler);
 
   // Example balance endpoint
