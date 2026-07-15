@@ -4,7 +4,7 @@ import json
 import sqlite3
 import asyncio
 from datetime import datetime, timezone
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from typing import Dict, Any
@@ -33,7 +33,7 @@ CANADIAN_INTERBANK_DIRECTORY = {
     "Scotiabank": "https://scotiabank.com",
     "BMO": "https://bmo.com",
     "CIBC": "https://cibc.com",
-    "Tangerine": "https://tangerine.ca",
+    "Tangerine": "https://www.tangerine.ca/app/#/transfer-in/type-of-account?locale=en_CA",
     "Desjardins": "https://desjardins.com",
     "NationalBank": "https://nbc.ca",
     "Simplii": "https://simplii.com",
@@ -92,28 +92,45 @@ async def initiate_branded_transaction_session(payload: TransactionManifestSchem
 
 
 @app.get("/api/v1/interac/oauth-url/{bank_key}")
-async def compile_bank_oauth_redirect_uri(bank_key: str, transfer_id: str):
+async def compile_bank_oauth_redirect_uri(bank_key: str, transfer_id: str, request: Request):
     """
     Step 2: Secure URL Redirection Compiler.
     Resolves chosen bank identities and appends session payload query arrays.
     """
-    base_portal_uri = CANADIAN_INTERBANK_DIRECTORY.get(bank_key)
-    if not base_portal_uri:
+    matched_key = None
+    for key in CANADIAN_INTERBANK_DIRECTORY.keys():
+        if key.lower() == bank_key.lower():
+            matched_key = key
+            break
+            
+    if not matched_key:
         raise HTTPException(status_code=400, detail="Target financial institution unrecognized by clearing registry.")
         
-    # Standard format to maintain system tracking states over external redirection loops
-    secure_transport_url = f"{base_portal_uri}?client_id=sovereigns_hub&redirect_uri=http://127.0.0.1:8000/api/v1/interac/callback?transfer_id={transfer_id}"
+    host = request.headers.get("host", "localhost:3000")
+    protocol = "https" if request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https" else "http"
+    if ":8000" in host:
+        host = host.replace(":8000", ":3000")
+        
+    request_origin = f"{protocol}://{host}"
+    base_portal_uri = f"{request_origin}/banking-hub/mock-login.html"
+    callback_base = f"{request_origin}/api/v1/interac/callback"
+    
+    secure_transport_url = f"{base_portal_uri}?client_id=sovereigns_hub&redirect_uri={callback_base}?transfer_id={transfer_id}&bank_key={matched_key}&state={transfer_id}"
     return {"target_redirect_url": secure_transport_url}
 
 
 @app.get("/api/v1/interac/callback")
-async def interac_oauth_callback(transfer_id: str, code: str = "MOCK_OAUTH_CODE"):
+async def interac_oauth_callback(transfer_id: str, request: Request, code: str = "MOCK_OAUTH_CODE"):
     """
     Step 2.5: OAuth callback receiver.
     Receives authentication token from bank portal redirect and redirects user back to front-end app.
     """
     from fastapi.responses import RedirectResponse
-    redirect_url = f"http://localhost:3000/?action=finalize_interac&transfer_id={transfer_id}&code={code}"
+    host = request.headers.get("host", "localhost:3000")
+    protocol = "https" if request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https" else "http"
+    if ":8000" in host:
+        host = host.replace(":8000", ":3000")
+    redirect_url = f"{protocol}://{host}/?action=finalize_interac&transfer_id={transfer_id}&code={code}"
     return RedirectResponse(url=redirect_url)
 
 

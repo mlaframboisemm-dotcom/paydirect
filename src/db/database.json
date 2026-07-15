@@ -140,15 +140,15 @@
       "blockchainLinked": true,
       "lockedToEmail": "whenwerisee@gmail.com",
       "lockedAt": "2026-07-05T18:14:53.494Z",
-      "kycFullName": "Jane Doe",
-      "kycAddress": "120 Pine Street",
-      "kycCity": "San Francisco",
+      "kycFullName": "marcel laframbosie",
+      "kycAddress": "475 albert st",
+      "kycCity": "oshawa",
       "kycState": "",
       "kycProvince": "ON",
-      "kycPostalCode": "94111",
-      "kycTaxId": "9812",
-      "kycPhone": "(555) 302-8391",
-      "kycVerifiedAt": "2026-07-12T04:44:01.416Z"
+      "kycPostalCode": "l1h4s7",
+      "kycTaxId": "0512",
+      "kycPhone": "9057184275",
+      "kycVerifiedAt": "2026-07-15T23:48:11.896Z"
     },
     {
       "id": "user_755f11ee-89ea-47bb-bf2d-828556754217",
@@ -474,6 +474,31 @@
       "kycTaxId": "",
       "kycPhone": "",
       "kycVerifiedAt": ""
+    },
+    {
+      "id": "user_mlaframboisemm",
+      "name": "Marcel Laframboise",
+      "email": "mlaframboisemm@gmail.com",
+      "passwordHash": "demo-hash",
+      "salt": "demo-salt",
+      "twoFactorSecret": "TQTK5ZLEH47PLUU6TQQMU2YN",
+      "twoFactorEnabled": false,
+      "kycLevel": 1,
+      "citizenship": "CA",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-15T23:51:48.117Z",
+      "kycFullName": "",
+      "kycAddress": "",
+      "kycCity": "",
+      "kycState": "",
+      "kycProvince": "",
+      "kycPostalCode": "",
+      "kycTaxId": "",
+      "kycPhone": "",
+      "kycVerifiedAt": ""
     }
   ],
   "wallets": [
@@ -710,6 +735,19 @@
       "blockchainLinked": true,
       "lockedToEmail": "e2e-1783825648997@example.com",
       "lockedAt": "2026-07-12T03:07:29.459Z"
+    },
+    {
+      "id": "wallet-user_mlaframboisemm-usd",
+      "userId": "user_mlaframboisemm",
+      "assetSymbol": "USD",
+      "balance": 1791272.8199999998,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-15T23:51:48.118Z"
     }
   ],
   "transactions": [
@@ -2246,6 +2284,186 @@
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "action": "LOGIN",
       "timestamp": 1783912651612,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_a5219b61-a15f-4505-ab88-da94d69a6d35",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784153845276,
+      "ipAddress": "169.254.169.126",
+      "status": "failure",
+      "details": "Password verification failed"
+    },
+    {
+      "id": "audit_faf3cc2e-03f5-4afa-9f59-ac318a765b45",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784153853353,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_0a524a9a-b11b-4d26-a8a0-90fbb99114f9",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784153853354,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_707a9ea8-b0b9-463c-b2e3-83425368f1b3",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784154369934,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_d09814d6-9d05-410b-9bfb-cd27ab6f8a23",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784154369936,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_053aae6f-d85c-4b99-a893-3a42eef115c1",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784155740926,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_d51dbfab-118d-4c66-97e4-ef71062db7ca",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784155740929,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_42143b18-4a2a-4594-be4e-ced4688441fc",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784156077430,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_429f8c44-0367-4ae7-a736-fa92410c5af8",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784156077432,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_a3c507db-159c-4ec4-81eb-e4bab1a14054",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784156594733,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_f730bf25-e481-4ef1-af0f-55b318ca671f",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784156594736,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_880aed04-212c-4c80-9886-9b3b87565ef7",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784157003314,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_87f6e0b8-acc2-431c-b331-5d7d71902a69",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784157003317,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_67f35f9d-c6d8-4b43-a402-ad362557d9dc",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784158291972,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_5445d74d-478d-46a6-8da9-aac4d7b3e11b",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784158291975,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_a6cb59ac-10ee-44a2-860f-b3697a4942dc",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784159111755,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for whenwerisee@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_5cbbb45f-d85e-442e-86de-9217fcef3227",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "LOGIN",
+      "timestamp": 1784159111756,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_b253d006-17d0-43b8-8bc5-1b0dbdeff66b",
+      "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
+      "action": "KYC_UPDATE",
+      "timestamp": 1784159291897,
+      "ipAddress": "169.254.169.126",
+      "status": "success",
+      "details": "KYC Level 3 information saved"
+    },
+    {
+      "id": "audit_0792ebf1-b754-4a73-b2ab-f509edf2b299",
+      "userId": "user_mlaframboisemm",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784159600305,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_372e2961-30c4-4019-8400-57f328191c0a",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1784159600308,
       "ipAddress": "169.254.169.126",
       "status": "success",
       "details": "Login successful with MFA verification"

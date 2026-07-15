@@ -19,9 +19,6 @@ const configuredApiBase = String(
 function buildApiUrl(path: string): string {
   const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
   const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
-  if (configuredApiBase) {
-    return new URL(normalized, configuredApiBase).toString();
-  }
   if (typeof window !== 'undefined') {
     if (window.location.protocol === 'file:') {
       return `http://localhost:3000${normalized}`;
@@ -29,6 +26,9 @@ function buildApiUrl(path: string): string {
     if (window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}${normalized}`;
     }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
   }
   return normalized;
 }
@@ -42,8 +42,8 @@ export default function AuthScreen({
   const [isResetPassword, setIsResetPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('mlaframboisemm@gmail.com');
+  const [password, setPassword] = useState('Password123456!');
   const [mfaCode, setMfaCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [region, setRegion] = useState<'US' | 'CA'>('US');

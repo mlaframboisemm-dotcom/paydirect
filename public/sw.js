@@ -50,6 +50,9 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, responseToCache);
         });
         return response;
+      }).catch((err) => {
+        // Propagate the network error so the browser knows it's a real failure
+        throw err;
       });
     })
   );

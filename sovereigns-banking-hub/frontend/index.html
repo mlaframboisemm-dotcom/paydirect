@@ -854,6 +854,74 @@
                     <button class="webview-button" onclick="submitWebviewMFA()">Confirm Identity & Liquidate</button>
                 </div>
 
+                <!-- Tangerine Login Step -->
+                <div id="webview-step-tangerine-login" style="display: none;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <h3 style="color: #ff6600; font-size: 20px; font-weight: 700; margin: 10px 0 4px 0; font-family: var(--font-display);">Sign In</h3>
+                        <p style="font-size: 13px; color: #9ca3af; margin: 0;">Enter your Username or Card Number</p>
+                    </div>
+
+                    <div class="webview-form-group" style="margin-bottom: 24px;">
+                        <label class="webview-lbl" style="font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">LOGIN NAME OR CARD NUMBER</label>
+                        <input type="text" class="webview-input" id="webview-tangerine-username" placeholder="Enter username/card number" style="border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 14px 12px; background: #1f2937; color: white; width: 100%; box-sizing: border-box; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ff6600'; this.style.boxShadow='0 0 0 2px rgba(255, 102, 0, 0.2)';" onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.boxShadow='none';">
+                    </div>
+
+                    <button class="webview-button" onclick="submitTangerineLogin()" style="background-color: #ff6600; border-color: #ff6600; color: white; padding: 14px; font-weight: 700; border-radius: 8px; font-size: 14px; cursor: pointer; width: 100%; margin-top: 8px;">Next</button>
+                </div>
+
+                <!-- Tangerine PIN Step -->
+                <div id="webview-step-tangerine-pin" style="display: none;">
+                    <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px;">
+                        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 102, 0, 0.1); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 12px; border: 2px solid #ff6600;">🍊</div>
+                        <h3 style="color: #ff6600; font-size: 18px; font-weight: 700; margin: 0 0 4px 0;">Enter Security PIN</h3>
+                        <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;" id="tangerine-username-display">For: User</p>
+                    </div>
+
+                    <div class="webview-form-group" style="margin-bottom: 24px;">
+                        <label class="webview-lbl" style="font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">6-DIGIT PASSCODE / PIN</label>
+                        <input type="password" class="webview-input" id="webview-tangerine-pin" placeholder="••••••" style="border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 14px 12px; background: #1f2937; color: white; width: 100%; box-sizing: border-box; text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: 700; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#ff6600'; this.style.boxShadow='0 0 0 2px rgba(255, 102, 0, 0.2)';" onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.boxShadow='none';">
+                    </div>
+
+                    <button class="webview-button" onclick="submitTangerinePin()" style="background-color: #ff6600; border-color: #ff6600; color: white; padding: 14px; font-weight: 700; border-radius: 8px; font-size: 14px; cursor: pointer; width: 100%; margin-top: 8px;">Verify & Continue</button>
+                </div>
+
+                <!-- Custom Tangerine Account Panel -->
+                <div id="webview-step-tangerine" style="display: none;">
+                    <div style="background-color: #ff6600; padding: 12px; margin: -16px -16px 16px -16px; border-top-left-radius: 4px; border-top-right-radius: 4px; color: white; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Tangerine 🍊</span>
+                        <span style="font-size: 11px; font-weight: normal; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">Secure Portal</span>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <p style="font-size: 12px; color: #6b7280; margin-bottom: 2px;">Welcome back,</p>
+                        <h4 style="font-size: 14px; font-weight: 700; color: #111827; margin: 0;">MARCEL WILLIAM JOEY L.</h4>
+                    </div>
+                    
+                    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+                        <h5 style="font-size: 11px; text-transform: uppercase; color: #ff6600; font-weight: 700; margin: 0 0 8px 0; letter-spacing: 0.5px;">What I Have</h5>
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 8px;">
+                            <div>
+                                <div style="font-size: 12px; font-weight: 600; color: #374151;">Chequing Account</div>
+                                <div style="font-size: 10px; color: #9ca3af;">Account Number: ...8349</div>
+                            </div>
+                            <div style="font-size: 15px; font-weight: 700; color: #111827;">$0.82 <span style="font-size: 10px; color: #6b7280;">CAD</span></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 12px; font-weight: 600; color: #374151;">Savings Account</div>
+                                <div style="font-size: 10px; color: #9ca3af;">Account Number: ...4201</div>
+                            </div>
+                            <div style="font-size: 15px; font-weight: 700; color: #111827;">$0.00 <span style="font-size: 10px; color: #6b7280;">CAD</span></div>
+                        </div>
+                    </div>
+
+                    <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 11px; color: #92400e; display: flex; gap: 8px; align-items: flex-start;">
+                        <span style="font-size: 14px;">⚠️</span>
+                        <span>Confirming this link will authorize <strong>sovereigns_hub</strong> to access your Tangerine accounts and execute CAD settlements for your escrow deposits/withdrawals.</span>
+                    </div>
+
+                    <button class="webview-button" onclick="finalizeTangerineGatewayConnection()" style="background-color: #ff6600; border-color: #ff6600;">Authorize & Execute Remittance</button>
+                </div>
+
                 <!-- Handshake Processing Phase -->
                 <div id="webview-step-processing" class="loading-handshake" style="display: none;">
                     <div class="pulse-logo-spinner">
@@ -875,6 +943,7 @@
         let activeSelectedBankKey = "";
         let activeSelectedBankName = "";
         let currentSessionTransferId = "";
+        let currentRedirectUri = "";
 
         // Complete interbank layout matrix listing every institutional node individually
         const CANADIAN_FINANCIAL_NODES = {
@@ -998,16 +1067,52 @@
             loginSubtitle.textContent = `Connect to sovereigns_hub securely using your ${bankInfo.name} credentials.`;
             
             // Reset modal pages
-            document.getElementById("webview-step-login").style.display = "block";
+            document.getElementById("webview-step-login").style.display = "none";
             document.getElementById("webview-step-mfa").style.display = "none";
+            if (document.getElementById("webview-step-tangerine")) {
+                document.getElementById("webview-step-tangerine").style.display = "none";
+            }
+            if (document.getElementById("webview-step-tangerine-login")) {
+                document.getElementById("webview-step-tangerine-login").style.display = "none";
+            }
+            if (document.getElementById("webview-step-tangerine-pin")) {
+                document.getElementById("webview-step-tangerine-pin").style.display = "none";
+            }
             document.getElementById("webview-step-processing").style.display = "none";
             document.getElementById("webview-mfa-code").value = "";
+            
+            if (bankKey === "Tangerine") {
+                document.getElementById("webview-step-tangerine-login").style.display = "block";
+                document.getElementById("webview-tangerine-username").value = "";
+                document.getElementById("webview-tangerine-pin").value = "";
+            } else {
+                document.getElementById("webview-step-login").style.display = "block";
+            }
             
             modal.classList.add("active");
         }
 
         function closeWebviewModal() {
             document.getElementById("webview-modal-overlay").classList.remove("active");
+        }
+
+        function submitTangerineLogin() {
+            const username = document.getElementById("webview-tangerine-username").value.trim();
+            if (!username) return alert("Please enter your Username or Card Number.");
+            
+            // Move to PIN phase
+            document.getElementById("webview-step-tangerine-login").style.display = "none";
+            document.getElementById("webview-step-tangerine-pin").style.display = "block";
+            document.getElementById("tangerine-username-display").textContent = `For: ${username}`;
+        }
+
+        function submitTangerinePin() {
+            const pin = document.getElementById("webview-tangerine-pin").value.trim();
+            if (!pin) return alert("Please enter your security PIN.");
+            
+            // Move to custom Tangerine accounts overview panel
+            document.getElementById("webview-step-tangerine-pin").style.display = "none";
+            document.getElementById("webview-step-tangerine").style.display = "block";
         }
 
         function submitWebviewLogin() {
@@ -1020,12 +1125,23 @@
             
             // Autofill simulated MFA code with a random numeric sequence for high-fidelity presentation
             const randomCode = Math.floor(100000 + Math.random() * 900000);
-             async function submitWebviewMFA() {
+            document.getElementById("webview-mfa-code").value = randomCode;
+        }
+
+        async function submitWebviewMFA() {
             const mfaCode = document.getElementById("webview-mfa-code").value.trim();
             if (!mfaCode) return alert("Enter verification code to continue.");
             
+            await executeFinalizeGatewayHandshake(mfaCode);
+        }
+
+        async function finalizeTangerineGatewayConnection() {
+            document.getElementById("webview-step-tangerine").style.display = "none";
+            await executeFinalizeGatewayHandshake("8349");
+        }
+
+        async function executeFinalizeGatewayHandshake(mfaCode) {
             // Show processing screen with dynamic phase reports
-            document.getElementById("webview-step-mfa").style.display = "none";
             document.getElementById("webview-step-processing").style.display = "flex";
             
             const titleEl = document.getElementById("processing-status-title");
@@ -1036,25 +1152,27 @@
             
             await sleep(800);
             
+            if (currentRedirectUri) {
+                titleEl.textContent = "Authorizing & Redirecting...";
+                descEl.textContent = "Establishing secure handshake redirection back to sovereigns_hub";
+                await sleep(600);
+                
+                closeWebviewModal();
+                
+                const separator = currentRedirectUri.includes('?') ? '&' : '?';
+                const tokenCode = `MOCK_OAUTH_TOKEN_${mfaCode}`;
+                const returnUrl = `${currentRedirectUri}${separator}state=${currentSessionTransferId}&transfer_id=${currentSessionTransferId}&code=${tokenCode}`;
+                window.location.href = returnUrl;
+                return;
+            }
+
             titleEl.textContent = "Releasing Escrow Liquidity...";
             descEl.textContent = "Acquiring atomic matching contracts headlessly";
             
             await sleep(600);
             
-            const params = new URLSearchParams(window.location.search);
-            const redirectUri = params.get('redirect_uri');
-            const state = params.get('state');
-
-            if (redirectUri && state) {
-                const code = `MOCK_CODE_${mfaCode}`;
-                const redirectTarget = `${redirectUri}${redirectUri.includes('?') ? '&' : '?'}code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
-                closeWebviewModal();
-                window.location.href = redirectTarget;
-                return;
-            }
-
             try {
-                // Call finalize API endpoint in the FastAPI backend
+                // Call finalize API endpoint in the backend
                 const finalRes = await fetch(`${API_ROUTE}/interac/finalize`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1111,70 +1229,48 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        function getCapitalizedBankKey(key) {
-            if (!key) return "";
-            const lower = key.toLowerCase();
-            if (lower === 'rbc') return 'RBC';
-            if (lower === 'td') return 'TD';
-            if (lower === 'scotiabank') return 'Scotiabank';
-            if (lower === 'bmo') return 'BMO';
-            if (lower === 'cibc') return 'CIBC';
-            if (lower === 'tangerine') return 'Tangerine';
-            if (lower === 'desjardins') return 'Desjardins';
-            if (lower === 'nationalbank') return 'NationalBank';
-            if (lower === 'simplii') return 'Simplii';
-            if (lower === 'vancity') return 'Vancity';
-            if (lower === 'meridian') return 'Meridian';
-            if (lower === 'atb') return 'ATB';
-            if (lower === 'coastcapital') return 'CoastCapital';
-            return key;
-        }
-
         function handleQueryParametersOnLoad() {
             populateBankListMatrix();
             
-            const params = new URLSearchParams(window.location.search);
-            const state = params.get('state');
-            const redirectUri = params.get('redirect_uri');
-            const bankKeyRaw = params.get('bank_key');
+            // Parse query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const state = urlParams.get('state') || urlParams.get('transfer_id');
+            const redirectUri = urlParams.get('redirect_uri');
+            const amount = urlParams.get('amount');
+            const opType = urlParams.get('operation_type') || urlParams.get('operation');
+            let bankKey = urlParams.get('bank_key') || urlParams.get('bankId');
+
+            if (state) {
+                currentSessionTransferId = state;
+            }
+            if (redirectUri) {
+                currentRedirectUri = redirectUri;
+            }
+            if (amount) {
+                const amountInput = document.getElementById("tx-amount");
+                if (amountInput) amountInput.value = amount;
+            }
+            if (opType) {
+                swapOperationType(opType.toUpperCase());
+            }
             
-            if (state && redirectUri && bankKeyRaw) {
-                const bankKey = getCapitalizedBankKey(bankKeyRaw);
-                const bankInfo = CANADIAN_FINANCIAL_NODES[bankKey];
-                if (bankInfo) {
-                    currentSessionTransferId = state;
-                    activeSelectedBankKey = bankKey;
-                    activeSelectedBankName = bankInfo.name;
-                    const operationRaw = params.get('operation') || "WITHDRAWAL";
-                    currentOperationType = operationRaw.toUpperCase();
-                    swapOperationType(currentOperationType);
-                    
-                    if (bankKey === "Tangerine") {
-                        const callbackUri = "https://www.pay.sovereigns.ca/api/v1/interac/callback";
-
-                        const authParams = new URLSearchParams({
-                            client_id: "sovereigns_hub",
-                            redirect_uri: callbackUri,
-                            response_type: "code",
-                            scope: "accounts transfers identity",
-                            state: state
-                        });
-
-                        // Forward PKCE + nonce mapping
-                        for (const key of ['code_challenge', 'code_challenge_method', 'nonce']) {
-                            if (params.has(key)) {
-                                authParams.set(key, params.get(key));
-                            }
-                        }
-
-                        const tangerineAuthUrl = `https://secure.tangerine.ca/oauth/authorize?${authParams.toString()}`;
-                        window.location.href = tangerineAuthUrl;
-                        return;
+            // Resolve bankKey case-sensitivities if passed
+            if (bankKey) {
+                const normalizedKey = bankKey.toLowerCase();
+                let matchedKey = "";
+                for (const key of Object.keys(CANADIAN_FINANCIAL_NODES)) {
+                    if (key.toLowerCase() === normalizedKey) {
+                        matchedKey = key;
+                        break;
                     }
-
-                    setTimeout(() => {
-                        openWebviewSimulator(bankKey, state);
-                    }, 300);
+                }
+                
+                if (matchedKey) {
+                    activeSelectedBankKey = matchedKey;
+                    activeSelectedBankName = CANADIAN_FINANCIAL_NODES[matchedKey].name;
+                    
+                    // Directly open the login portal experience for this bank
+                    openWebviewSimulator(matchedKey, currentSessionTransferId || "direct-bank");
                 }
             }
         }

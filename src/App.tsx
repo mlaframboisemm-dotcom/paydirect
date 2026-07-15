@@ -29,9 +29,6 @@ const configuredApiBase = String(
 function buildApiUrl(path: string): string {
   const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
   const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
-  if (configuredApiBase) {
-    return new URL(normalized, configuredApiBase).toString();
-  }
   if (typeof window !== 'undefined') {
     if (window.location.protocol === 'file:') {
       return `http://localhost:3000${normalized}`;
@@ -39,6 +36,9 @@ function buildApiUrl(path: string): string {
     if (window.location?.origin && window.location.origin !== 'null') {
       return `${window.location.origin}${normalized}`;
     }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
   }
   return normalized;
 }
@@ -590,6 +590,101 @@ export default function App() {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  // Listen for 'code' query parameter and exchange it for a secure session token
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const transferId = params.get('transfer_id') || params.get('state');
+
+    if (code) {
+      const exchangeCodeForSession = async () => {
+        showToast('Exchanging bank authorization code for secure session...', 'info');
+        try {
+          const response = await fetch(buildApiUrl('/api/auth/exchange-code'), {
+            method: 'POST',
+            headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ code, transfer_id: transferId })
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to exchange authentication code.');
+          }
+
+          const data = await response.json();
+          if (data.success && data.token) {
+            // Secure session token exchanged successfully
+            sessionStorage.setItem('cb_auth_jwt_token', data.token);
+            localStorage.setItem('cb_auth_jwt_token', data.token);
+            localStorage.setItem('cb_auth_authenticated', 'true');
+            
+            if (data.user) {
+              migrateGlobalStateToUserScope(data.user.email);
+              hydrateStateFromUserScope(data.user.email);
+              setUserName(data.user.name);
+              setUserEmail(data.user.email);
+              setCitizenship(data.user.region || 'CA');
+              setKycLevel(data.user.kycLevel !== undefined ? data.user.kycLevel : 2);
+            }
+            
+            setIsAuthenticated(true);
+            showToast('Secure session handshake established successfully with backend gateway!', 'success');
+            
+            // If there's a transfer ID, open the Cash Modal automatically to let the finalize effect process
+            if (transferId) {
+              setCashModalAction('deposit');
+              setIsCashModalOpen(true);
+            }
+          }
+        } catch (error: any) {
+          console.error('Session exchange failed:', error);
+          showToast(`Session Exchange Failed: ${error.message}`, 'error');
+        }
+      };
+
+      exchangeCodeForSession();
+    }
+  }, []);
+
+  // Auto-login to mlaframboisemm@gmail.com on startup
+  useEffect(() => {
+    const autoLogin = async () => {
+      const savedEmail = localStorage.getItem('cb_auth_email');
+      const savedAuthenticated = localStorage.getItem('cb_auth_authenticated') === 'true';
+
+      if (!savedAuthenticated || savedEmail !== 'mlaframboisemm@gmail.com') {
+        try {
+          const response = await fetch(buildApiUrl('/api/auth/auto-login'), {
+            method: 'POST',
+            headers: buildAuthHeaders({ 'Content-Type': 'application/json' })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.token) {
+              sessionStorage.setItem('cb_auth_jwt_token', data.token);
+              localStorage.setItem('cb_auth_jwt_token', data.token);
+              localStorage.setItem('cb_auth_authenticated', 'true');
+              localStorage.setItem('cb_auth_email', data.user.email);
+              localStorage.setItem('cb_auth_name', data.user.name);
+
+              migrateGlobalStateToUserScope(data.user.email);
+              hydrateStateFromUserScope(data.user.email);
+              setUserName(data.user.name);
+              setUserEmail(data.user.email);
+              setCitizenship(data.user.region || 'CA');
+              setKycLevel(data.user.kycLevel !== undefined ? data.user.kycLevel : 3);
+              setIsAuthenticated(true);
+              showToast('Successfully signed in to your live profile & account!', 'success');
+            }
+          }
+        } catch (error) {
+          console.error('[Auto Login Mount Error]', error);
+        }
+      }
+    };
+    autoLogin();
+  }, []);
 
   // --- Calculations for Portfolio Sums ---
   const cryptoTotalValue = useMemo(() => {
@@ -1697,6 +1792,7 @@ export default function App() {
         showToast={showToast}
         initialTab={cashModalAction}
         citizenship={(citizenship === 'CA' ? 'CA' : 'US') as 'US' | 'CA'}
+        isAuthenticated={isAuthenticated}
         onTriggerEmail={(subject, fromName, fromEmail, bodyHtml) => {
           const newMail: InboxEmail = {
             id: `mail-${Date.now()}`,

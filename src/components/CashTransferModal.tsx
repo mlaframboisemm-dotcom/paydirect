@@ -15,7 +15,7 @@ const bankUrls: Record<string, string> = {
   'BMO Bank of Montreal': 'https://www.bmo.com/main/personal',
   'CIBC': 'https://www.cibc.com',
   'Simplii Financial': 'https://www.simplii.com',
-  'Tangerine': 'https://www.tangerine.ca',
+  'Tangerine': 'https://www.tangerine.ca/app/#/transfer-in/type-of-account?locale=en_CA',
   'Chase Bank': 'https://www.chase.com',
   'Wells Fargo': 'https://www.wellsfargo.com',
   'Bank of America': 'https://www.bankofamerica.com',
@@ -31,9 +31,6 @@ const configuredApiBase = String(
 function buildApiUrl(path: string): string {
   const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
   const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
-  if (configuredApiBase) {
-    return new URL(normalized, configuredApiBase).toString();
-  }
   if (typeof window !== 'undefined') {
     // Electron/file:// renderers cannot resolve relative /api routes.
     if (window.location.protocol === 'file:') {
@@ -42,6 +39,9 @@ function buildApiUrl(path: string): string {
     if (window.location.origin && window.location.origin !== 'null') {
       return `${window.location.origin}${normalized}`;
     }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
   }
   return normalized;
 }
@@ -62,6 +62,7 @@ interface CashTransferModalProps {
   initialTab?: 'deposit' | 'withdraw';
   citizenship?: 'US' | 'CA';
   onTriggerEmail?: (subject: string, sender: string, senderEmail: string, bodyHtml: string) => void;
+  isAuthenticated?: boolean;
 }
 
 interface LinkedBank {
@@ -80,7 +81,8 @@ export default function CashTransferModal({
   showToast,
   initialTab = 'deposit',
   citizenship = 'US',
-  onTriggerEmail
+  onTriggerEmail,
+  isAuthenticated = false
 }: CashTransferModalProps) {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'banks'>(initialTab);
   
@@ -120,6 +122,50 @@ export default function CashTransferModal({
     localStorage.setItem('cb_linked_banks', JSON.stringify(linkedBanks));
   }, [linkedBanks]);
 
+
+  // Plaid-like connector states
+  const [linkingStep, setLinkingStep] = useState<'none' | 'welcome' | 'select-bank' | 'credentials' | 'success'>('none');
+  const [plaidSelectedBank, setPlaidSelectedBank] = useState<string>('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [isPlaidConnecting, setIsPlaidConnecting] = useState(false);
+  const [plaidHandshakeStep, setPlaidHandshakeStep] = useState<number>(0);
+
+  // Deposit States
+  const [depositAmount, setDepositAmount] = useState('500');
+  const [depositBankId, setDepositBankId] = useState(linkedBanks[0]?.id || '');
+  const [depositSpeed, setDepositSpeed] = useState<'instant' | 'standard'>('instant');
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [depositProgressStep, setDepositProgressStep] = useState(0);
+
+  // Withdrawal States
+  const [withdrawAmount, setWithdrawAmount] = useState('200');
+  const [withdrawBankId, setWithdrawBankId] = useState(linkedBanks[0]?.id || '');
+  const [withdrawSpeed, setWithdrawSpeed] = useState<'instant' | 'standard'>('instant');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawProgressStep, setWithdrawProgressStep] = useState(0);
+
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [usdCadRate, setUsdCadRate] = useState<number>(1.365);
+  const [successScreenData, setSuccessScreenData] = useState<{
+    type: 'deposit' | 'withdraw';
+    amount: number;
+    fee: number;
+    netAmount: number;
+    bankName: string;
+    speed: string;
+    pendingExternal?: boolean;
+    requestId?: string;
+  } | null>(null);
+
+  const [useSovereignsGateway, setUseSovereignsGateway] = useState<boolean>(true);
+  const [activeSelectedBankKey, setActiveSelectedBankKey] = useState<string>('');
+  const [activeSelectedBankName, setActiveSelectedBankName] = useState<string>('');
+  const [isSovereignsWebviewOpen, setIsSovereignsWebviewOpen] = useState<boolean>(false);
+  const [webviewStep, setWebviewStep] = useState<'login' | 'mfa' | 'processing'>('login');
+  const [webviewMfaCode, setWebviewMfaCode] = useState<string>('');
+  const [currentSessionTransferId, setCurrentSessionTransferId] = useState<string>('');
+
   // Handle bank redirection callback on page load
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -128,6 +174,11 @@ export default function CashTransferModal({
     const code = params.get('code');
 
     if (action === 'finalize_interac' && transferId && code) {
+      if (!isAuthenticated) {
+        // App.tsx hook needs to complete its secure code exchange first!
+        return;
+      }
+
       window.history.replaceState({}, document.title, window.location.pathname);
       
       const finalizeRedirectionCallback = async () => {
@@ -188,51 +239,7 @@ export default function CashTransferModal({
       
       finalizeRedirectionCallback();
     }
-  }, []);
-
-
-  // Plaid-like connector states
-  const [linkingStep, setLinkingStep] = useState<'none' | 'welcome' | 'select-bank' | 'credentials' | 'success'>('none');
-  const [plaidSelectedBank, setPlaidSelectedBank] = useState<string>('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [isPlaidConnecting, setIsPlaidConnecting] = useState(false);
-  const [plaidHandshakeStep, setPlaidHandshakeStep] = useState<number>(0);
-
-  // Deposit States
-  const [depositAmount, setDepositAmount] = useState('500');
-  const [depositBankId, setDepositBankId] = useState(linkedBanks[0]?.id || '');
-  const [depositSpeed, setDepositSpeed] = useState<'instant' | 'standard'>('instant');
-  const [isDepositing, setIsDepositing] = useState(false);
-  const [depositProgressStep, setDepositProgressStep] = useState(0);
-
-  // Withdrawal States
-  const [withdrawAmount, setWithdrawAmount] = useState('200');
-  const [withdrawBankId, setWithdrawBankId] = useState(linkedBanks[0]?.id || '');
-  const [withdrawSpeed, setWithdrawSpeed] = useState<'instant' | 'standard'>('instant');
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [withdrawProgressStep, setWithdrawProgressStep] = useState(0);
-
-  const [localError, setLocalError] = useState<string | null>(null);
-  const [usdCadRate, setUsdCadRate] = useState<number>(1.365);
-  const [successScreenData, setSuccessScreenData] = useState<{
-    type: 'deposit' | 'withdraw';
-    amount: number;
-    fee: number;
-    netAmount: number;
-    bankName: string;
-    speed: string;
-    pendingExternal?: boolean;
-    requestId?: string;
-  } | null>(null);
-
-  const [useSovereignsGateway, setUseSovereignsGateway] = useState<boolean>(true);
-  const [activeSelectedBankKey, setActiveSelectedBankKey] = useState<string>('');
-  const [activeSelectedBankName, setActiveSelectedBankName] = useState<string>('');
-  const [isSovereignsWebviewOpen, setIsSovereignsWebviewOpen] = useState<boolean>(false);
-  const [webviewStep, setWebviewStep] = useState<'login' | 'mfa' | 'processing'>('login');
-  const [webviewMfaCode, setWebviewMfaCode] = useState<string>('');
-  const [currentSessionTransferId, setCurrentSessionTransferId] = useState<string>('');
+  }, [isAuthenticated, activeSelectedBankKey, onAddTransaction, onUpdateUsdBalance, usdBalance, showToast]);
 
   // Make sure depositBankId and withdrawBankId are updated if linked banks list changes
   useEffect(() => {
