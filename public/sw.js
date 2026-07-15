@@ -50,8 +50,6 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, responseToCache);
         });
         return response;
-      }).catch(() => {
-        // Fallback for offline if necessary
       });
     })
   );
