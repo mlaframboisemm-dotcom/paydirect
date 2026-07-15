@@ -54,16 +54,11 @@ export async function tangerineCallbackHandler(req: any, res: any) {
     // Store tokens for this user
     tokenStore.set(userId, tokens);
 
-    return res.json({
-      success: true,
-      message: "Tangerine account connected",
-      userId,
-      transferId,
-      tokens: {
-        scope: tokens.scope,
-        expiresAt: tokens.expiresAt,
-      },
-    });
+    const requestHost = req.headers['x-forwarded-host'] || req.headers.host || 'www.pay.sovereigns.ca';
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const cleanHost = requestHost.includes('localhost') && !requestHost.includes(':') ? `${requestHost}:3000` : requestHost;
+    
+    return res.redirect(`${protocol}://${cleanHost}/?action=finalize_interac&transfer_id=${transferId}&code=${code}`);
   } catch (err: any) {
     console.error("Tangerine callback error:", err);
     return res.status(500).json({ error: "Failed to complete Tangerine OAuth" });

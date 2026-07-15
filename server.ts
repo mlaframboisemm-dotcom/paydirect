@@ -7563,6 +7563,12 @@ async function startServer() {
     }
   });
 
+  app.get('/banking-hub/index.html', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
+  app.get('/banking-hub', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
