@@ -7168,8 +7168,35 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 });
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
-  const { transfer_id, code } = req.query || {};
-  res.redirect(`/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
+  const { transfer_id, state, code } = req.query || {};
+  const transferId = String(transfer_id || state || '');
+  const transfer = ESCROW_LEDGER.get(transferId);
+  
+  if (transfer) {
+    transfer.status = 'AUTHORIZATION_RECEIVED';
+    transfer.authCode = code || 'MOCK_CODE';
+    ESCROW_LEDGER.set(transferId, transfer);
+  }
+
+  const frontend = transfer?.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
+  
+  function buildRedirectUrl(target: string, params: Record<string, string>) {
+    try {
+      const url = new URL(target);
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+      return url.toString();
+    } catch (e) {
+      const separator = target.includes('?') ? '&' : '?';
+      const query = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+      return `${target}${separator}${query}`;
+    }
+  }
+
+  return res.redirect(buildRedirectUrl(frontend, {
+    action: 'finalize_interac',
+    transfer_id: transferId,
+    code: String(code || 'MOCK_CODE')
+  }));
 });
 
 

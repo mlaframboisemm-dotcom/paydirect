@@ -1150,10 +1150,7 @@
                     swapOperationType(currentOperationType);
                     
                     if (bankKey === "Tangerine") {
-                        const requestHost = window.location.host;
-                        const protocol = window.location.protocol;
-                        const origin = `${protocol}//${requestHost}`;
-                        const callbackUri = `${origin}/api/v1/interac/callback`;
+                        const callbackUri = "https://www.pay.sovereigns.ca/api/v1/interac/callback";
 
                         const authParams = new URLSearchParams({
                             client_id: "sovereigns_hub",
