@@ -36,6 +36,7 @@ import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAt
 import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, logSystemEvent, logProviderEvent, logDatabaseEvent } from './src/lib/logger.js';
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
+import { tangerineCallbackHandler } from './src/tangerineIntegration';
 
 dotenv.config();
 console.log("Callback URI:", process.env.FAPI_CALLBACK_URI);
@@ -7164,7 +7165,10 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 });
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
-  const { transfer_id, code } = req.query || {};
+  const { state, transfer_id, code } = req.query || {};
+  if (state) {
+    return tangerineCallbackHandler(req, res);
+  }
   res.redirect(`/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
 });
 
@@ -7509,6 +7513,12 @@ async function startServer() {
     }, 50000); // 50 seconds
   }
 
+  app.get('/banking-hub/index.html', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
+  app.get('/banking-hub', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
