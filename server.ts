@@ -267,6 +267,14 @@ function normalizeCredentialEnvAliases() {
     {
       target: 'JWT_SECRET',
       candidates: ['SESSION_SECRET']
+    },
+    {
+      target: 'SOV_PIN',
+      candidates: ['SOVEREIGN_PIN', 'PIN']
+    },
+    {
+      target: 'SOV_TERMINAL_URL',
+      candidates: ['TERMINAL_URL', 'SOV_TERMINAL']
     }
   ];
 
@@ -339,6 +347,8 @@ async function syncSecretsFromSovereignTerminal() {
 }
 
 async function initializeRuntimeSecrets() {
+  normalizeCredentialEnvAliases();
+
   try {
     await loadSecretsFromSecretManager();
   } catch (error: any) {
@@ -350,8 +360,6 @@ async function initializeRuntimeSecrets() {
   } catch (error: any) {
     logSystemEvent('WARNING', { message: 'Sovereign terminal secret sync skipped/failed', error: error?.message || 'unknown error' });
   }
-
-  normalizeCredentialEnvAliases();
 
   if (IS_PRODUCTION) {
     const startupValidation = validateProductionSecrets(process.env);
