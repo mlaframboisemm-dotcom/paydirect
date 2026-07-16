@@ -570,6 +570,9 @@ export default function App() {
           handleAuthExpired();
           return;
         }
+        if (res.status === 403) {
+          return;
+        }
         if (res.ok) {
           hasLoggedEmailSyncError.current = false;
           const data = await res.json();

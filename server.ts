@@ -6791,7 +6791,7 @@ app.post('/api/coinbase/quiz', requireAuth, requireMfa, async (req: any, res) =>
   }
 });
 
-app.get('/api/messaging/emails', requireAuth, requireMfa, (req: any, res: any) => {
+app.get('/api/messaging/emails', requireAuth, (req: any, res: any) => {
   if (IS_PRODUCTION && !isAdminRequest(req)) {
     return res.status(403).json({ success: false, error: 'ADMIN_REQUIRED', message: 'Access to email previews is restricted in production.' });
   }
