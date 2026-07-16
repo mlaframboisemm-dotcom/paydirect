@@ -20,6 +20,8 @@ import OnboardingKyc from './components/OnboardingKyc';
 import AuthScreen from './components/AuthScreen';
 import EmailInbox, { InboxEmail } from './components/EmailInbox';
 import { convertUsdToCad, DEFAULT_USD_CAD_RATE } from './lib/financial-hardening';
+import { db } from './lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const configuredApiBase = String(
   (import.meta as any).env?.VITE_API_BASE ||
@@ -833,6 +835,62 @@ export default function App() {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  // Synchronize state with Firebase Firestore for cross-device persistence
+  useEffect(() => {
+    if (!isAuthenticated || !userEmail) return;
+
+    const syncFromFirestore = async () => {
+      try {
+        const userDocRef = doc(db, 'users', userEmail);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (typeof data.usdBalance === 'number') {
+            setUsdBalance(data.usdBalance);
+          }
+          if (data.name) {
+            setUserName(data.name);
+          }
+          if (data.citizenship) {
+            setCitizenship(data.citizenship);
+          }
+          if (typeof data.kycLevel === 'number') {
+            setKycLevel(data.kycLevel);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load user profile from Firestore:', err);
+      }
+    };
+
+    syncFromFirestore();
+  }, [isAuthenticated, userEmail]);
+
+  // Write changes back to Firestore to ensure cross-device consistency
+  useEffect(() => {
+    if (!isAuthenticated || !userEmail) return;
+
+    const saveToFirestore = async () => {
+      try {
+        const userDocRef = doc(db, 'users', userEmail);
+        await setDoc(userDocRef, {
+          email: userEmail,
+          name: userName,
+          usdBalance: usdBalance,
+          citizenship: citizenship,
+          kycLevel: kycLevel,
+          lastUpdated: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('Failed to save user profile to Firestore:', err);
+      }
+    };
+
+    // Debounce saves slightly to prevent rapid writes during fast updates
+    const timer = setTimeout(saveToFirestore, 1000);
+    return () => clearTimeout(timer);
+  }, [usdBalance, userName, citizenship, kycLevel, isAuthenticated, userEmail]);
 
   const handleInstallPWA = async () => {
     if (!deferredPrompt) return;
