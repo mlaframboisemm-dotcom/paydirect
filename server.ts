@@ -6160,7 +6160,7 @@ async function recordLedgerEntry(entryPayload: { type: string; status: string; p
   }
 }
 
-app.get('/api/coinbase/config', requireAuth, requireMfa, async (req: any, res) => {
+app.get('/api/coinbase/config', requireAuth, async (req: any, res) => {
   const readiness = await buildRuntimeReadinessReport(process.env);
   res.json({
     mode: 'real',

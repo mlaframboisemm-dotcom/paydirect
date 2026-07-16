@@ -27,7 +27,9 @@ if (typeof window !== 'undefined') {
       });
       console.log('Firebase App Check initialized.');
     } else {
-      console.log('Firebase App Check skipped: No valid VITE_RECAPTCHA_SITE_KEY provided.');
+      if ((import.meta as any).env?.DEV) {
+        console.log('Firebase App Check skipped: No valid VITE_RECAPTCHA_SITE_KEY provided.');
+      }
     }
   } catch (err) {
     console.warn('Firebase App Check failed to initialize gracefully:', err);
