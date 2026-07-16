@@ -2112,9 +2112,11 @@ app.post('/api/wallet/send', requireAuth, tradeRateLimiter, requireMfa, requireK
     return res.status(500).json({ error: 'PRODUCTION_CONFIG_INVALID', message: error.message });
   }
 
-  const { asset, amount, toAddress, note } = req.body;
+  const { asset, amount, toAddress, note, assetSymbol, recipientAddress, memo } = req.body;
+  const activeToAddress = toAddress || recipientAddress;
+  const activeAsset = asset || assetSymbol;
   
-  if (!toAddress || !ethers.isAddress(toAddress)) {
+  if (!activeToAddress || !ethers.isAddress(activeToAddress)) {
     return res.status(400).json({ error: 'Invalid destination Ethereum address' });
   }
   
@@ -2130,9 +2132,9 @@ app.post('/api/wallet/send', requireAuth, tradeRateLimiter, requireMfa, requireK
         success: true,
         hash: '0x' + crypto.randomBytes(32).toString('hex'),
         from: '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f',
-        to: toAddress,
+        to: activeToAddress,
         amount,
-        asset: asset || 'ETH',
+        asset: activeAsset || 'ETH',
         message: 'Transaction mock verified on blockchain (Development Mode)',
         timestamp: new Date().toISOString()
       });
@@ -2826,14 +2828,16 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
     return res.status(500).json({ error: 'PRODUCTION_CONFIG_INVALID', message: error.message });
   }
 
-  const { action, symbol, amount, exchange = 'all', fiat = 'USD' } = req.body;
+  const { action, symbol, amount, exchange = 'all', fiat = 'USD', side, assetSymbol } = req.body;
+  const activeSymbol = symbol || assetSymbol;
+  const activeAction = action || side;
 
-  if (!symbol || !amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+  if (!activeSymbol || !amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
     return res.status(400).json({ error: 'Invalid asset symbol or trade amount.' });
   }
 
-  const isBuy = action?.toLowerCase() === 'buy';
-  const isSell = action?.toLowerCase() === 'sell';
+  const isBuy = activeAction?.toLowerCase() === 'buy';
+  const isSell = activeAction?.toLowerCase() === 'sell';
   if (!isBuy && !isSell) {
     return res.status(400).json({ error: 'Action must be "buy" or "sell".' });
   }
@@ -2850,8 +2854,8 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
     const cbSecret = process.env.COINBASE_API_SECRET_RAW;
     if (cbKey && cbSecret) {
       try {
-        const seed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${symbol}:${amount}:${fiat}`).trim();
-        const orderResult = await executeCoinbaseOrder(isBuy ? 'BUY' : 'SELL', symbol, amount, fiat, req.user.id, seed);
+        const seed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${activeSymbol}:${amount}:${fiat}`).trim();
+        const orderResult = await executeCoinbaseOrder(isBuy ? 'BUY' : 'SELL', activeSymbol, amount, fiat, req.user.id, seed);
         results.coinbase = { success: true, live: true, data: orderResult };
         executedReal = true;
         orderIdForVerification = orderResult.id || orderResult.order_id;
@@ -2874,8 +2878,8 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
     const krSecret = process.env.KRAKEN_API_SECRET;
     if (krKey && krSecret) {
       try {
-        const krSeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${symbol}:${amount}:${fiat}`).trim();
-        const orderResult = await executeKrakenOrder(isBuy ? 'buy' : 'sell', symbol, amount, fiat, req.user.id, krSeed);
+        const krSeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${activeSymbol}:${amount}:${fiat}`).trim();
+        const orderResult = await executeKrakenOrder(isBuy ? 'buy' : 'sell', activeSymbol, amount, fiat, req.user.id, krSeed);
         results.kraken = { success: true, live: true, data: orderResult };
         executedReal = true;
         orderIdForVerification = orderResult.txid || orderResult.id;
@@ -2901,8 +2905,8 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
 
     if ((cbKey && cbSecret) || (krKey && krSecret)) {
       try {
-        const seed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${symbol}:${amount}:${fiat}`).trim();
-        const orderResult = await executeHardenedOrder(isBuy ? 'BUY' : 'SELL', symbol, amount, fiat, req.user.id, seed);
+        const seed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${activeSymbol}:${amount}:${fiat}`).trim();
+        const orderResult = await executeHardenedOrder(isBuy ? 'BUY' : 'SELL', activeSymbol, amount, fiat, req.user.id, seed);
         
         results.routing = { success: true, live: true, data: orderResult };
         executedReal = true;
@@ -2939,7 +2943,7 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
     const verificationResult = await enforcer.executeExchangeTrade(
       verificationExchange,
       orderIdForVerification,
-      symbol,
+      activeSymbol,
       amount,
       isBuy ? 'buy' : 'sell',
       req.user.id
