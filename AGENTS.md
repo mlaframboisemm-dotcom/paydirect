@@ -37,3 +37,8 @@ Act as a cautious, production-minded engineering agent for this repository. Prio
 3. Add or update tests when practical.
 4. Verify the relevant behavior with the appropriate command.
 5. Summarize what changed and what was verified.
+
+## Console Cleanliness & API Middleware Rules
+- **Clean Console**: Do not write noisy warnings, non-critical logs, or placeholder errors (such as missing optional dev keys like reCAPTCHA) in production browser console logs. Keep them restricted to `import.meta.env.DEV` conditions.
+- **Eager GET Endpoint Design**: Do not apply state-blocking middleware (such as `requireMfa` or `requireKyc`) to read-only configuration/metadata GET endpoints (like `/api/coinbase/config`) that the client calls on initial app load. Applying MFA to load-time config endpoints causes false 401 rejections, triggering unexpected logout/redirection loops before the user can complete their authentication flow. Keep these checks on state-changing (POST/PUT/DELETE) routes.
+
