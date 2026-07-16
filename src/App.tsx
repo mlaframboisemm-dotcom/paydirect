@@ -1975,29 +1975,45 @@ export default function App() {
             </div>
 
             {/* Grid of Balances */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Available Balance (CAD)</span>
-                <span className="text-2xl font-black text-gray-900 mt-2 block font-mono">
-                  ${stripeAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Master Ledger Reservoir</span>
+                <span className="text-xl font-black text-gray-900 mt-2 block font-mono">
+                  ${Math.max(0, usdBalance - stripeTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9px] text-emerald-600 font-bold mt-1 block">Ready for Instant Payout</span>
+                <span className="text-[9px] text-gray-500 font-bold mt-1 block">
+                  Approx. CA${convertUsdToCad(Math.max(0, usdBalance - stripeTotal), DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Pending Balance (CAD)</span>
-                <span className="text-2xl font-black text-gray-500 mt-2 block font-mono">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Stripe Hub Available</span>
+                <span className="text-xl font-black text-gray-900 mt-2 block font-mono">
+                  ${stripeAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[9px] text-emerald-600 font-bold mt-1 block">
+                  Approx. CA${convertUsdToCad(stripeAvailable, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Stripe Hub Pending</span>
+                <span className="text-xl font-black text-gray-500 mt-2 block font-mono">
                   ${stripePending.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9px] text-gray-400 font-bold mt-1 block">Clearing in 1-2 Business Days</span>
+                <span className="text-[9px] text-gray-400 font-bold mt-1 block">
+                  Approx. CA${convertUsdToCad(stripePending, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs bg-slate-50/50">
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Stripe Balance (CAD)</span>
-                <span className="text-2xl font-black text-[#635BFF] mt-2 block font-mono">
-                  ${stripeTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Consolidated Treasury</span>
+                <span className="text-xl font-black text-[#635BFF] mt-2 block font-mono">
+                  ${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9px] text-gray-500 font-semibold mt-1 block">Synced to App Worth</span>
+                <span className="text-[9px] text-[#635BFF] font-semibold mt-1 block">
+                  Approx. CA${convertUsdToCad(usdBalance, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
               </div>
             </div>
 
