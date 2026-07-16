@@ -7664,6 +7664,172 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
   }
 });
 
+app.post('/api/stripe/create-checkout-session', requireAuth, async (req: any, res) => {
+  const { amount, fxRate, origin } = req.body || {};
+  const amountCad = parseFloat(amount);
+  if (isNaN(amountCad) || amountCad <= 0) {
+    return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Please enter a valid deposit amount.' });
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return res.status(501).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured on this server.' });
+  }
+
+  try {
+    const activeRate = parseFloat(fxRate) || DEFAULT_USD_CAD_RATE;
+    const amountUsd = convertCadToUsd(amountCad, activeRate);
+
+    const sessionRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        'success_url': `${origin || 'https://www.pay.sovereigns.ca'}/?action=stripe_success&session_id={CHECKOUT_SESSION_ID}`,
+        'cancel_url': `${origin || 'https://www.pay.sovereigns.ca'}/`,
+        'mode': 'payment',
+        'customer_email': req.user.email,
+        'client_reference_id': req.user.id,
+        'payment_method_types[0]': 'card',
+        'line_items[0][price_data][currency]': 'cad',
+        'line_items[0][price_data][product_data][name]': 'Sovereign Wallet Fund Deposit',
+        'line_items[0][price_data][unit_amount]': String(Math.round(amountCad * 100)),
+        'line_items[0][quantity]': '1',
+        'metadata[userId]': req.user.id,
+        'metadata[amountCad]': String(amountCad),
+        'metadata[amountUsd]': String(amountUsd),
+        'metadata[fxRate]': String(activeRate)
+      }).toString()
+    });
+
+    if (!sessionRes.ok) {
+      const errText = await sessionRes.text();
+      throw new Error(errText || 'Stripe Checkout API request failed');
+    }
+
+    const sessionJson = await sessionRes.json() as any;
+    res.json({ success: true, url: sessionJson.url });
+  } catch (err: any) {
+    console.error('Stripe session creation error:', err);
+    res.status(500).json({ error: 'STRIPE_SESSION_FAILED', message: err.message || String(err) });
+  }
+});
+
+app.post('/api/stripe/finalize-session', requireAuth, async (req: any, res) => {
+  const { session_id } = req.body || {};
+  if (!session_id) {
+    return res.status(400).json({ error: 'MISSING_SESSION_ID', message: 'session_id parameter is required.' });
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return res.status(501).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured on this server.' });
+  }
+
+  try {
+    // Prevent double credit
+    const existingTx = db.execute('SELECT * FROM transactions WHERE id = ?', [session_id]) as any[];
+    if (existingTx && existingTx.length > 0) {
+      return res.json({ success: true, alreadyProcessed: true, amountUsd: Number(existingTx[0].amount) });
+    }
+
+    // Retrieve session from Stripe
+    const sessionRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${session_id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`
+      }
+    });
+
+    if (!sessionRes.ok) {
+      const errText = await sessionRes.text();
+      throw new Error(errText || 'Failed to retrieve Stripe session details');
+    }
+
+    const sessionJson = await sessionRes.json() as any;
+    if (sessionJson.payment_status !== 'paid') {
+      return res.status(400).json({ error: 'PAYMENT_NOT_PAID', message: 'This Stripe transaction has not been marked as paid.' });
+    }
+
+    const userId = sessionJson.metadata?.userId || sessionJson.client_reference_id;
+    if (userId !== req.user.id) {
+      return res.status(403).json({ error: 'FORBIDDEN', message: 'Transaction ownership verification failed.' });
+    }
+
+    const amountCad = parseFloat(sessionJson.metadata?.amountCad || '0');
+    const amountUsd = parseFloat(sessionJson.metadata?.amountUsd || '0');
+
+    if (amountUsd <= 0) {
+      return res.status(400).json({ error: 'INVALID_METADATA_AMOUNT', message: 'Session metadata does not contain a valid amount.' });
+    }
+
+    // Update wallet balance in DB
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+    if (wallets && wallets.length > 0) {
+      const currentBalance = Number(wallets[0].balance || 0);
+      const newBalance = Number((currentBalance + amountUsd).toFixed(2));
+      db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBalance, req.user.id, 'USD']);
+      console.log(`[STRIPE] Credited $${amountUsd} USD to user ${req.user.id}. New Balance: $${newBalance}`);
+    } else {
+      // Create wallet if it doesn't exist
+      const publicAddressEth = "0x" + crypto.randomBytes(20).toString("hex");
+      const publicAddressBtc = "bc1" + crypto.randomBytes(20).toString("hex");
+      db.execute(
+        'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_eth, public_address_btc, identity_locked, production_mode, blockchain_linked, locked_to_email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [`wallet_${crypto.randomUUID()}`, req.user.id, 'USD', amountUsd, publicAddressEth, publicAddressBtc, 0, 'live', 0, '']
+      );
+    }
+
+    // Record transaction
+    db.execute(
+      `INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        session_id,
+        req.user.id,
+        'RECEIVE',
+        'USD',
+        amountUsd,
+        amountUsd,
+        Date.now(),
+        `Stripe Card/Apple Pay Deposit (Session: ${session_id.substring(0, 15)}...)`,
+        session_id,
+        'completed',
+        'stripe_gateway',
+        'user_wallet'
+      ]
+    );
+
+    // Record ledger entry
+    await recordLedgerEntry({
+      type: "transfer",
+      status: "executed",
+      payload: {
+        action: "settlement.deposit",
+        method: "stripe",
+        amount: amountUsd,
+        currency: "USD",
+        amountCad: amountCad,
+        bankName: "Stripe Checkout",
+        userId: req.user.id,
+        referenceNotes: `Stripe Checkout Session deposit: ${session_id}`
+      },
+      result: {
+        state: "reconciled",
+        recordedAt: new Date().toISOString(),
+        trackingReferenceId: session_id,
+        amountDelta: `+$${amountCad.toFixed(2)} CAD`
+      }
+    });
+
+    res.json({ success: true, amountUsd });
+  } catch (err: any) {
+    console.error('Stripe finalization error:', err);
+    res.status(500).json({ error: 'STRIPE_FINALIZATION_FAILED', message: err.message || String(err) });
+  }
+});
+
 // =========================================================================
 async function createAutomatedLedgerBackup() {
   const ledgerPath = process.env.SOVEREIGN_LEDGER_PATH || './ledger_db.json';

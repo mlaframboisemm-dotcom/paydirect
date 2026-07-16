@@ -171,6 +171,7 @@ export default function CashTransferModal({
   } | null>(null);
 
   const [useSovereignsGateway, setUseSovereignsGateway] = useState<boolean>(true);
+  const [useStripeCheckout, setUseStripeCheckout] = useState<boolean>(false);
   const [activeSelectedBankKey, setActiveSelectedBankKey] = useState<string>('');
   const [activeSelectedBankName, setActiveSelectedBankName] = useState<string>('');
   const [isSovereignsWebviewOpen, setIsSovereignsWebviewOpen] = useState<boolean>(false);
@@ -184,6 +185,48 @@ export default function CashTransferModal({
     const action = params.get('action');
     const transferId = params.get('transfer_id') || params.get('state');
     const code = params.get('code');
+    const sessionId = params.get('session_id');
+
+    if (action === 'stripe_success' && sessionId) {
+      if (!isAuthenticated) return;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      const finalizeStripeCallback = async () => {
+        showToast('Settling Stripe Checkout Payment...', 'info');
+        try {
+          const res = await fetch(buildApiUrl('/api/stripe/finalize-session'), {
+            method: 'POST',
+            headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ session_id: sessionId })
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to finalize Stripe payment.');
+          }
+          const resData = await res.json();
+          const amountUsd = Number(resData.amountUsd || 100);
+          
+          if (!resData.alreadyProcessed) {
+            onAddTransaction({
+              id: sessionId,
+              type: 'RECEIVE',
+              assetSymbol: 'USD',
+              amount: amountUsd,
+              fiatAmount: amountUsd,
+              timestamp: Date.now(),
+              details: `Stripe Card/Apple Pay Deposit (Ref: ${sessionId.substring(0, 15)}...)`
+            });
+            onUpdateUsdBalance(usdBalance + amountUsd);
+            showToast(`Stripe payment settled! Credited $${amountUsd.toFixed(2)} USD`, 'success');
+          } else {
+            showToast('Stripe payment has already been credited.', 'info');
+          }
+        } catch (e: any) {
+          showToast(`Stripe finalization failed: ${e.message}`, 'error');
+        }
+      };
+      finalizeStripeCallback();
+    }
 
     if (action === 'finalize_interac' && transferId && code) {
       if (!isAuthenticated) {
@@ -925,6 +968,45 @@ export default function CashTransferModal({
 
 
 
+  const handleStripeDeposit = async () => {
+    setLocalError(null);
+    const amountCad = parseFloat(depositAmount);
+    if (isNaN(amountCad) || amountCad <= 0) {
+      setLocalError('Please enter a valid amount.');
+      return;
+    }
+
+    try {
+      showToast('Creating Stripe Checkout session...', 'info');
+      const res = await fetch(buildApiUrl('/api/stripe/create-checkout-session'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          amount: amountCad,
+          fxRate: usdCadRate,
+          origin: window.location.origin
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || err.error || 'Failed to initialize Stripe Checkout.');
+      }
+
+      const data = await res.json();
+      if (data.url) {
+        showToast('Redirecting to Stripe secure checkout...', 'info');
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 1000);
+      } else {
+        throw new Error('No checkout URL returned from server.');
+      }
+    } catch (e: any) {
+      setLocalError(`Stripe error: ${e.message}`);
+    }
+  };
+
   const handleInitiateSovereignsWithdrawal = async (overrideKey?: string, overrideName?: string) => {
     setLocalError(null);
     const amountCad = Number.parseFloat(withdrawAmount);
@@ -1593,10 +1675,11 @@ export default function CashTransferModal({
                                 type="button"
                                 onClick={() => {
                                   setUseSovereignsGateway(true);
+                                  setUseStripeCheckout(false);
                                   setLocalError(null);
                                 }}
                                 className={`px-2.5 py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
-                                  useSovereignsGateway 
+                                  useSovereignsGateway && !useStripeCheckout
                                     ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-2xs' 
                                     : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
                                 }`}
@@ -1607,10 +1690,26 @@ export default function CashTransferModal({
                                 type="button"
                                 onClick={() => {
                                   setUseSovereignsGateway(false);
+                                  setUseStripeCheckout(true);
                                   setLocalError(null);
                                 }}
                                 className={`px-2.5 py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
-                                  !useSovereignsGateway 
+                                  useStripeCheckout 
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-2xs' 
+                                    : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
+                                }`}
+                              >
+                                Stripe Card
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setUseSovereignsGateway(false);
+                                  setUseStripeCheckout(false);
+                                  setLocalError(null);
+                                }}
+                                className={`px-2.5 py-1 text-[9px] font-bold rounded-lg border transition-all cursor-pointer ${
+                                  !useSovereignsGateway && !useStripeCheckout 
                                     ? 'bg-blue-50 text-blue-600 border-blue-200 shadow-2xs' 
                                     : 'bg-white text-gray-400 border-gray-100 hover:bg-gray-50'
                                 }`}
@@ -1620,7 +1719,30 @@ export default function CashTransferModal({
                             </div>
                           </div>
 
-                          {useSovereignsGateway ? (
+                          {useStripeCheckout ? (
+                            <div className="space-y-4">
+                              <div className="bg-gray-50/50 p-4 border border-gray-150 rounded-2xl text-center space-y-3">
+                                <span className="text-3xl">💳</span>
+                                <h4 className="text-xs font-bold text-gray-800 font-sans">Secure Deposit via Stripe</h4>
+                                <p className="text-[10px] text-gray-500 leading-normal max-w-[240px] mx-auto">
+                                  Instantly credit your wallet using your credit/debit card, Apple Pay, or Google Pay.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={handleStripeDeposit}
+                                  className="w-full bg-blue-600 text-white rounded-xl py-2.5 text-xs font-bold shadow-xs hover:bg-blue-700 transition-all cursor-pointer"
+                                >
+                                  Deposit CA${(parseFloat(depositAmount) || 0).toFixed(2)}
+                                </button>
+                              </div>
+                              {localError && (
+                                <div className="p-2.5 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs font-semibold flex items-center space-x-2">
+                                  <AlertCircle className="h-4 w-4 shrink-0" />
+                                  <span>{localError}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : useSovereignsGateway ? (
                              <div className="space-y-4">
                                <div>
                                  <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Click a Financial Institution to Connect Instantly</label>
