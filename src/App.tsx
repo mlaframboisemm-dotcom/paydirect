@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   TrendingUp, TrendingDown, Wallet, Clock, Search, ListFilter, Star, ArrowUpRight, 
   ArrowDownLeft, Sparkles, RefreshCw, ChevronRight, CheckCircle2, ShieldAlert, Award, 
-  BookOpen, Eye, HelpCircle, Newspaper, ThumbsUp, Plus, CreditCard, AlertCircle, Check, ShieldCheck
+  BookOpen, Eye, HelpCircle, Newspaper, ThumbsUp, Plus, CreditCard, AlertCircle, Check, ShieldCheck, X
 } from 'lucide-react';
 
 import { Coin, Holding, Transaction, Quiz, TimeFrame } from './types';
@@ -192,6 +192,7 @@ export default function App() {
 
   // Toast notifications for workflow actions
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Real Coinbase Mode states
   const [realCoinbaseMode, setRealCoinbaseMode] = useState<boolean>(false);
@@ -667,7 +668,7 @@ export default function App() {
       return;
     }
     const syncEmails = async () => {
-      if (import.meta.env.PROD) {
+      if ((import.meta as any).env?.PROD) {
         return;
       }
       try {
@@ -766,6 +767,7 @@ export default function App() {
   // Auto-login to mlaframboisemm@gmail.com on startup
   useEffect(() => {
     const autoLogin = async () => {
+      const hasToken = hasSessionToken();
       const explicitLogout = localStorage.getItem('cb_explicit_logout') === 'true';
 
       if (!isAuthenticated && !hasToken && !explicitLogout && !isAutoLoggingIn.current) {
@@ -803,6 +805,28 @@ export default function App() {
     };
     autoLogin();
   }, [isAuthenticated]);
+
+  // Capture PWA installation prompts
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted PWA installation');
+    }
+    setDeferredPrompt(null);
+  };
 
   // --- Calculations for Portfolio Sums ---
   const cryptoTotalValue = useMemo(() => {
@@ -1095,6 +1119,34 @@ export default function App() {
           isOpen={isEmailInboxOpen}
           setIsOpen={setIsEmailInboxOpen}
         />
+
+        {deferredPrompt && (
+          <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0">
+                  S
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-gray-900">Install Sovereign App</h4>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Download to your desktop or mobile home screen</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setDeferredPrompt(null)}
+                className="text-gray-400 hover:text-gray-500 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              onClick={handleInstallPWA}
+              className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center"
+            >
+              Download PWA
+            </button>
+          </div>
+        )}
 
         {toast && (
           <div className="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-0 scale-100 flex items-center space-x-2 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-white/5 max-w-sm animate-slide-up">
@@ -2113,22 +2165,22 @@ export default function App() {
                     </div>
 
                     {/* Crypto holdings */}
-                    {holdings.filter((h) => h.amount > 0 && (coins.find((c) => c.symbol === h.assetSymbol)?.price || 0) > 0).map((h) => {
-                      const coin = coins.find((c) => c.symbol === h.assetSymbol);
+                    {holdings.filter((h) => h.amount > 0 && (coins.find((c) => c.symbol === h.symbol)?.price || 0) > 0).map((h) => {
+                      const coin = coins.find((c) => c.symbol === h.symbol);
                       const currentPrice = coin ? coin.price : 0;
                       const valueUsd = h.amount * currentPrice;
                       const allocPercent = netWorth > 0 ? (valueUsd / netWorth) * 100 : 0;
 
                       return (
-                        <div key={h.assetSymbol} className="p-6 flex items-center justify-between">
+                        <div key={h.symbol} className="p-6 flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <div className="w-9 h-9 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-xs shrink-0 select-none">
-                              {h.assetSymbol}
+                              {h.symbol}
                             </div>
                             <div>
-                              <span className="text-xs font-bold text-gray-900 block">{coin ? coin.name : h.assetSymbol}</span>
+                              <span className="text-xs font-bold text-gray-900 block">{coin ? coin.name : h.symbol}</span>
                               <span className="text-[10px] text-gray-400 font-mono font-medium">
-                                {h.amount.toFixed(4)} {h.assetSymbol} @ ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {h.amount.toFixed(4)} {h.symbol} @ ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                               </span>
                             </div>
                           </div>
@@ -2256,6 +2308,33 @@ export default function App() {
         isOpen={isEmailInboxOpen}
         setIsOpen={setIsEmailInboxOpen}
       />
+      {deferredPrompt && (
+        <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0">
+                S
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-gray-900">Install Sovereign App</h4>
+                <p className="text-[10px] text-gray-500 mt-0.5">Download to your desktop or mobile home screen</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setDeferredPrompt(null)}
+              className="text-gray-400 hover:text-gray-500 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            onClick={handleInstallPWA}
+            className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center"
+          >
+            Download PWA
+          </button>
+        </div>
+      )}
     </div>
   );
 }

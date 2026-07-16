@@ -7509,6 +7509,7 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
 
 // Step 3: Headless Transaction Settlement Valve
 app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => {
+  const requestOrigin = `${req.protocol}://${req.get('host')}`;
   const { transfer_id, selected_bank_key, oauth_authorization_token } = req.body || {};
 
   const transfer = ESCROW_LEDGER.get(transfer_id);

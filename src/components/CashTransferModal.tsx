@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ArrowUpRight, ArrowDownLeft, CheckCircle2, Landmark, 
   Plus, ShieldCheck, Lock, ChevronLeft, CreditCard, DollarSign,
-  Building2, ArrowRight, RefreshCw, AlertCircle
+  Building2, ArrowRight, RefreshCw, AlertCircle, Sparkles
 } from 'lucide-react';
 import { Transaction } from '../types';
 import { fetchLiveExchangeRates } from '../lib/blockchain';
@@ -63,6 +63,7 @@ interface CashTransferModalProps {
   citizenship?: 'US' | 'CA';
   onTriggerEmail?: (subject: string, sender: string, senderEmail: string, bodyHtml: string) => void;
   isAuthenticated?: boolean;
+  onRefreshBalances?: () => void;
 }
 
 interface LinkedBank {
@@ -82,7 +83,8 @@ export default function CashTransferModal({
   initialTab = 'deposit',
   citizenship = 'US',
   onTriggerEmail,
-  isAuthenticated = false
+  isAuthenticated = false,
+  onRefreshBalances
 }: CashTransferModalProps) {
   const [activeTab, setActiveTab] = useState<'deposit' | 'withdraw' | 'banks'>(initialTab);
   
