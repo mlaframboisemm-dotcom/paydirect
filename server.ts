@@ -6428,7 +6428,7 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
         }
       }
 
-      const cashBalance = externalCash + stripeHeldFunds;
+      let cashBalance = externalCash + stripeHeldFunds;
 
       // Attempt to derive ETH balance from configured Marshall wallet when available
       let ethBalance = 0;
