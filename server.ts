@@ -1574,18 +1574,23 @@ app.get('/api/verification/infrastructure', requireAuth, requireMfa, (req: any, 
     if (fs.existsSync(ledgerPath)) {
       ledgerSize = fs.statSync(ledgerPath).size;
       const encryptedContent = fs.readFileSync(ledgerPath, 'utf-8');
-      const ledger = decryptLedgerData(encryptedContent);
-      
-      ledgerEntries = ledger.entries?.length || 0;
-      let validCount = 0;
-      
-      if (ledger.entries) {
-        for (const entry of ledger.entries) {
-          if (verifyLedgerEntrySignature(entry)) validCount++;
+      try {
+        const ledger = decryptLedgerData(encryptedContent);
+        
+        ledgerEntries = ledger.entries?.length || 0;
+        let validCount = 0;
+        
+        if (ledger.entries) {
+          for (const entry of ledger.entries) {
+            if (verifyLedgerEntrySignature(entry)) validCount++;
+          }
         }
+        
+        ledgerIntegrity = validCount === ledgerEntries ? 'VERIFIED' : 'COMPROMISED';
+      } catch (decryptErr) {
+        ledgerIntegrity = 'LOCKED';
+        ledgerEntries = -1;
       }
-      
-      ledgerIntegrity = validCount === ledgerEntries ? 'VERIFIED' : 'COMPROMISED';
     }
     
     const providerHealthStatus = Array.from(providerHealthCache.values()).map(h => ({
