@@ -6418,6 +6418,28 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
               const curr = (item.currency || 'usd').toLowerCase();
               availableUsd += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
             }
+
+            // Include pending Stripe Top-ups to preserve assets in consolidated balance
+            try {
+              const topupsRes = await fetch('https://api.stripe.com/v1/topups?status=pending&limit=100', {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${stripeKey}`,
+                  'Accept': 'application/json'
+                }
+              });
+              if (topupsRes.ok) {
+                const topupsJson = await topupsRes.json() as any;
+                for (const tu of topupsJson.data || []) {
+                  const amt = tu.amount || 0;
+                  const curr = (tu.currency || 'usd').toLowerCase();
+                  availableUsd += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+                }
+              }
+            } catch (tuErr) {
+              console.warn('Failed to fetch pending topups for balances consolidation:', tuErr);
+            }
+
             stripeHeldFunds = availableUsd / 100;
           } else {
             stripeHeldFunds = GLOBAL_STRIPE_BALANCE.available + GLOBAL_STRIPE_BALANCE.pending;
