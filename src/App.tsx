@@ -62,7 +62,9 @@ const USER_SCOPED_STATE_KEYS = [
   'cb_transactions',
   'cb_quizzes',
   'cb_watchlist',
-  'cb_inbox_emails'
+  'cb_inbox_emails',
+  'cb_kyc_level',
+  'cb_citizenship'
 ] as const;
 
 function getUserScopedStorageKey(email: string, key: string): string {
@@ -230,11 +232,17 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('cb_citizenship', citizenship);
-  }, [citizenship]);
+    if (isAuthenticated && userEmail) {
+      localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_citizenship'), citizenship);
+    }
+  }, [citizenship, isAuthenticated, userEmail]);
 
   useEffect(() => {
     localStorage.setItem('cb_kyc_level', kycLevel.toString());
-  }, [kycLevel]);
+    if (isAuthenticated && userEmail) {
+      localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_kyc_level'), kycLevel.toString());
+    }
+  }, [kycLevel, isAuthenticated, userEmail]);
 
   useEffect(() => {
     localStorage.setItem('cb_inbox_emails', JSON.stringify(emails));
@@ -309,6 +317,16 @@ export default function App() {
       if (scopedEmails) setEmails(JSON.parse(scopedEmails));
     } catch {
       // keep existing state on parse failure
+    }
+
+    const scopedKyc = read('cb_kyc_level');
+    if (scopedKyc && Number.isFinite(Number(scopedKyc))) {
+      setKycLevel(parseInt(scopedKyc, 10));
+    }
+
+    const scopedCitizenship = read('cb_citizenship');
+    if (scopedCitizenship) {
+      setCitizenship(scopedCitizenship);
     }
   };
 
