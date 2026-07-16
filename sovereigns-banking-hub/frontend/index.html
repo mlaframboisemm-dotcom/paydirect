@@ -851,7 +851,21 @@
                         <input type="text" class="webview-input" id="webview-mfa-code" placeholder="4 8 2 1 9 5" style="text-align: center; letter-spacing: 6px; font-size: 20px; font-weight: 700;">
                     </div>
 
-                    <button class="webview-button" onclick="submitWebviewMFA()">Confirm Identity & Liquidate</button>
+                    <button class="webview-button" onclick="submitWebviewMFA()">Confirm Identity & Proceed</button>
+                </div>
+
+                <!-- Generic Account Selection Step (For all other banks) -->
+                <div id="webview-step-accounts" style="display: none;">
+                    <div style="text-align: center; margin-bottom: 16px;">
+                        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 4px;">Select Account</h3>
+                        <p style="font-size: 12px; color: #9ca3af;">Choose which account you want to use for this transfer.</p>
+                    </div>
+                    
+                    <div id="generic-accounts-container" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                        <!-- Populate dynamically -->
+                    </div>
+
+                    <button class="webview-button" onclick="submitWebviewAccounts()">Authorize & Execute Remittance</button>
                 </div>
 
                 <!-- Tangerine Login Step -->
@@ -1168,11 +1182,83 @@
             });
         }
 
+        let selectedGenericAccountKey = "chequing";
+
+        function populateGenericAccounts(bankKey) {
+            selectedGenericAccountKey = "chequing";
+            const bankInfo = CANADIAN_FINANCIAL_NODES[bankKey] || { name: "Bank", theme: "#0052FF" };
+            const container = document.getElementById("generic-accounts-container");
+            container.innerHTML = "";
+
+            const accounts = [
+                { key: "chequing", name: bankInfo.name + " Chequing", number: "****4910", balance: "$1,250.00" },
+                { key: "savings", name: bankInfo.name + " Savings", number: "****8271", balance: "$10,000.00" },
+                { key: "joint", name: bankInfo.name + " Joint Chequing", number: "****1042", balance: "$543.20" }
+            ];
+
+            accounts.forEach(acc => {
+                const el = document.createElement("div");
+                el.id = "gen-acct-" + acc.key;
+                el.onclick = () => selectGenericAccount(acc.key, bankInfo.theme);
+                el.style.display = "flex";
+                el.style.justifyContent = "space-between";
+                el.style.alignItems = "center";
+                el.style.borderRadius = "8px";
+                el.style.padding = "10px";
+                el.style.cursor = "pointer";
+                el.style.transition = "all 0.2s";
+
+                if (acc.key === "chequing") {
+                    el.style.border = "2px solid " + bankInfo.theme;
+                    el.style.background = "rgba(0, 0, 0, 0.02)";
+                } else {
+                    el.style.border = "1px solid #e5e7eb";
+                    el.style.background = "#ffffff";
+                }
+
+                el.innerHTML = `
+                    <div>
+                        <div style="font-size: 11px; font-weight: 700; color: #374151;">${acc.name}</div>
+                        <div style="font-size: 9px; color: #6b7280; font-family: monospace;">${acc.number}</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; font-weight: 700; color: #111827;">${acc.balance}</div>
+                        <span style="font-size: 9px; color: #9ca3af;">CAD</span>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function selectGenericAccount(key, themeColor) {
+            selectedGenericAccountKey = key;
+            const keys = ["chequing", "savings", "joint"];
+            keys.forEach(k => {
+                const el = document.getElementById("gen-acct-" + k);
+                if (el) {
+                    if (k === key) {
+                        el.style.border = "2px solid " + themeColor;
+                        el.style.background = "rgba(0, 0, 0, 0.02)";
+                    } else {
+                        el.style.border = "1px solid #e5e7eb";
+                        el.style.background = "#ffffff";
+                    }
+                }
+            });
+        }
+
+        function submitWebviewAccounts() {
+            document.getElementById("webview-step-accounts").style.display = "none";
+            executeFinalizeGatewayHandshake(activeSelectedBankKey.toUpperCase() + "_" + selectedGenericAccountKey.toUpperCase());
+        }
+
         async function submitWebviewMFA() {
             const mfaCode = document.getElementById("webview-mfa-code").value.trim();
             if (!mfaCode) return alert("Enter verification code to continue.");
             
-            await executeFinalizeGatewayHandshake(mfaCode);
+            document.getElementById("webview-step-mfa").style.display = "none";
+            document.getElementById("webview-step-accounts").style.display = "block";
+            populateGenericAccounts(activeSelectedBankKey);
         }
 
         async function finalizeTangerineGatewayConnection() {
