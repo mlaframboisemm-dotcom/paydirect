@@ -392,12 +392,22 @@ export default function Header({
                   <div className="py-1">
                     <button
                       onClick={() => {
+                        setCurrentTab('profile');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
+                    >
+                      <User className="h-4 w-4 text-[#0052FF]" />
+                      <span className="font-bold text-gray-900">My Profile Hub</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         setCurrentTab('onboarding');
                         setShowProfileMenu(false);
                       }}
                       className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
                     >
-                      <User className="h-4 w-4 text-gray-400" />
+                      <ShieldCheck className="h-4 w-4 text-gray-400" />
                       <span>KYC Verification & Limits</span>
                     </button>
                     <button
