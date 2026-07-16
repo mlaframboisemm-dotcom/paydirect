@@ -6384,18 +6384,7 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
   if (!cbKey || !cbSecret) {
     try {
       const holdingsMap = new Map();
-      let externalCash = 0;
-      
-      try {
-        const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
-        if (wallets && wallets.length > 0) {
-          externalCash = Number(wallets[0].balance || 0);
-        }
-      } catch (dbErr) {
-        console.warn('Failed to retrieve USD wallet balance from DB:', dbErr);
-      }
-
-      let stripeHeldFunds = 0;
+      let cashBalance = 0;
       const stripeKey = process.env.STRIPE_SECRET_KEY;
       if (stripeKey) {
         try {
@@ -6408,18 +6397,55 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
           });
           if (balanceRes.ok) {
             const balanceJson = await balanceRes.json() as any;
-            const available = balanceJson.available?.[0]?.amount || 0;
-            stripeHeldFunds = available / 100;
+            let availableUsd = 0;
+            for (const item of balanceJson.available || []) {
+              const amt = item.amount || 0;
+              const curr = (item.currency || 'usd').toLowerCase();
+              availableUsd += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+            }
+            for (const item of balanceJson.pending || []) {
+              const amt = item.amount || 0;
+              const curr = (item.currency || 'usd').toLowerCase();
+              availableUsd += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+            }
+            const totalStripeBalance = availableUsd / 100;
+            
+            // Synchronize the database USD wallet directly to Stripe total balance using supported SQL prefixes
+            try {
+              const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+              if (wallets && wallets.length > 0) {
+                db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [totalStripeBalance, req.user.id, 'USD']);
+              } else {
+                const publicAddressEth = "0x" + crypto.randomBytes(20).toString("hex");
+                const publicAddressBtc = "bc1" + crypto.randomBytes(20).toString("hex");
+                db.execute(
+                  'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  [`wallet_${crypto.randomUUID()}`, req.user.id, 'USD', totalStripeBalance, publicAddressEth, publicAddressBtc, 0, 'live', 0, '']
+                );
+              }
+            } catch (dbErr) {
+              console.warn('Failed to update wallet balance in DB during Stripe sync:', dbErr);
+            }
+            cashBalance = totalStripeBalance;
           } else {
-            stripeHeldFunds = GLOBAL_STRIPE_BALANCE.available;
+            cashBalance = GLOBAL_STRIPE_BALANCE.available + GLOBAL_STRIPE_BALANCE.pending;
           }
         } catch (stripeErr) {
           console.warn('Failed to fetch Stripe balance, falling back to cache:', stripeErr);
-          stripeHeldFunds = GLOBAL_STRIPE_BALANCE.available;
+          cashBalance = GLOBAL_STRIPE_BALANCE.available + GLOBAL_STRIPE_BALANCE.pending;
         }
       }
 
-      let cashBalance = externalCash + stripeHeldFunds;
+      if (cashBalance === 0) {
+        try {
+          const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+          if (wallets && wallets.length > 0) {
+            cashBalance = Number(wallets[0].balance || 0);
+          }
+        } catch (dbErr) {
+          console.warn('Failed to retrieve USD wallet balance from DB:', dbErr);
+        }
+      }
 
       // Attempt to derive ETH balance from configured Marshall wallet when available
       let ethBalance = 0;
