@@ -98,7 +98,8 @@ export default function AuthScreen({
     let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
     const loadGoogleButton = () => {
       if ((window as any).google?.accounts?.id) {
-        const client_id = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '825946-googleoauthplaceholder.apps.googleusercontent.com';
+        // @ts-ignore
+        const client_id = import.meta.env.VITE_GOOGLE_CLIENT_ID || '825946-googleoauthplaceholder.apps.googleusercontent.com';
         if (!isGoogleInitialized) {
           (window as any).google.accounts.id.initialize({
             client_id,
