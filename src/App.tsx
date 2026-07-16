@@ -400,6 +400,7 @@ export default function App() {
     localStorage.removeItem('cb_kyc_level');
     sessionStorage.removeItem('cb_auth_jwt_token');
     localStorage.removeItem('cb_auth_jwt_token');
+    localStorage.setItem('cb_explicit_logout', 'true');
     setIsAuthenticated(false);
     setUserEmail('');
     setUserName('');
@@ -766,9 +767,9 @@ export default function App() {
   // Auto-login to mlaframboisemm@gmail.com on startup
   useEffect(() => {
     const autoLogin = async () => {
-      const hasToken = hasSessionToken();
+      const explicitLogout = localStorage.getItem('cb_explicit_logout') === 'true';
 
-      if (!isAuthenticated && !hasToken && !isAutoLoggingIn.current) {
+      if (!isAuthenticated && !hasToken && !explicitLogout && !isAutoLoggingIn.current) {
         isAutoLoggingIn.current = true;
         try {
           const response = await fetch(buildApiUrl('/api/auth/auto-login'), {

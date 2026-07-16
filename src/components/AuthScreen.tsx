@@ -158,8 +158,11 @@ export default function AuthScreen({
         return;
       }
 
-      if (!result?.token) {
-        // Session cookie should be set by the server; no client-side token persistence is required.
+      if (result?.token) {
+        sessionStorage.setItem('cb_auth_jwt_token', result.token);
+        localStorage.setItem('cb_auth_jwt_token', result.token);
+        localStorage.setItem('cb_auth_authenticated', 'true');
+        localStorage.removeItem('cb_explicit_logout');
       }
 
       const name = result?.user?.name || (email.split('@')[0] || email).trim();
