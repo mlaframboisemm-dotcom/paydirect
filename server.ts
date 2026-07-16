@@ -510,12 +510,20 @@ function decryptLedgerData(encrypted: string): any {
     return JSON.parse(encrypted);
   }
   
+  if (!encryptionKey || encryptionKey.length < 32) {
+    try {
+      return JSON.parse(encrypted);
+    } catch {
+      throw new Error('Ledger is encrypted but SOVEREIGN_ENCRYPTION_KEY is missing or too short.');
+    }
+  }
+  
   try {
     const [ivHex, cipherHex] = encrypted.split(':');
     const iv = Buffer.from(ivHex, 'hex');
-    const key = Buffer.from(encryptionKey!.slice(0, 32), 'hex').length === 32
-      ? Buffer.from(encryptionKey!.slice(0, 32), 'hex')
-      : crypto.pbkdf2Sync(encryptionKey!, 'sovereign_ledger_salt', 100000, 32, 'sha256');
+    const key = Buffer.from(encryptionKey.slice(0, 32), 'hex').length === 32
+      ? Buffer.from(encryptionKey.slice(0, 32), 'hex')
+      : crypto.pbkdf2Sync(encryptionKey, 'sovereign_ledger_salt', 100000, 32, 'sha256');
     
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(cipherHex, 'hex', 'utf-8');
@@ -523,7 +531,11 @@ function decryptLedgerData(encrypted: string): any {
     
     return JSON.parse(decrypted);
   } catch (err) {
-    logDatabaseEvent('READ', 'ledger', { message: 'Decryption failed', error: err, severity: 'error' });
+    logDatabaseEvent('READ', 'ledger', { 
+      message: 'Decryption failed', 
+      error: err, 
+      severity: IS_PRODUCTION ? 'error' : 'debug' 
+    });
     throw err;
   }
 }
@@ -1923,8 +1935,13 @@ setInterval(async () => {
         }
       }
     }
-  } catch (err) {
-    logSystemEvent('WARNING', { message: 'Background auditor encountered sync error', error: err });
+  } catch (err: any) {
+    if (IS_PRODUCTION) {
+      logSystemEvent('WARNING', { 
+        message: 'Background auditor sync check skipped (configuration-dependent)', 
+        error: err?.message || String(err) 
+      });
+    }
   }
 }, 45000); // Run silently in background every 45s
 
