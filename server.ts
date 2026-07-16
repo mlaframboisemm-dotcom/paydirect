@@ -1007,7 +1007,6 @@ app.use('/api/atm/withdraw', strictLimiter);
 app.use('/api/atm/deposit', strictLimiter);
 app.use('/api/mempool/submit', strictLimiter);
 app.use('/api/messaging', strictLimiter);
-app.use('/api/coinbase', strictLimiter);
 app.use('/api/admin', strictLimiter);
 
 // Require authenticated, MFA-verified sessions for all transaction surfaces.
