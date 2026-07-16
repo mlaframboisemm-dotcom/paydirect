@@ -8087,30 +8087,52 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Payout amount must be a positive number.' });
     }
 
-    const stripeBalance = GLOBAL_STRIPE_BALANCE.available;
-
-    if (amountNum > stripeBalance) {
-      console.log(`[PAYOUT ROUTER] Request amount ($${amountNum} USD) exceeds active Stripe pipeline balance ($${stripeBalance} USD). Triggering reservoir Auto-Refill...`);
-      
-      const refillNeeded = amountNum - stripeBalance;
-      
-      const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
-      const externalCash = wallets && wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
-
-      if (externalCash < refillNeeded) {
-        return res.status(400).json({
-          error: 'balance_insufficient',
-          message: `Insufficient consolidated funds to complete payout. Required top-up of $${refillNeeded.toFixed(2)} USD exceeds available internal database reservoir balance ($${externalCash.toFixed(2)} USD).`
-        });
+    // 1. Check Authority: Does the consolidated ledger cover this?
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+    const externalCash = wallets && wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
+    
+    // Fetch fresh available balance from Stripe API
+    let stripeAvailable = 0;
+    try {
+      const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${stripeKey}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (balanceRes.ok) {
+        const balanceJson = await balanceRes.json() as any;
+        for (const item of balanceJson.available || []) {
+          const amt = item.amount || 0;
+          const curr = (item.currency || 'usd').toLowerCase();
+          stripeAvailable += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+        }
       }
+    } catch (e) {
+      console.warn('[PAYOUT ROUTER] Failed to fetch fresh Stripe balance, using cache:', e);
+      stripeAvailable = GLOBAL_STRIPE_BALANCE.available;
+    }
 
-      // Execute auto-refill: Debit reservoir database wallet balance
+    const consolidatedCash = externalCash + stripeAvailable;
+    if (amountNum > consolidatedCash) {
+      return res.status(400).json({
+        error: 'balance_insufficient',
+        message: `Insufficient consolidated cash balance. You have US$${consolidatedCash.toLocaleString(undefined, { minimumFractionDigits: 2 })} available across your treasury.`
+      });
+    }
+
+    // 2. Command the Sync if available Stripe balance is insufficient
+    if (stripeAvailable < amountNum) {
+      const refillNeeded = amountNum - stripeAvailable;
+      console.log(`[PAYOUT ROUTER] Request ($${amountNum.toFixed(2)} USD) exceeds Stripe active balance ($${stripeAvailable.toFixed(2)} USD). Top-up required: $${refillNeeded.toFixed(2)} USD.`);
+
+      // Debit reservoir database wallet balance
       const newDbBalance = Number((externalCash - refillNeeded).toFixed(2));
       db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newDbBalance, req.user.id, 'USD']);
 
-      // Natively trigger a real Stripe Top-up to add funds to the Stripe balance natively from the connected bank!
+      let topupJson: any;
       try {
-        console.log(`[PAYOUT ROUTER] Initiating real Stripe Top-up of $${refillNeeded.toFixed(2)} USD...`);
         const topupForm = new URLSearchParams();
         topupForm.set('amount', String(Math.round(refillNeeded * 100)));
         topupForm.set('currency', 'usd');
@@ -8128,37 +8150,73 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
 
         if (!topupRes.ok) {
           const errText = await topupRes.text();
-          console.error('[PAYOUT ROUTER] Stripe native Top-up call rejected:', errText);
           throw new Error(`Stripe native Top-up failed: ${errText}`);
         }
-
-        const topupJson = await topupRes.json() as any;
-        console.log(`[PAYOUT ROUTER] Stripe native Top-up successfully created! ID: ${topupJson.id}, Status: ${topupJson.status}`);
+        topupJson = await topupRes.json() as any;
+        console.log(`[PAYOUT ROUTER] Stripe native Top-up initiated! ID: ${topupJson.id}, Status: ${topupJson.status}`);
       } catch (topupErr: any) {
-        console.error('[PAYOUT ROUTER ERROR] Failed to complete native Stripe top-up refill:', topupErr);
-        throw new Error(topupErr.message || 'Auto-Refill Top-up failed.');
+        // Revert database balance deduction if Stripe Top-up request fails physically
+        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [externalCash, req.user.id, 'USD']);
+        throw topupErr;
       }
-      
-      GLOBAL_STRIPE_BALANCE.available += refillNeeded;
-      console.log(`[PAYOUT ROUTER] Auto-Refill successful! Deducted $${refillNeeded.toFixed(2)} USD from reservoir database wallet. New database balance: $${newDbBalance.toFixed(2)} USD. Active Stripe available: $${GLOBAL_STRIPE_BALANCE.available.toFixed(2)} USD.`);
 
-      // Log successful refill audit log
+      // Record pending liquidity payout transaction
+      const payoutTxId = `po_${crypto.randomUUID().substring(0, 14)}`;
+      const detailsObj = {
+        payout_status: 'PENDING_LIQUIDITY',
+        payoutAmount: amountNum,
+        topupId: topupJson.id,
+        userId: req.user.id
+      };
+
+      db.execute(
+        `INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          payoutTxId,
+          req.user.id,
+          'SEND',
+          'USD',
+          amountNum,
+          amountNum,
+          Date.now(),
+          JSON.stringify(detailsObj),
+          payoutTxId,
+          'pending',
+          'user_wallet',
+          'stripe_gateway'
+        ]
+      );
+
+      // Record audit log entry
       db.execute(
         'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           `audit_${crypto.randomUUID()}`,
           req.user.id,
-          'PAYOUT_ROUTING_REFILL_SUCCESS',
+          'PAYOUT_PENDING_LIQUIDITY',
           Date.now(),
           '127.0.0.1',
           'success',
-          `Payout Routing Auto-Refill: Transferred $${refillNeeded.toFixed(2)} USD from reservoir database to active Stripe payout pipeline to satisfy payout request of $${amountNum.toFixed(2)} USD.`
+          `Stripe Top-up ${topupJson.id} created: Payout of $${amountNum.toFixed(2)} USD deferred until Top-up settlements complete.`
         ]
       );
+
+      return res.json({
+        success: true,
+        status: 'syncing',
+        message: 'Liquidity buffer replenishing. Payout will execute automatically once Top-up settles.',
+        payout: {
+          id: payoutTxId,
+          status: 'pending',
+          payout_status: 'PENDING_LIQUIDITY',
+          amount: amountNum,
+          topupId: topupJson.id
+        }
+      });
     }
 
+    // 3. Execute Stripe Payout directly when funds are natively available
     const amountCents = Math.round(amountNum * 100);
-
     const form = new URLSearchParams();
     form.set('amount', String(amountCents));
     form.set('currency', 'cad');
@@ -8175,16 +8233,14 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
 
     if (!payoutRes.ok) {
       const errText = await payoutRes.text();
-      // Throw the raw Stripe error directly to report exact live API response
       const errJson = JSON.parse(errText);
       return res.status(payoutRes.status).json(errJson);
     }
 
     const payoutJson = await payoutRes.json() as any;
-
-    // Decrement the active Stripe balance cache by the paid out amount
     GLOBAL_STRIPE_BALANCE.available = Math.max(0, GLOBAL_STRIPE_BALANCE.available - amountNum);
 
+    // Update wallet balance to reflect the payout (credit back CAD value)
     try {
       const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [req.user.id]) as any[];
       const usdWallet = walletRows.find((w: any) => w.assetSymbol.toUpperCase() === 'USD');
@@ -8197,6 +8253,34 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       console.error('Failed to update wallet after Stripe payout:', dbErr);
     }
 
+    // Record completed transaction
+    const payoutTxId = `po_${crypto.randomUUID().substring(0, 14)}`;
+    const detailsObj = {
+      payout_status: 'PAYOUT_EXECUTED',
+      payoutAmount: amountNum,
+      payoutId: payoutJson.id,
+      userId: req.user.id
+    };
+
+    db.execute(
+      `INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        payoutTxId,
+        req.user.id,
+        'SEND',
+        'USD',
+        amountNum,
+        amountNum,
+        Date.now(),
+        JSON.stringify(detailsObj),
+        payoutTxId,
+        'completed',
+        'user_wallet',
+        'stripe_gateway'
+      ]
+    );
+
+    // Record ledger entry
     try {
       const clearinghouse_reference_hash = '0x' + crypto.randomBytes(32).toString('hex');
       await recordLedgerEntry({
@@ -8264,6 +8348,146 @@ app.post('/api/webhooks/stripe', async (req: any, res: any) => {
     if (event.type === 'balance.available') {
       console.log('[STRIPE WEBHOOK] balance.available triggered. Initiating background balance aggregation...');
       await syncAllStripeBalances();
+    }
+
+    // Sentinel check: Check if balance change or top-up settlement allows pending payouts to fire
+    if (event.type === 'balance.available' || event.type === 'topup.succeeded') {
+      console.log('[STRIPE WEBHOOK SENTINEL] Search for pending payouts...');
+      const txs = db.execute("SELECT * FROM transactions WHERE status = 'pending'") as any[];
+      const pendingTxs = txs.filter(t => {
+        try {
+          const detailsObj = JSON.parse(t.details || '{}');
+          return detailsObj.payout_status === 'PENDING_LIQUIDITY';
+        } catch {
+          return false;
+        }
+      });
+
+      for (const tx of pendingTxs) {
+        const details = JSON.parse(tx.details);
+        const amountNum = details.payoutAmount;
+        const userId = details.userId;
+
+        // Retrieve fresh Stripe balance
+        let stripeAvailable = 0;
+        try {
+          const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${stripeKey}`,
+              'Accept': 'application/json'
+            }
+          });
+          if (balanceRes.ok) {
+            const balanceJson = await balanceRes.json() as any;
+            for (const item of balanceJson.available || []) {
+              const amt = item.amount || 0;
+              const curr = (item.currency || 'usd').toLowerCase();
+              stripeAvailable += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+            }
+          }
+        } catch (e) {
+          console.warn('[STRIPE WEBHOOK SENTINEL] Failed to fetch stripe balance:', e);
+        }
+
+        if (stripeAvailable >= amountNum) {
+          console.log(`[STRIPE WEBHOOK SENTINEL] Active Stripe balance ($${stripeAvailable.toFixed(2)} USD) covers pending payout ($${amountNum.toFixed(2)} USD). Executing...`);
+          try {
+            const amountCents = Math.round(amountNum * 100);
+            const form = new URLSearchParams();
+            form.set('amount', String(amountCents));
+            form.set('currency', 'cad');
+
+            const payoutRes = await fetch('https://api.stripe.com/v1/payouts', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${stripeKey}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+              },
+              body: form.toString()
+            });
+
+            if (!payoutRes.ok) {
+              const errText = await payoutRes.text();
+              throw new Error(`Deferred Stripe payout failed: ${errText}`);
+            }
+
+            const payoutJson = await payoutRes.json() as any;
+            console.log(`[STRIPE WEBHOOK SENTINEL] Deferred Stripe payout successfully executed! Payout ID: ${payoutJson.id}`);
+
+            // Update wallet balance
+            try {
+              const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+              const usdWallet = walletRows.find((w: any) => w.assetSymbol.toUpperCase() === 'USD');
+              if (usdWallet) {
+                const currentBalance = Number(usdWallet.balance || 0);
+                const newBalance = Number((currentBalance + amountNum).toFixed(2));
+                db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBalance, userId, 'USD']);
+              }
+            } catch (dbErr: any) {
+              console.error('Failed to update wallet after deferred Stripe payout:', dbErr);
+            }
+
+            // Update transaction details
+            const updatedDetails = {
+              ...details,
+              payout_status: 'PAYOUT_EXECUTED',
+              payoutId: payoutJson.id
+            };
+
+            db.execute(
+              "UPDATE transactions SET status = 'completed', details = ? WHERE id = ?",
+              [JSON.stringify(updatedDetails), tx.id]
+            );
+
+            // Record audit log
+            db.execute(
+              'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [
+                `audit_${crypto.randomUUID()}`,
+                userId,
+                'PAYOUT_EXECUTED_SUCCESS',
+                Date.now(),
+                '127.0.0.1',
+                'success',
+                `Deferred Payout Executed: Top-up settled. Dispatched payout ${payoutJson.id} of CA$${amountNum.toFixed(2)} to connected account.`
+              ]
+            );
+
+            // Record ledger entry
+            try {
+              const clearinghouse_reference_hash = '0x' + crypto.randomBytes(32).toString('hex');
+              await recordLedgerEntry({
+                type: "transfer",
+                status: "executed",
+                payload: {
+                  action: "settlement.withdrawal",
+                  method: "stripe",
+                  amount: amountNum,
+                  currency: "CAD",
+                  userId,
+                  referenceNotes: `Deferred Stripe payout triggered. Payout ID: ${payoutJson.id}`,
+                  clearinghouseHash: clearinghouse_reference_hash
+                },
+                result: {
+                  state: "reconciled",
+                  recordedAt: new Date().toISOString(),
+                  trackingReferenceId: clearinghouse_reference_hash,
+                  amountDelta: `-$${amountNum.toFixed(2)} CAD`
+                }
+              });
+            } catch (ledgerErr) {
+              console.error('Failed to record Stripe payout in ledger:', ledgerErr);
+            }
+
+          } catch (payoutErr: any) {
+            console.error('[STRIPE WEBHOOK SENTINEL ERROR] Failed to dispatch deferred payout:', payoutErr);
+          }
+        } else {
+          console.warn(`[STRIPE WEBHOOK SENTINEL] Stripe balance ($${stripeAvailable.toFixed(2)} USD) is still insufficient for $${amountNum.toFixed(2)} USD payout. Waiting for further balance updates.`);
+        }
+      }
     } else if (event.type === 'payout.paid') {
       const payout = event.data?.object;
       if (payout) {
