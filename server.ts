@@ -21,7 +21,7 @@ import { createEnforcer, enforceExternalProofRequirement, isFinancialOperationVe
 import { generateVerificationReport, validateReport } from './src/lib/truth-based-reporter.js';
 import { LedgerMutex } from './src/lib/ledger-mutex.js';
 import { db } from './src/db/ledger.js';
-import { syncAllStripeBalances, runAsymmetricForensicAudit, GLOBAL_STRIPE_BALANCE } from './src/lib/stripe-sync.js';
+import { syncAllStripeBalances, runAsymmetricForensicAudit, GLOBAL_STRIPE_BALANCE, checkAndRefillLiquidity, MIN_LIQUIDITY_THRESHOLD } from './src/lib/stripe-sync.js';
 import { generateSessionId, signSessionToken, verifyPassword, verifySessionToken, verifyTotpCode } from './src/lib/auth-security.js';
 import { validateLiveOperationConfig, validateProductionSecrets } from './src/lib/production-config.js';
 import { buildRuntimeReadinessReport } from './src/lib/runtime-readiness.js';
@@ -8060,13 +8060,33 @@ app.get('/api/stripe/balance', requireAuth, async (req: any, res) => {
     }
 
     const balanceJson = await balanceRes.json() as any;
-    const available = balanceJson.available?.[0]?.amount || 0;
-    const pending = balanceJson.pending?.[0]?.amount || 0;
+    let availableUsd = 0;
+    let pendingUsd = 0;
+
+    for (const item of balanceJson.available || []) {
+      const amt = item.amount || 0;
+      const curr = (item.currency || 'usd').toLowerCase();
+      availableUsd += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+    }
+
+    for (const item of balanceJson.pending || []) {
+      const amt = item.amount || 0;
+      const curr = (item.currency || 'usd').toLowerCase();
+      pendingUsd += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+    }
+
+    // Proactive Sync: If Stripe balance falls below threshold, trigger background sync immediately
+    if (availableUsd < MIN_LIQUIDITY_THRESHOLD) {
+      console.log(`[STRIPE BALANCE] Live available USD ($${availableUsd.toFixed(2)}) is below threshold ($${MIN_LIQUIDITY_THRESHOLD}). Triggering proactive Auto-Refill check in background...`);
+      checkAndRefillLiquidity(req.user.id).catch(err => {
+        console.error('Failed to run background auto-refill:', err);
+      });
+    }
 
     res.json({
-      available: available / 100,
-      pending: pending / 100,
-      total: (available + pending) / 100
+      available: availableUsd,
+      pending: pendingUsd,
+      total: availableUsd + pendingUsd
     });
   } catch (err: any) {
     console.error('Stripe balance fetch error:', err);
