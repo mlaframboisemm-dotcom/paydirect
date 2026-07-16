@@ -3380,11 +3380,7 @@ async function lockAccountToIdentity(user: any, source: 'register' | 'login') {
 async function sendETransferEmail(email: string, subject: string, htmlContent: string) {
   const gateway = readGatewayConfig();
 
-  // Reroute default administrator email to custom configured gateway email if applicable
-  let targetEmail = email;
-  if (email === 'mlaframboisemm@gmail.com' && gateway.contactEmail) {
-    targetEmail = gateway.contactEmail;
-  }
+  const targetEmail = email;
 
   // In production, avoid persisting email previews to disk to reduce exposure of sensitive content.
   if (!IS_PRODUCTION) {
