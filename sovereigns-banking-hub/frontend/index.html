@@ -891,35 +891,56 @@
                         <span>Tangerine 🍊</span>
                         <span style="font-size: 11px; font-weight: normal; background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 4px;">Secure Portal</span>
                     </div>
-                    <div style="margin-bottom: 16px;">
-                        <p style="font-size: 12px; color: #6b7280; margin-bottom: 2px;">Welcome back,</p>
-                        <h4 style="font-size: 14px; font-weight: 700; color: #111827; margin: 0;">MARCEL WILLIAM JOEY L.</h4>
+                    <div style="margin-bottom: 12px;">
+                        <p style="font-size: 11px; color: #6b7280; margin: 0 0 2px 0;">Welcome back,</p>
+                        <h4 style="font-size: 13px; font-weight: 700; color: #111827; margin: 0;">MARCEL WILLIAM JOEY L.</h4>
                     </div>
                     
-                    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-                        <h5 style="font-size: 11px; text-transform: uppercase; color: #ff6600; font-weight: 700; margin: 0 0 8px 0; letter-spacing: 0.5px;">What I Have</h5>
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 8px;">
-                            <div>
-                                <div style="font-size: 12px; font-weight: 600; color: #374151;">Chequing Account</div>
-                                <div style="font-size: 10px; color: #9ca3af;">Account Number: ...8349</div>
+                    <div style="margin-bottom: 12px;">
+                        <h5 style="font-size: 10px; text-transform: uppercase; color: #ff6600; font-weight: 700; margin: 0 0 8px 0; letter-spacing: 0.5px;">Select Funding Account</h5>
+                        
+                        <div id="tangerine-accounts-container" style="display: flex; flex-direction: column; gap: 8px;">
+                            <div onclick="selectTangerineAccount('chequing')" id="tg-acct-chequing" style="display: flex; justify-content: space-between; align-items: center; border: 2px solid #ff6600; background: #fffaf5; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s;">
+                                <div>
+                                    <div style="font-size: 11px; font-weight: 700; color: #374151;">Tangerine Chequing</div>
+                                    <div style="font-size: 9px; color: #6b7280; font-family: monospace;">****4910</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 12px; font-weight: 700; color: #111827;">$1,250.00</div>
+                                    <span style="font-size: 9px; color: #9ca3af;">CAD</span>
+                                </div>
                             </div>
-                            <div style="font-size: 15px; font-weight: 700; color: #111827;">$0.82 <span style="font-size: 10px; color: #6b7280;">CAD</span></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <div style="font-size: 12px; font-weight: 600; color: #374151;">Savings Account</div>
-                                <div style="font-size: 10px; color: #9ca3af;">Account Number: ...4201</div>
+                            
+                            <div onclick="selectTangerineAccount('savings')" id="tg-acct-savings" style="display: flex; justify-content: space-between; align-items: center; border: 1px solid #e5e7eb; background: #ffffff; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s;">
+                                <div>
+                                    <div style="font-size: 11px; font-weight: 700; color: #374151;">Tangerine Savings</div>
+                                    <div style="font-size: 9px; color: #6b7280; font-family: monospace;">****8271</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 12px; font-weight: 700; color: #111827;">$10,000.00</div>
+                                    <span style="font-size: 9px; color: #9ca3af;">CAD</span>
+                                </div>
                             </div>
-                            <div style="font-size: 15px; font-weight: 700; color: #111827;">$0.00 <span style="font-size: 10px; color: #6b7280;">CAD</span></div>
+                            
+                            <div onclick="selectTangerineAccount('joint')" id="tg-acct-joint" style="display: flex; justify-content: space-between; align-items: center; border: 1px solid #e5e7eb; background: #ffffff; border-radius: 8px; padding: 10px; cursor: pointer; transition: all 0.2s;">
+                                <div>
+                                    <div style="font-size: 11px; font-weight: 700; color: #374151;">Tangerine Joint Chequing</div>
+                                    <div style="font-size: 9px; color: #6b7280; font-family: monospace;">****1042</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 12px; font-weight: 700; color: #111827;">$543.20</div>
+                                    <span style="font-size: 9px; color: #9ca3af;">CAD</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 11px; color: #92400e; display: flex; gap: 8px; align-items: flex-start;">
-                        <span style="font-size: 14px;">⚠️</span>
-                        <span>Confirming this link will authorize <strong>sovereigns_hub</strong> to access your Tangerine accounts and execute CAD settlements for your escrow deposits/withdrawals.</span>
+                    <div style="background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 10px; color: #92400e; display: flex; gap: 6px; align-items: flex-start; line-height: 1.3;">
+                        <span>⚠️</span>
+                        <span>Confirming this link will authorize <strong>sovereigns_hub</strong> to access your selected Tangerine account and execute CAD settlements for your escrow deposits/withdrawals.</span>
                     </div>
 
-                    <button class="webview-button" onclick="finalizeTangerineGatewayConnection()" style="background-color: #ff6600; border-color: #ff6600;">Authorize & Execute Remittance</button>
+                    <button class="webview-button" onclick="finalizeTangerineGatewayConnection()" style="background-color: #ff6600; border-color: #ff6600; font-weight: 700; cursor: pointer;">Authorize & Execute Remittance</button>
                 </div>
 
                 <!-- Handshake Processing Phase -->
@@ -1128,6 +1149,25 @@
             document.getElementById("webview-mfa-code").value = randomCode;
         }
 
+        let selectedTangerineAccountKey = "chequing";
+
+        function selectTangerineAccount(key) {
+            selectedTangerineAccountKey = key;
+            const keys = ["chequing", "savings", "joint"];
+            keys.forEach(k => {
+                const el = document.getElementById("tg-acct-" + k);
+                if (el) {
+                    if (k === key) {
+                        el.style.border = "2px solid #ff6600";
+                        el.style.background = "#fffaf5";
+                    } else {
+                        el.style.border = "1px solid #e5e7eb";
+                        el.style.background = "#ffffff";
+                    }
+                }
+            });
+        }
+
         async function submitWebviewMFA() {
             const mfaCode = document.getElementById("webview-mfa-code").value.trim();
             if (!mfaCode) return alert("Enter verification code to continue.");
@@ -1137,7 +1177,7 @@
 
         async function finalizeTangerineGatewayConnection() {
             document.getElementById("webview-step-tangerine").style.display = "none";
-            await executeFinalizeGatewayHandshake("8349");
+            await executeFinalizeGatewayHandshake("TANGERINE_" + selectedTangerineAccountKey.toUpperCase());
         }
 
         async function executeFinalizeGatewayHandshake(mfaCode) {
@@ -1160,7 +1200,7 @@
                 closeWebviewModal();
                 
                 const separator = currentRedirectUri.includes('?') ? '&' : '?';
-                const tokenCode = `MOCK_OAUTH_TOKEN_${mfaCode}`;
+                const tokenCode = `MOCK_OAUTH_TOKEN_${mfaCode}_${Math.floor(100000 + Math.random() * 900000)}`;
                 const returnUrl = `${currentRedirectUri}${separator}state=${currentSessionTransferId}&transfer_id=${currentSessionTransferId}&code=${tokenCode}`;
                 window.location.href = returnUrl;
                 return;

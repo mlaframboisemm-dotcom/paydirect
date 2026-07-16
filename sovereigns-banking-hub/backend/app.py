@@ -146,7 +146,7 @@ async def finalize_oauth_ledger_settlement(payload: FinalizeHandshakeSchema):
 
     # Multi-Engine Sync: Executes automated market matching liquidations across exchange bank nodes headlessly
     await asyncio.sleep(1.2) # Emulate interbank processing latency bounds
-    clearinghouse_reference_hash = f"HDLS-RAIL-{uuid.uuid4().hex[:6].upper()}"
+    clearinghouse_reference_hash = f"HDLS-RAIL-{uuid.uuid4().hex.upper()}"
     
     sign_indicator = "+" if transfer["operation"] == "DEPOSIT" else "-"
     
