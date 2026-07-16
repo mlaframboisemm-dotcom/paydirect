@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import net from 'net';
+import crypto from 'crypto';
 
 const repoRoot = process.cwd();
 const dbPath = path.join(repoRoot, 'src', 'db', 'database.json');
@@ -168,6 +169,41 @@ async function main() {
 
     const cookie = parseCookie(loginRes.headers.get('set-cookie'));
     assert(Boolean(cookie), 'Expected cb_session cookie');
+
+    // Route Contract Test: Verify MFA middleware chain blocks withdrawal disbursement
+    const downgradeTokenMfa = (token: string, secret: string): string => {
+      const [headerPart, payloadPart] = token.split('.');
+      const base64UrlDecode = (input: string): Buffer => {
+        let normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+        while (normalized.length % 4) normalized += '=';
+        return Buffer.from(normalized, 'base64');
+      };
+      const base64UrlEncode = (input: string | Buffer): string => {
+        const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input, 'utf8');
+        return buffer.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+      };
+      const payload = JSON.parse(base64UrlDecode(payloadPart!).toString('utf8'));
+      payload.mfa = false;
+      
+      const encodedHeader = headerPart!;
+      const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+      const signature = crypto
+        .createHmac('sha256', secret)
+        .update(`${encodedHeader}.${encodedPayload}`)
+        .digest();
+      return `${encodedHeader}.${encodedPayload}.${base64UrlEncode(signature)}`;
+    };
+
+    const jwtSecret = '12345678901234567890123456789012';
+    const downgradedToken = downgradeTokenMfa(loginBody.token, jwtSecret);
+    const mfaPendingCookie = `cb_session=${encodeURIComponent(downgradedToken)}`;
+
+    const mfaPendingDisburse = await fetch(`${base}/api/withdrawal/disburse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', cookie: mfaPendingCookie },
+      body: JSON.stringify({ amount: 50 })
+    });
+    assert(mfaPendingDisburse.status === 403, `Expected MFA middleware to block withdrawal disbursement with 403, got ${mfaPendingDisburse.status}`);
 
     const spendabilityRes = await fetch(`${base}/api/transactions/spendability`, {
       headers: { cookie }

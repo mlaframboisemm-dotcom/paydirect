@@ -1028,7 +1028,7 @@ app.use('/api/exchanges/sync', strictLimiter);
 app.use('/api/exchanges/trade', strictLimiter);
 app.use('/api/exchanges/swap', strictLimiter);
 app.use('/api/exchanges/etransfer', strictLimiter);
-app.use('/api/withdrawal/disburse', strictLimiter);
+app.use('/api/withdrawal/disburse', strictLimiter, withdrawalRateLimiter);
 app.use('/api/atm/voucher', strictLimiter);
 app.use('/api/atm/connect', strictLimiter);
 app.use('/api/atm/withdraw', strictLimiter);
