@@ -51,9 +51,25 @@ function buildAuthHeaders(extraHeaders?: Record<string, string>): Record<string,
   };
 }
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (typeof payload.exp === 'number') {
+      // Return true if expired (or within 5 seconds of expiring to be safe)
+      return (Date.now() / 1000) >= (payload.exp - 5);
+    }
+  } catch (e) {
+    return true;
+  }
+  return false;
+}
+
 function hasSessionToken(): boolean {
   const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
-  return !!token;
+  if (!token) return false;
+  return !isTokenExpired(token);
 }
 
 const USER_SCOPED_STATE_KEYS = [
@@ -541,7 +557,7 @@ export default function App() {
   }, [realCoinbaseMode, isAuthenticated]);
 
   const fetchStripeBalance = async () => {
-    if (!isAuthenticated || !hasSessionToken()) return;
+    if (!isAuthenticated || !hasSessionToken() || !isStripeConfigured) return;
     setIsFetchingStripeBalance(true);
     try {
       const res = await fetch(buildApiUrl('/api/stripe/balance'), {
@@ -2097,7 +2113,7 @@ export default function App() {
                     </div>
 
                     {/* Crypto holdings */}
-                    {holdings.map((h) => {
+                    {holdings.filter((h) => h.amount > 0 && (coins.find((c) => c.symbol === h.assetSymbol)?.price || 0) > 0).map((h) => {
                       const coin = coins.find((c) => c.symbol === h.assetSymbol);
                       const currentPrice = coin ? coin.price : 0;
                       const valueUsd = h.amount * currentPrice;
