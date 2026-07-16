@@ -497,7 +497,7 @@ export default function OnboardingKyc({
                   <CreditCard className="h-4 w-4 text-gray-500" />
                   <div>
                     <span className="font-bold text-gray-800">{c.name}</span>
-                    <span className="text-[10px] text-gray-400 font-mono block">{c.details} ({c.region})</span>
+                    <span className="text-[10px] text-gray-400 font-mono block">{c.details} ({c.region === 'CA' ? 'CAD' : 'USD'})</span>
                   </div>
                 </div>
                 <button

@@ -273,7 +273,9 @@ export default function Header({
           <div className="hidden md:flex flex-col items-end px-3 py-1 bg-gray-50 rounded-lg border border-gray-100 select-none">
             <span className="text-[10px] text-gray-400 font-medium">PORTFOLIO</span>
             <span className="text-sm font-bold text-gray-900">
-              ${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {citizenship === 'Canada' || citizenship === 'CA'
+                ? `CA$${(portfolioValue * 1.36).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                : `$${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
             </span>
           </div>
 
