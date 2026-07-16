@@ -579,6 +579,9 @@ export default function App() {
       return;
     }
     const syncEmails = async () => {
+      if (import.meta.env.PROD) {
+        return;
+      }
       try {
         const res = await fetch(buildApiUrl('/api/messaging/emails'), {
           headers: buildAuthHeaders(),
