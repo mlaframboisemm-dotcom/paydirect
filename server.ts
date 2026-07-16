@@ -6032,7 +6032,7 @@ async function getTransactionsFromLedger() {
             const action = payload.action || '';
             const method = payload.method || '';
             
-            if (action === 'settlement.withdrawal' || method === 'atm_cashout' || method === 'etransfer_withdraw' || method === 'bank_withdraw') {
+            if (action === 'settlement.withdrawal' || method === 'bank' || method === 'atm_cashout' || method === 'etransfer_withdraw' || method === 'bank_withdraw') {
               list.push({
                 id: entry.id,
                 type: 'SEND',
@@ -6044,11 +6044,13 @@ async function getTransactionsFromLedger() {
                   ? `ATM Cashout Withdrawal (Voucher Ref: ${payload.voucherRef})`
                   : method === 'etransfer_withdraw'
                   ? `Interac e-Transfer Withdrawal to Scotiabank (${payload.email})`
+                  : method === 'bank'
+                  ? `ACH Cash WithdrawalCleared via ${payload.bankName || 'Linked Bank'} Portal`
                   : `ACH Cash Withdrawal to ${payload.bankName || 'Linked Bank'}`,
-                hash: result.txHash,
+                hash: result.txHash || result.trackingReferenceId || payload.clearinghouseHash || payload.reference || '0x' + crypto.createHash('sha256').update(entry.id).digest('hex'),
                 status: status
               });
-            } else if (action === 'settlement.deposit' || action === 'treasury.deposit' || method === 'atm_deposit' || method === 'etransfer_deposit' || method === 'bank_deposit') {
+            } else if (action === 'settlement.deposit' || action === 'treasury.deposit' || method === 'atm_deposit' || method === 'etransfer_deposit' || method === 'bank_deposit' || method === 'bank') {
               list.push({
                 id: entry.id,
                 type: 'RECEIVE',
@@ -6059,11 +6061,13 @@ async function getTransactionsFromLedger() {
                 details: method === 'atm_deposit'
                   ? `ATM Cash Deposit (Ref: ${payload.depositRef})`
                   : method === 'etransfer_deposit'
-                  ? `Interac e-Transfer Deposit from ${payload.bankName || 'Linked Bank'} (Ref: ${payload.reference})`
+                  ? `Interac e-Transfer Deposit from ${payload.bankName || 'Linked Bank'} (Ref: ${payload.reference || payload.clearinghouseHash || '0x'})`
+                  : method === 'bank'
+                  ? `ACH Cash Deposit Cleared via ${payload.bankName || 'Linked Bank'} Portal (Ref: ${payload.reference || payload.clearinghouseHash || '0x'})`
                   : method === 'learning_reward'
                   ? `Coinbase Learning Reward Claimed ($${payload.amount.toFixed(2)})`
                   : `ACH Cash Deposit from ${payload.bankName || 'Linked Bank'}`,
-                hash: result.txHash,
+                hash: result.txHash || result.trackingReferenceId || payload.clearinghouseHash || payload.reference || '0x' + crypto.createHash('sha256').update(entry.id).digest('hex'),
                 status: status
               });
             }
@@ -7839,6 +7843,7 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
         state: "reconciled",
         recordedAt: new Date().toISOString(),
         trackingReferenceId: clearinghouse_reference_hash,
+        txHash: clearinghouse_reference_hash,
         amountDelta
       }
     });

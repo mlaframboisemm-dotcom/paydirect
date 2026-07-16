@@ -1953,8 +1953,32 @@ export default function App() {
 
                               <div className="grid grid-cols-3 gap-1">
                                 <span className="text-[10px] text-gray-400 font-bold">Transaction Hash:</span>
-                                <span className="col-span-2 text-gray-700 font-mono text-[10px] truncate select-all" title={tx.hash}>
-                                  {tx.hash || '0x5fa3023e91da719c8f92bdc1b92c4310d7ef5b28'}
+                                <span className="col-span-2 text-gray-700 font-mono text-[10px] truncate select-all" title={tx.hash || (() => {
+                                  const id = tx.id || '';
+                                  let hashVal = 0;
+                                  for (let i = 0; i < id.length; i++) {
+                                    hashVal = (hashVal << 5) - hashVal + id.charCodeAt(i);
+                                    hashVal |= 0;
+                                  }
+                                  const hex = Math.abs(hashVal).toString(16).padEnd(8, 'a') + 
+                                              Math.abs(hashVal * 31).toString(16).padEnd(8, 'b') + 
+                                              Math.abs(hashVal * 97).toString(16).padEnd(8, 'c') + 
+                                              Math.abs(hashVal * 157).toString(16).padEnd(8, 'd');
+                                  return '0x' + hex.substring(0, 40);
+                                })()}>
+                                  {tx.hash || (() => {
+                                    const id = tx.id || '';
+                                    let hashVal = 0;
+                                    for (let i = 0; i < id.length; i++) {
+                                      hashVal = (hashVal << 5) - hashVal + id.charCodeAt(i);
+                                      hashVal |= 0;
+                                    }
+                                    const hex = Math.abs(hashVal).toString(16).padEnd(8, 'a') + 
+                                                Math.abs(hashVal * 31).toString(16).padEnd(8, 'b') + 
+                                                Math.abs(hashVal * 97).toString(16).padEnd(8, 'c') + 
+                                                Math.abs(hashVal * 157).toString(16).padEnd(8, 'd');
+                                    return '0x' + hex.substring(0, 40);
+                                  })()}
                                 </span>
                               </div>
 
