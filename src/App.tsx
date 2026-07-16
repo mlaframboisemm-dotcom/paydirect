@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   TrendingUp, TrendingDown, Wallet, Clock, Search, ListFilter, Star, ArrowUpRight, 
   ArrowDownLeft, Sparkles, RefreshCw, ChevronRight, CheckCircle2, ShieldAlert, Award, 
-  BookOpen, Eye, HelpCircle, Newspaper, ThumbsUp, Plus 
+  BookOpen, Eye, HelpCircle, Newspaper, ThumbsUp, Plus, CreditCard, AlertCircle, Check
 } from 'lucide-react';
 
 import { Coin, Holding, Transaction, Quiz, TimeFrame } from './types';
@@ -156,6 +156,16 @@ export default function App() {
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [cashModalAction, setCashModalAction] = useState<'deposit' | 'withdraw'>('deposit');
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+
+  // Stripe Hub states
+  const [stripeAvailable, setStripeAvailable] = useState<number>(0);
+  const [stripePending, setStripePending] = useState<number>(0);
+  const [stripeTotal, setStripeTotal] = useState<number>(0);
+  const [isFetchingStripeBalance, setIsFetchingStripeBalance] = useState(false);
+  const [isProcessingStripePayout, setIsProcessingStripePayout] = useState(false);
+  const [stripePayoutAmount, setStripePayoutAmount] = useState('');
+  const [stripePayoutError, setStripePayoutError] = useState<string | null>(null);
+  const [stripePayoutSuccess, setStripePayoutSuccess] = useState<string | null>(null);
   
   // Market search & filters
   const [marketFilter, setMarketFilter] = useState<'all' | 'gainers' | 'losers' | 'watchlist'>('all');
@@ -524,6 +534,60 @@ export default function App() {
     }, 25000); // Poll every 25 seconds
     return () => clearInterval(interval);
   }, [realCoinbaseMode, isAuthenticated]);
+
+  const fetchStripeBalance = async () => {
+    if (!isAuthenticated) return;
+    setIsFetchingStripeBalance(true);
+    try {
+      const res = await fetch(buildApiUrl('/api/stripe/balance'), {
+        headers: buildAuthHeaders(),
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStripeAvailable(data.available || 0);
+        setStripePending(data.pending || 0);
+        setStripeTotal(data.total || 0);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch Stripe balance:', err);
+    } finally {
+      setIsFetchingStripeBalance(false);
+    }
+  };
+
+  const handleTriggerStripePayout = async (amountNum: number) => {
+    setStripePayoutError(null);
+    setStripePayoutSuccess(null);
+    setIsProcessingStripePayout(true);
+    try {
+      const res = await fetch(buildApiUrl('/api/stripe/payout'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ amount: amountNum })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStripePayoutSuccess(`Payout of CA$${amountNum.toFixed(2)} initiated successfully to your connected bank account!`);
+        showToast(`Stripe payout of CA$${amountNum.toFixed(2)} dispatched!`, 'success');
+        setStripePayoutAmount('');
+        fetchStripeBalance();
+        syncCoinbaseBalances();
+      } else {
+        setStripePayoutError(data.message || data.error || 'Failed to dispatch Stripe payout.');
+      }
+    } catch (err: any) {
+      setStripePayoutError(err.message || 'Payout request failed.');
+    } finally {
+      setIsProcessingStripePayout(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === 'stripe' && isAuthenticated) {
+      fetchStripeBalance();
+    }
+  }, [currentTab, isAuthenticated]);
 
   // --- Real-time Price Integration from Sovereign Backend ---
   useEffect(() => {
@@ -1777,6 +1841,163 @@ export default function App() {
                   No account transaction activity recorded yet.
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* --- Tab 6: Stripe Synchronization Hub --- */}
+        {currentTab === 'stripe' && (
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 className="text-lg font-black text-gray-900 flex items-center space-x-2">
+                  <CreditCard className="h-5 w-5 text-[#635BFF]" />
+                  <span>Stripe Synchronization Hub</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 font-medium">
+                  Monitor your live Stripe account balance, auto-sync parameters, and execute connected account payouts.
+                </p>
+              </div>
+              <button
+                onClick={fetchStripeBalance}
+                disabled={isFetchingStripeBalance}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetchingStripeBalance ? 'animate-spin' : ''}`} />
+                <span>{isFetchingStripeBalance ? 'Syncing...' : 'Sync Balance Now'}</span>
+              </button>
+            </div>
+
+            {/* Grid of Balances */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Available Balance (CAD)</span>
+                <span className="text-2xl font-black text-gray-900 mt-2 block font-mono">
+                  ${stripeAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[9px] text-emerald-600 font-bold mt-1 block">Ready for Instant Payout</span>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Pending Balance (CAD)</span>
+                <span className="text-2xl font-black text-gray-500 mt-2 block font-mono">
+                  ${stripePending.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[9px] text-gray-400 font-bold mt-1 block">Clearing in 1-2 Business Days</span>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs bg-slate-50/50">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Total Stripe Balance (CAD)</span>
+                <span className="text-2xl font-black text-[#635BFF] mt-2 block font-mono">
+                  ${stripeTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-[9px] text-gray-500 font-semibold mt-1 block">Synced to App Worth</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+              {/* Left Column: Sync Checklist / Rules */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
+                    🔄 Live Synchronization Rules
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        1
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-gray-900">USD Cash Balance Sync</h5>
+                        <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed font-medium">
+                          The <strong>USD Cash</strong> row in your Balances table displays your live Stripe balance. It updates automatically in the background.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        2
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-gray-900">Buy/Sell Trading Power</h5>
+                        <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed font-medium">
+                          The <strong>Cash</strong> balance inside the trading widget matches your Stripe balance state, meaning your live available purchasing power updates automatically.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-3">
+                      <div className="w-5 h-5 rounded-full bg-blue-50 text-[#0052FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                        3
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-gray-900">Total Net Worth Calculation</h5>
+                        <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed font-medium">
+                          Your <strong>Total Net Worth (CAD)</strong> is calculated as the sum of USD Cash and active crypto balances. Any Stripe card deposits or bank payouts immediately update this figure.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Payout Portal */}
+              <div className="lg:col-span-5 space-y-6">
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">
+                  <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2">
+                    💸 Connected Payout Portal
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                        Payout Amount (CAD)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-gray-400 font-extrabold text-xs">CA$</span>
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={stripePayoutAmount}
+                          onChange={(e) => setStripePayoutAmount(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#635BFF]"
+                        />
+                      </div>
+                    </div>
+
+                    {stripePayoutError && (
+                      <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-semibold flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{stripePayoutError}</span>
+                      </div>
+                    )}
+
+                    {stripePayoutSuccess && (
+                      <div className="p-2.5 bg-green-50 border border-green-100 rounded-xl text-green-700 text-xs font-semibold flex items-center space-x-2">
+                        <Check className="h-4 w-4 shrink-0" />
+                        <span>{stripePayoutSuccess}</span>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => handleTriggerStripePayout(parseFloat(stripePayoutAmount))}
+                      disabled={isProcessingStripePayout || !stripePayoutAmount || parseFloat(stripePayoutAmount) <= 0}
+                      className="w-full bg-[#635BFF] hover:bg-[#4E46E5] text-white py-3 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2 shadow-md shadow-indigo-500/10"
+                    >
+                      {isProcessingStripePayout ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Dispatching payout...</span>
+                        </>
+                      ) : (
+                        <span>Initiate Connected Payout</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
