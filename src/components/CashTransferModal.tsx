@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ArrowUpRight, ArrowDownLeft, CheckCircle2, Landmark, 
   Plus, ShieldCheck, Lock, ChevronLeft, CreditCard, DollarSign,
-  Building2, ArrowRight, RefreshCw, AlertCircle, Sparkles
+  Building2, ArrowRight, RefreshCw, AlertCircle, Sparkles, Smartphone
 } from 'lucide-react';
 import { Transaction } from '../types';
 import { fetchLiveExchangeRates } from '../lib/blockchain';
@@ -138,12 +138,14 @@ export default function CashTransferModal({
 
 
   // Plaid-like connector states
-  const [linkingStep, setLinkingStep] = useState<'none' | 'welcome' | 'select-bank' | 'credentials' | 'success'>('none');
+  const [linkingStep, setLinkingStep] = useState<'none' | 'welcome' | 'select-bank' | 'credentials' | 'select-account' | 'success'>('none');
   const [plaidSelectedBank, setPlaidSelectedBank] = useState<string>('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isPlaidConnecting, setIsPlaidConnecting] = useState(false);
   const [plaidHandshakeStep, setPlaidHandshakeStep] = useState<number>(0);
+  const [selectedBankAccount, setSelectedBankAccount] = useState<'chequing' | 'savings' | 'joint'>('chequing');
+  const [pushConfirmationStatus, setPushConfirmationStatus] = useState<'waiting' | 'approved'>('waiting');
 
   // Deposit States
   const [depositAmount, setDepositAmount] = useState('500');
@@ -425,9 +427,24 @@ export default function CashTransferModal({
       setPlaidHandshakeStep(3); // bank API session established
       await sleep(600);
 
-      const lastFour = Math.floor(1000 + Math.random() * 9000).toString();
-      const mockPublicToken = `public-sandbox-${Date.now()}`;
-      
+      setLinkingStep('select-account');
+      setPushConfirmationStatus('waiting');
+    } catch (err: any) {
+      setLocalError(err.message || 'Verification failed.');
+    } finally {
+      setIsPlaidConnecting(false);
+    }
+  };
+
+  const handleConfirmPlaidAccount = async () => {
+    setLocalError(null);
+    setIsPlaidConnecting(true);
+
+    const lastFour = selectedBankAccount === 'chequing' ? '4910' : selectedBankAccount === 'savings' ? '8271' : '1042';
+    const accountSubtype = selectedBankAccount === 'chequing' ? 'checking' : selectedBankAccount === 'savings' ? 'savings' : 'checking';
+    const mockPublicToken = `public-sandbox-${Date.now()}`;
+
+    try {
       const linkRes = await fetch(buildApiUrl('/api/plaid/link'), {
         method: 'POST',
         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -436,7 +453,7 @@ export default function CashTransferModal({
           public_token: mockPublicToken,
           metadata: {
             institution: { name: plaidSelectedBank },
-            account: { mask: lastFour, subtype: 'checking' }
+            account: { mask: lastFour, subtype: accountSubtype }
           }
         })
       });
@@ -1221,13 +1238,11 @@ export default function CashTransferModal({
                       </button>
                     ))}
                   </div>
-
                   <div className="pt-2 text-center text-[10px] text-gray-400">
                     Secure linkage protected by Coinbase Bankshield protocols.
                   </div>
                 </div>
               )}
-
               {linkingStep === 'credentials' && (
                 <form onSubmit={handlePlaidSubmit} className="flex flex-col justify-between h-full">
                   <div>
@@ -1279,8 +1294,35 @@ export default function CashTransferModal({
                             </div>
                           </div>
 
-                          <div className="text-xs text-gray-500 text-center py-2">
-                            Authorization payload will be signed by your hardware bridge.
+                          {/* Login Credentials Inputs */}
+                          <div className="space-y-3.5 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                {plaidSelectedBank === 'Tangerine' ? 'Client Number or Username' : 'Username / Login ID'}
+                              </label>
+                              <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                required
+                                placeholder={plaidSelectedBank === 'Tangerine' ? 'e.g. 12345678' : 'Enter username'}
+                                className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#0052FF]"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                {plaidSelectedBank === 'Tangerine' ? 'Orange PIN (6 Digits)' : 'Banking Password / PIN'}
+                              </label>
+                              <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                maxLength={plaidSelectedBank === 'Tangerine' ? 6 : undefined}
+                                placeholder="••••••"
+                                className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-mono font-bold tracking-widest focus:outline-none focus:border-[#0052FF]"
+                              />
+                            </div>
                           </div>
                         </>
                       )}
@@ -1317,6 +1359,158 @@ export default function CashTransferModal({
                     </button>
                   </div>
                 </form>
+              )}
+
+              {linkingStep === 'select-account' && (
+                <div className="flex flex-col justify-between h-full">
+                  <div>
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                      <span className="text-xs font-bold text-gray-800">{plaidSelectedBank} Configuration</span>
+                      <button type="button" onClick={handleClosePlaid} className="p-1 text-gray-400 hover:text-gray-900">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left: Account Selector */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                          Select Bank Account
+                        </span>
+                        
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBankAccount('chequing')}
+                            className={`w-full p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${selectedBankAccount === 'chequing' ? 'border-[#0052FF] bg-blue-50/40' : 'border-gray-150 bg-white hover:border-gray-300'}`}
+                          >
+                            <div>
+                              <span className="text-xs font-bold text-gray-800 block">Tangerine Chequing</span>
+                              <span className="text-[9px] text-gray-400 font-mono">****4910 • CAD Cash</span>
+                            </div>
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedBankAccount === 'chequing' ? 'border-[#0052FF] bg-[#0052FF]' : 'border-gray-300'}`}>
+                              {selectedBankAccount === 'chequing' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBankAccount('savings')}
+                            className={`w-full p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${selectedBankAccount === 'savings' ? 'border-[#0052FF] bg-blue-50/40' : 'border-gray-150 bg-white hover:border-gray-300'}`}
+                          >
+                            <div>
+                              <span className="text-xs font-bold text-gray-800 block">Tangerine Savings</span>
+                              <span className="text-[9px] text-gray-400 font-mono">****8271 • CAD Staking</span>
+                            </div>
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedBankAccount === 'savings' ? 'border-[#0052FF] bg-[#0052FF]' : 'border-gray-300'}`}>
+                              {selectedBankAccount === 'savings' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBankAccount('joint')}
+                            className={`w-full p-3 rounded-xl border text-left flex items-center justify-between cursor-pointer transition-all ${selectedBankAccount === 'joint' ? 'border-[#0052FF] bg-blue-50/40' : 'border-gray-150 bg-white hover:border-gray-300'}`}
+                          >
+                            <div>
+                              <span className="text-xs font-bold text-gray-800 block">Tangerine Joint Chequing</span>
+                              <span className="text-[9px] text-gray-400 font-mono">****1042 • Family Share</span>
+                            </div>
+                            <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${selectedBankAccount === 'joint' ? 'border-[#0052FF] bg-[#0052FF]' : 'border-gray-300'}`}>
+                              {selectedBankAccount === 'joint' && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Right: Bank Mobile App Push Authentication Confirmation */}
+                      <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-150 flex flex-col justify-between space-y-3 select-none">
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
+                            Bank MFA Verification
+                          </span>
+                          
+                          <div className="flex items-center space-x-3">
+                            <div className="relative flex items-center justify-center">
+                              <Smartphone className="h-9 w-9 text-gray-500" />
+                              <span className="absolute top-0 right-0 flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-500"></span>
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs font-bold text-gray-800 block">Tangerine Push Request</span>
+                              <span className="text-[10px] text-gray-500 block leading-tight">Sent to your registered iPhone</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-gray-200/80 space-y-1">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase block">Status</span>
+                          {pushConfirmationStatus === 'waiting' ? (
+                            <div className="flex items-center space-x-1.5 text-xs text-orange-600 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                              <span>Waiting for approval...</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-1.5 text-xs text-green-600 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-green-500" />
+                              <span>Approved on Mobile Device</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {pushConfirmationStatus === 'waiting' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPushConfirmationStatus('approved');
+                              showToast('Push authentication request approved in Tangerine app!', 'success');
+                            }}
+                            className="w-full py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                          >
+                            Confirm in Tangerine App
+                          </button>
+                        ) : (
+                          <div className="text-center text-[10px] text-green-600 font-bold py-1 bg-green-50 rounded-lg border border-green-150">
+                            Push Confirmed! Ready to Proceed.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {localError && (
+                      <p className="text-xs text-red-600 font-semibold bg-red-50 p-2 rounded-lg mt-4">
+                        {localError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-4 space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleConfirmPlaidAccount}
+                      disabled={isPlaidConnecting || pushConfirmationStatus !== 'approved'}
+                      className="w-full py-2.5 bg-[#0052FF] hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold text-xs sm:text-sm rounded-xl transition-colors cursor-pointer flex items-center justify-center space-x-2"
+                    >
+                      {isPlaidConnecting ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Connecting Selected Account...</span>
+                        </>
+                      ) : (
+                        <span>Confirm Account & Connect</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClosePlaid}
+                      className="w-full text-center text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      Cancel Setup
+                    </button>
+                  </div>
+                </div>
               )}
 
               {linkingStep === 'success' && (
