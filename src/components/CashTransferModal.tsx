@@ -122,6 +122,18 @@ export default function CashTransferModal({
     localStorage.setItem('cb_linked_banks', JSON.stringify(linkedBanks));
   }, [linkedBanks]);
 
+  // Load Plaid Link CDN script
+  useEffect(() => {
+    const existingScript = document.getElementById('plaid-link-script');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.plaid.com/link/v2/stable/link-initialize.js';
+      script.id = 'plaid-link-script';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
 
   // Plaid-like connector states
   const [linkingStep, setLinkingStep] = useState<'none' | 'welcome' | 'select-bank' | 'credentials' | 'success'>('none');
@@ -282,41 +294,122 @@ export default function CashTransferModal({
     setLocalError(null);
   };
 
-  const handleSelectPlaidBank = (bankName: string) => {
-    setPlaidSelectedBank(bankName);
-    setLinkingStep('credentials');
-  };
+  const openPlaidLinkSDK = async () => {
+    try {
+      setLocalError(null);
+      setIsPlaidConnecting(true);
 
-  const handlePlaidSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    setIsPlaidConnecting(true);
-    setPlaidHandshakeStep(0);
+      const res = await fetch(buildApiUrl('/api/plaid/create-link-token'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include'
+      });
 
-    setTimeout(() => {
-      setPlaidHandshakeStep(1); // signed by Kiln Node 01
-      setTimeout(() => {
-        setPlaidHandshakeStep(2); // JWT client assertion verified
-        setTimeout(() => {
-          setPlaidHandshakeStep(3); // bank API session established
-          setTimeout(() => {
-            setIsPlaidConnecting(false);
-            const lastFour = Math.floor(1000 + Math.random() * 9000).toString();
-            const newBank: LinkedBank = {
-              id: `bank-${Date.now()}`,
-              bankName: plaidSelectedBank,
-              accountType: 'Checking',
-              lastFour: lastFour
-            };
+      if (!res.ok) {
+        throw new Error('Failed to create Plaid link token.');
+      }
+
+      const { link_token } = await res.json();
+
+      if (!(window as any).Plaid) {
+        throw new Error('Plaid Link SDK is not loaded. Falling back to secure simulator.');
+      }
+
+      const handler = (window as any).Plaid.create({
+        token: link_token,
+        onSuccess: async (public_token: string, metadata: any) => {
+          try {
+            const linkRes = await fetch(buildApiUrl('/api/plaid/link'), {
+              method: 'POST',
+              headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+              credentials: 'include',
+              body: JSON.stringify({ public_token, metadata })
+            });
+
+            if (!linkRes.ok) {
+              throw new Error('Failed to link bank account via secure portal.');
+            }
+
+            const newBank = await linkRes.json();
             const updated = [...linkedBanks, newBank];
             setLinkedBanks(updated);
             setDepositBankId(newBank.id);
             setWithdrawBankId(newBank.id);
             setLinkingStep('success');
-          }, 800);
-        }, 800);
-      }, 800);
-    }, 800);
+            setIsPlaidConnecting(false);
+          } catch (e: any) {
+            setLocalError(e.message || 'Plaid linking failed.');
+            setIsPlaidConnecting(false);
+          }
+        },
+        onExit: (err: any) => {
+          setIsPlaidConnecting(false);
+          if (err != null) {
+            setLocalError(err.message || 'Plaid authorization exited early.');
+          }
+        }
+      });
+
+      handler.open();
+    } catch (e: any) {
+      console.warn('Plaid Link SDK setup failed. Using fallback simulation:', e.message);
+      setLinkingStep('select-bank');
+      setIsPlaidConnecting(false);
+    }
+  };
+
+  const handleSelectPlaidBank = (bankName: string) => {
+    setPlaidSelectedBank(bankName);
+    setLinkingStep('credentials');
+  };
+
+  const handlePlaidSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    setIsPlaidConnecting(true);
+    setPlaidHandshakeStep(0);
+
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    try {
+      await sleep(600);
+      setPlaidHandshakeStep(1); // signed by Kiln Node 01
+      await sleep(600);
+      setPlaidHandshakeStep(2); // JWT client assertion verified
+      await sleep(600);
+      setPlaidHandshakeStep(3); // bank API session established
+      await sleep(600);
+
+      const lastFour = Math.floor(1000 + Math.random() * 9000).toString();
+      const mockPublicToken = `public-sandbox-${Date.now()}`;
+      
+      const linkRes = await fetch(buildApiUrl('/api/plaid/link'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        body: JSON.stringify({
+          public_token: mockPublicToken,
+          metadata: {
+            institution: { name: plaidSelectedBank },
+            account: { mask: lastFour, subtype: 'checking' }
+          }
+        })
+      });
+
+      if (!linkRes.ok) {
+        throw new Error('Failed to link bank account with secure database.');
+      }
+
+      const newBank = await linkRes.json();
+      const updated = [...linkedBanks, newBank];
+      setLinkedBanks(updated);
+      setDepositBankId(newBank.id);
+      setWithdrawBankId(newBank.id);
+      setLinkingStep('success');
+    } catch (err: any) {
+      setLocalError(err.message || 'Verification failed.');
+    } finally {
+      setIsPlaidConnecting(false);
+    }
   };
 
   // Close Plaid
@@ -938,7 +1031,7 @@ export default function CashTransferModal({
                       Cancel
                     </button>
                     <button
-                      onClick={() => setLinkingStep('select-bank')}
+                      onClick={openPlaidLinkSDK}
                       className="flex-1 py-2.5 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-xl cursor-pointer flex items-center justify-center space-x-1"
                     >
                       <span>Continue</span>

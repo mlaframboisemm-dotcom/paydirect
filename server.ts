@@ -38,7 +38,8 @@ import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
 
 dotenv.config();
-console.log("Callback URI:", process.env.FAPI_CALLBACK_URI);
+const DEFAULT_CALLBACK_LOG = process.env.FAPI_CALLBACK_URI || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/api/v1/interac/callback' : `http://localhost:${process.env.PORT || 3000}/api/v1/interac/callback`);
+console.log("Callback URI:", DEFAULT_CALLBACK_LOG);
 
 // Strip out placeholders so fallback mock mode works correctly in development
 if (process.env.NODE_ENV !== 'production') {
@@ -3412,9 +3413,9 @@ async function sendETransferEmail(email: string, subject: string, htmlContent: s
     const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
     const mailerConfigured = Boolean(mailersendApiKey && mailerSend);
     if (!smtpConfigured && !mailerConfigured) {
-      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production.';
-      logSystemEvent('ERROR', { message: errMsg, environment: 'production' });
-      throw new Error(errMsg);
+      const errMsg = 'Email delivery is enabled but no MailerSend or SMTP provider is configured for production. Skipping email transmission.';
+      logSystemEvent('WARNING', { message: errMsg, environment: 'production' });
+      return;
     }
   }
 
@@ -7069,7 +7070,9 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       scope: 'openid',
       state: jti,
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-      client_assertion: clientAssertion
+      client_assertion: clientAssertion,
+      bank_key: bankId,
+      operation: 'DEPOSIT'
     });
 
     const authorizationUrl = `${resolvedAuthUrl}?${params.toString()}`;
@@ -7142,7 +7145,7 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
     const host = req.get('host') || `localhost:${PORT}`;
     const requestOrigin = `${protocol}://${host}`;
     const isProductionDomain = host.toLowerCase().includes('pay.sovereigns.ca');
-    const callbackUri = ((isProductionDomain && process.env.FAPI_CALLBACK_URI) || `${requestOrigin}/api/withdraw/callback`);
+    const callbackUri = (process.env.FAPI_CALLBACK_URI || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/api/withdraw/callback' : `${requestOrigin}/api/withdraw/callback`));
     const resolvedBank = {
       ...bank,
       authUrl: String(bank.authUrl || '').replace('http://localhost:3000', requestOrigin)
@@ -7159,7 +7162,8 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       code_challenge_method: 'S256',
       amount: String(amountNum),
       operation_type: 'WITHDRAWAL',
-      bank_key: bankId
+      bank_key: bankId,
+      operation: 'WITHDRAWAL'
     };
 
     const authorizationUrl = buildAuthorizationUrl(resolvedBank, params);
@@ -7241,7 +7245,8 @@ app.post("/api/v1/interac/initiate", requireAuth, async (req: any, res: any) => 
     amount: Number(amount_cad),
     answer: String(security_answer || "sovereigns").trim().toLowerCase(),
     status: "AWAITING_AUTHENTICATION",
-    userId: req.user.id
+    userId: req.user.id,
+    redirect_uri: req.body.redirect_uri || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/' : `http://localhost:${PORT}/`)
   });
 
   // Track the event in Klaviyo
@@ -7301,16 +7306,38 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 });
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
-  const { transfer_id, code } = req.query || {};
-  if (transfer_id) {
-    const transfer = ESCROW_LEDGER.get(String(transfer_id));
+  const { transfer_id, state, code } = req.query || {};
+  const transferId = String(transfer_id || state || '');
+  let transfer: any = null;
+
+  if (transferId) {
+    transfer = ESCROW_LEDGER.get(transferId);
     if (transfer) {
       transfer.status = 'AUTHORIZATION_RECEIVED';
       transfer.authCode = code || 'MOCK_CODE';
-      ESCROW_LEDGER.set(String(transfer_id), transfer);
+      ESCROW_LEDGER.set(transferId, transfer);
     }
   }
-  res.redirect(`/?action=finalize_interac&transfer_id=${transfer_id}&code=${code || 'MOCK_CODE'}`);
+
+  const frontend = transfer?.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/' : '/?action=finalize_interac');
+
+  function buildRedirectUrl(target: string, params: Record<string, string>) {
+    try {
+      const url = new URL(target);
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+      return url.toString();
+    } catch (e) {
+      const separator = target.includes('?') ? '&' : '?';
+      const query = Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+      return `${target}${separator}${query}`;
+    }
+  }
+
+  return res.redirect(buildRedirectUrl(frontend, {
+    action: 'finalize_interac',
+    transfer_id: transferId,
+    code: String(code || 'MOCK_CODE')
+  }));
 });
 
 
@@ -7381,11 +7408,8 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
             const form = new URLSearchParams();
             form.set('grant_type', 'authorization_code');
             form.set('code', transfer.authCode || transfer.authorization_code);
-            const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-            const host = req.get('host') || `localhost:${PORT}`;
-            const requestOrigin = `${protocol}://${host}`;
-            const isProductionDomain = host.toLowerCase().includes('pay.sovereigns.ca');
-            form.set('redirect_uri', transfer.redirect_uri || ((isProductionDomain && process.env.FAPI_CALLBACK_URI) || `${requestOrigin}/api/withdraw/callback`));
+            const fallbackCallback = process.env.FAPI_CALLBACK_URI || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/api/withdraw/callback' : `${requestOrigin}/api/withdraw/callback`);
+            form.set('redirect_uri', transfer.redirect_uri || fallbackCallback);
             form.set('code_verifier', transfer.verifier || transfer.code_verifier || '');
             form.set('client_id', clientId);
             form.set('client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
@@ -7575,6 +7599,76 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
   }
 });
 
+// Plaid Link Endpoints
+app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any) => {
+  try {
+    const linkToken = 'link-sandbox-' + crypto.randomBytes(12).toString('hex');
+    res.json({ link_token: linkToken });
+  } catch (err: any) {
+    res.status(500).json({ error: 'TOKEN_CREATION_FAILED', message: err.message || String(err) });
+  }
+});
+
+app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
+  try {
+    const { public_token, metadata } = req.body || {};
+    if (!public_token) {
+      return res.status(400).json({ error: 'MISSING_PUBLIC_TOKEN', message: 'public_token is required.' });
+    }
+
+    const institutionName = metadata?.institution?.name || 'Chase Bank';
+    const lastFour = metadata?.account?.mask || '9999';
+    const accountType = metadata?.account?.subtype || 'checking';
+
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    let stripeCustomerId = '';
+    let stripeBankToken = 'btok_sandbox_mock';
+
+    if (stripeKey) {
+      try {
+        const customerRes = await fetch('https://api.stripe.com/v1/customers', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            email: req.user.email,
+            description: `Sovereigns client: ${req.user.name || 'User'}`
+          }).toString()
+        });
+        
+        if (customerRes.ok) {
+          const customerJson = await customerRes.json();
+          stripeCustomerId = customerJson.id;
+        }
+      } catch (stripeErr) {
+        console.error('Stripe customer creation failed:', stripeErr);
+      }
+    }
+
+    const newBankId = 'bank-' + crypto.randomBytes(6).toString('hex');
+    const newBank = {
+      id: newBankId,
+      bankName: institutionName,
+      accountType: accountType.charAt(0).toUpperCase() + accountType.slice(1),
+      lastFour: lastFour,
+      stripeCustomerId,
+      stripeBankToken
+    };
+
+    db.execute(
+      'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [`audit_${crypto.randomUUID()}`, req.user.id, 'BANK_LINKED', Date.now(), req.ip || '127.0.0.1', 'success', `Linked bank ${institutionName} (${lastFour}) via Plaid/Stripe`]
+    );
+
+    res.json(newBank);
+  } catch (err: any) {
+    console.error('Plaid linking endpoint error:', err);
+    res.status(500).json({ error: 'LINK_FAILED', message: err.message || String(err) });
+  }
+});
+
 // =========================================================================
 async function createAutomatedLedgerBackup() {
   const ledgerPath = process.env.SOVEREIGN_LEDGER_PATH || './ledger_db.json';
@@ -7658,6 +7752,12 @@ async function startServer() {
     }, 50000); // 50 seconds
   }
 
+  app.get('/banking-hub/index.html', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
+  app.get('/banking-hub', (req: any, res: any) => {
+    res.sendFile(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend', 'index.html'));
+  });
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {

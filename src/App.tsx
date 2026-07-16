@@ -521,8 +521,10 @@ export default function App() {
                   .filter(([symbol, value]: any) => typeof symbol === 'string' && value && typeof value.USD === 'number')
                   .sort(([a], [b]) => a.localeCompare(b))
                   .map(([symbol, value]: any, index) => buildCoinFromLive(symbol, Number(value.USD), index + 1))
-              : prevCoins.map((coin) => {
-                  const liveData = data[coin.symbol];
+              : prevCoins
+                  .filter((coin) => coin && coin.symbol)
+                  .map((coin) => {
+                    const liveData = data[coin.symbol];
                   if (liveData && typeof liveData.USD === 'number') {
                     const newPrice = liveData.USD;
                     const updatedSparkline = [...coin.sparkline.slice(1), parseFloat(newPrice.toFixed(4))];
