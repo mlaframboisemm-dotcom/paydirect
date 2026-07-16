@@ -52,7 +52,8 @@ function buildAuthHeaders(extraHeaders?: Record<string, string>): Record<string,
 }
 
 function hasSessionToken(): boolean {
-  return true;
+  const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+  return !!token;
 }
 
 const USER_SCOPED_STATE_KEYS = [
@@ -166,6 +167,7 @@ export default function App() {
   const [stripePayoutAmount, setStripePayoutAmount] = useState('');
   const [stripePayoutError, setStripePayoutError] = useState<string | null>(null);
   const [stripePayoutSuccess, setStripePayoutSuccess] = useState<string | null>(null);
+  const [isStripeConfigured, setIsStripeConfigured] = useState<boolean>(false);
   
   // Market search & filters
   const [marketFilter, setMarketFilter] = useState<'all' | 'gainers' | 'losers' | 'watchlist'>('all');
@@ -179,9 +181,10 @@ export default function App() {
   const [isRefreshingReal, setIsRefreshingReal] = useState<boolean>(false);
   const [backendStatus, setBackendStatus] = useState<'online' | 'degraded' | 'offline'>('online');
 
-  // --- Authentication, Regional Compliance & Email states ---
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('cb_auth_authenticated') === 'true';
+    const auth = localStorage.getItem('cb_auth_authenticated') === 'true';
+    const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+    return auth && !!token;
   });
   const [userEmail, setUserEmail] = useState<string>(() => {
     return localStorage.getItem('cb_auth_email') || '';
@@ -420,6 +423,7 @@ export default function App() {
       
       const isReal = config.mode === 'real';
       setRealCoinbaseMode(isReal);
+      setIsStripeConfigured(!!config.stripeConfigured);
 
       setIsRefreshingReal(true);
       const balRes = await fetch(buildApiUrl('/api/coinbase/balances'), {
@@ -536,7 +540,7 @@ export default function App() {
   }, [realCoinbaseMode, isAuthenticated]);
 
   const fetchStripeBalance = async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !hasSessionToken()) return;
     setIsFetchingStripeBalance(true);
     try {
       const res = await fetch(buildApiUrl('/api/stripe/balance'), {
@@ -548,6 +552,9 @@ export default function App() {
         setStripeAvailable(data.available || 0);
         setStripePending(data.pending || 0);
         setStripeTotal(data.total || 0);
+        setIsStripeConfigured(true);
+      } else if (res.status === 501) {
+        setIsStripeConfigured(false);
       }
     } catch (err) {
       console.warn('Failed to fetch Stripe balance:', err);
@@ -1848,6 +1855,18 @@ export default function App() {
         {/* --- Tab 6: Stripe Synchronization Hub --- */}
         {currentTab === 'stripe' && (
           <div className="max-w-4xl mx-auto space-y-8">
+            {!isStripeConfigured && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start space-x-3.5 shadow-xs">
+                <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-amber-800">Stripe Integration is Pending Configuration</h4>
+                  <p className="text-[11px] text-amber-700 leading-relaxed font-medium">
+                    To activate live balance synchronization and Connected Account bank payouts, please configure your <code>STRIPE_SECRET_KEY</code> inside your server environment settings.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h3 className="text-lg font-black text-gray-900 flex items-center space-x-2">

@@ -6002,11 +6002,12 @@ async function recordLedgerEntry(entryPayload: { type: string; status: string; p
   }
 }
 
-app.get('/api/coinbase/config', requireAuth, requireMfa, async (req, res) => {
+app.get('/api/coinbase/config', requireAuth, requireMfa, async (req: any, res) => {
   const readiness = await buildRuntimeReadinessReport(process.env);
   res.json({
     mode: 'real',
     readiness,
+    stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
     enforcement: getCriticalOperationsEnforcementState()
   });
 });
