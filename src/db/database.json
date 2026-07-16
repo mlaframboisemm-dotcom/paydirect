@@ -498,7 +498,7 @@
       "kycPostalCode": "l1h4s7",
       "kycTaxId": "0512",
       "kycPhone": "9057184275",
-      "kycVerifiedAt": "2026-07-15T23:54:21.348Z"
+      "kycVerifiedAt": "2026-07-16T19:15:35.198Z"
     }
   ],
   "wallets": [
@@ -532,7 +532,7 @@
       "id": "wallet-user_0a9ad97e-eca7-49e3-9d66-75fae1820086-usd",
       "userId": "user_0a9ad97e-eca7-49e3-9d66-75fae1820086",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -545,7 +545,7 @@
       "id": "wallet-user_77485de6-6347-45cb-8d6d-c673df3e50f1-usd",
       "userId": "user_77485de6-6347-45cb-8d6d-c673df3e50f1",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -558,7 +558,7 @@
       "id": "wallet-user_41b3a4c2-288f-49be-874f-44ba4741237c-usd",
       "userId": "user_41b3a4c2-288f-49be-874f-44ba4741237c",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": false,
@@ -571,7 +571,7 @@
       "id": "wallet-user_755f11ee-89ea-47bb-bf2d-828556754217-usd",
       "userId": "user_755f11ee-89ea-47bb-bf2d-828556754217",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -584,7 +584,7 @@
       "id": "wallet-user_1f1c57e1-2397-4119-97b7-ae462bb120ca-usd",
       "userId": "user_1f1c57e1-2397-4119-97b7-ae462bb120ca",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -597,7 +597,7 @@
       "id": "wallet-user_dd7e489f-036f-4604-bbe8-2e3f5ef8ffb8-usd",
       "userId": "user_dd7e489f-036f-4604-bbe8-2e3f5ef8ffb8",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -610,7 +610,7 @@
       "id": "wallet-user_40f2a91b-858c-43cc-841c-6ad4817d9491-usd",
       "userId": "user_40f2a91b-858c-43cc-841c-6ad4817d9491",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -623,7 +623,7 @@
       "id": "wallet-user_65da451b-5c50-4ac5-a4a0-7cec2c90dac5-usd",
       "userId": "user_65da451b-5c50-4ac5-a4a0-7cec2c90dac5",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -636,7 +636,7 @@
       "id": "wallet-user_e0e2438a-6cf9-43a0-8d3c-38cca5fd5cb4-usd",
       "userId": "user_e0e2438a-6cf9-43a0-8d3c-38cca5fd5cb4",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -649,7 +649,7 @@
       "id": "wallet-user_991e0e33-e87a-4868-9a4f-388f1bdc1b85-usd",
       "userId": "user_991e0e33-e87a-4868-9a4f-388f1bdc1b85",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -662,7 +662,7 @@
       "id": "wallet-user_261ac41e-7cd9-44ea-a596-e7eb14178de1-usd",
       "userId": "user_261ac41e-7cd9-44ea-a596-e7eb14178de1",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -675,7 +675,7 @@
       "id": "wallet-user_16ebdac9-ffbf-47f1-bfa2-e8d26a8483d8-usd",
       "userId": "user_16ebdac9-ffbf-47f1-bfa2-e8d26a8483d8",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -688,7 +688,7 @@
       "id": "wallet-user_eecf3009-3262-42bd-8301-999e1b4ef611-usd",
       "userId": "user_eecf3009-3262-42bd-8301-999e1b4ef611",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -701,7 +701,7 @@
       "id": "wallet-user_f0d45747-f90d-449f-97d1-e9c914deaf30-usd",
       "userId": "user_f0d45747-f90d-449f-97d1-e9c914deaf30",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -714,7 +714,7 @@
       "id": "wallet-user_3107460e-14c2-420b-978f-1a8efd4f2c16-usd",
       "userId": "user_3107460e-14c2-420b-978f-1a8efd4f2c16",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -727,7 +727,7 @@
       "id": "wallet-user_d4d2c39e-38f7-46eb-bb2a-6441228503c4-usd",
       "userId": "user_d4d2c39e-38f7-46eb-bb2a-6441228503c4",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -740,7 +740,7 @@
       "id": "wallet-user_mlaframboisemm-usd",
       "userId": "user_mlaframboisemm",
       "assetSymbol": "USD",
-      "balance": 1791200,
+      "balance": 1786100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -790,6 +790,146 @@
       "status": "completed",
       "ledgerDebit": "external_wire",
       "ledgerCredit": "usdc_balance"
+    },
+    {
+      "id": "ch_d329e40220f1da6bff7b93db",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 150,
+      "fiatAmount": 150,
+      "timestamp": 1784193781994,
+      "details": "Stripe Card Deposit (Session: ch_d329e40220f1da6bff7b93db)",
+      "hash": "ch_d329e40220f1da6bff7b93db",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_029b424f8eae0dccaef8bdd3",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 300,
+      "fiatAmount": 300,
+      "timestamp": 1784193782031,
+      "details": "Stripe Card Deposit (Session: ch_029b424f8eae0dccaef8bdd3)",
+      "hash": "ch_029b424f8eae0dccaef8bdd3",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_d01ab9e39d939f7efa6ab751",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 150,
+      "fiatAmount": 150,
+      "timestamp": 1784201596160,
+      "details": "Stripe Card Deposit (Session: ch_d01ab9e39d939f7efa6ab751)",
+      "hash": "ch_d01ab9e39d939f7efa6ab751",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_3d92a83bc66e1ca2997067ce",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 300,
+      "fiatAmount": 300,
+      "timestamp": 1784201596171,
+      "details": "Stripe Card Deposit (Session: ch_3d92a83bc66e1ca2997067ce)",
+      "hash": "ch_3d92a83bc66e1ca2997067ce",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_045cea3d9bbb1af463c113fe",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 150,
+      "fiatAmount": 150,
+      "timestamp": 1784201620488,
+      "details": "Stripe Card Deposit (Session: ch_045cea3d9bbb1af463c113fe)",
+      "hash": "ch_045cea3d9bbb1af463c113fe",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_095c1383cd5c89776ee1e6f6",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 300,
+      "fiatAmount": 300,
+      "timestamp": 1784201620493,
+      "details": "Stripe Card Deposit (Session: ch_095c1383cd5c89776ee1e6f6)",
+      "hash": "ch_095c1383cd5c89776ee1e6f6",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_124b42b3a8cd18d0a9144851",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 150,
+      "fiatAmount": 150,
+      "timestamp": 1784207753764,
+      "details": "Stripe Card Deposit (Session: ch_124b42b3a8cd18d0a9144851)",
+      "hash": "ch_124b42b3a8cd18d0a9144851",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_91917e77656b1db86b2b8b69",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 300,
+      "fiatAmount": 300,
+      "timestamp": 1784207753779,
+      "details": "Stripe Card Deposit (Session: ch_91917e77656b1db86b2b8b69)",
+      "hash": "ch_91917e77656b1db86b2b8b69",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_0d65af0c81b6b7aeaf7b138b",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 150,
+      "fiatAmount": 150,
+      "timestamp": 1784207790328,
+      "details": "Stripe Card Deposit (Session: ch_0d65af0c81b6b7aeaf7b138b)",
+      "hash": "ch_0d65af0c81b6b7aeaf7b138b",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
+    },
+    {
+      "id": "ch_c03b50b57a9e6b802f1a5c3f",
+      "userId": "user_mlaframboisemm",
+      "type": "RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 300,
+      "fiatAmount": 300,
+      "timestamp": 1784207790342,
+      "details": "Stripe Card Deposit (Session: ch_c03b50b57a9e6b802f1a5c3f)",
+      "hash": "ch_c03b50b57a9e6b802f1a5c3f",
+      "status": "completed",
+      "ledgerDebit": "stripe_gateway",
+      "ledgerCredit": "user_wallet"
     }
   ],
   "auditLogs": [
@@ -2493,6 +2633,978 @@
       "ipAddress": "169.254.169.126",
       "status": "success",
       "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_2b6ec1eb-49b4-4d99-a684-de1b3633ede7",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_FAILURE",
+      "timestamp": 1784193782195,
+      "ipAddress": "127.0.0.1",
+      "status": "failure",
+      "details": "Reconciliation audit failed. Detected discrepancies:\nAmount Mismatch: Stripe transaction txn_2 amount ($200.00) does not match internal ledger record ($300.00) for transaction ID ch_029b424f8eae0dccaef8bdd3.\nMissing Ledger Entry: Stripe transaction txn_3 (Source: ch_862a1fb2a9c3979b299a6da6, Amount: $50.00 USD) was not found in database ledger."
+    },
+    {
+      "id": "audit_9c114d18-3e02-4df3-a79a-3b6810a1af9e",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784195014212,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_8d8c96b3-a9f1-4d12-bab1-bbfe011b06c1",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784195361998,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_efe33033-73ba-4cc4-bf74-671b23ad5b87",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784196181702,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_0d4fb393-3794-44b3-ac3b-390a0e08c57e",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784196924336,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_a7edfae8-1485-4296-b41a-74fc025c011f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784197615412,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_cc946501-f262-4f17-a02c-754d1032db70",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784197635837,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_3d232678-fc5a-40b3-b0fb-d38c8c7a2227",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784197644774,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_9aef784d-f9b6-4984-994e-e2ddef1287a8",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784197935135,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_329590b7-e143-4c90-a1f0-6bdcdecc33b0",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784198236076,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_66cb99c1-5ee3-410e-93a0-ef3b281999eb",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784198535605,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_1b697844-01d7-4319-aef4-4cc8297db8ab",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784198835556,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_2f6818c3-2e46-41a2-8900-abcc1ccb439c",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784199080431,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_eed3ac41-ce6a-4cd0-9722-8ff087a4a448",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784199089862,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_7ce4bcbd-4c9d-4536-9e3c-333b0717600f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784199380451,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_33b56075-35c2-4bfb-9f32-cd126a107281",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784199680567,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_7b39a818-ae32-4b14-abf6-70d706e3664f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784199805575,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_d004b99e-c6a9-4519-bbcd-3cba1ebd5b81",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784201596183,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $4800.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_64e0ee07-81e8-4a48-9658-9e1971f1fc6e",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_FAILURE",
+      "timestamp": 1784201620502,
+      "ipAddress": "127.0.0.1",
+      "status": "failure",
+      "details": "Reconciliation audit failed. Detected discrepancies:\nAmount Mismatch: Stripe transaction txn_2 amount ($200.00) does not match internal ledger record ($300.00) for transaction ID ch_095c1383cd5c89776ee1e6f6.\nMissing Ledger Entry: Stripe transaction txn_3 (Source: ch_b1dedbca28c9c9f120dd4215, Amount: $50.00 USD) was not found in database ledger."
+    },
+    {
+      "id": "audit_dc4394f8-2e13-4834-a999-ff7dcd15afc2",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784205398813,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_061fd1eb-ce13-4d2a-8604-b6d86d7fa857",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_FAILURE",
+      "timestamp": 1784207790355,
+      "ipAddress": "127.0.0.1",
+      "status": "failure",
+      "details": "Reconciliation audit failed. Detected discrepancies:\nAmount Mismatch: Stripe transaction txn_2 amount ($200.00) does not match internal ledger record ($300.00) for transaction ID ch_c03b50b57a9e6b802f1a5c3f.\nMissing Ledger Entry: Stripe transaction txn_3 (Source: ch_1a22c6c30385f73c51827eb5, Amount: $50.00 USD) was not found in database ledger."
+    },
+    {
+      "id": "audit_030a3ce1-126e-4bed-a858-8a2fbebeb19c",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784209257039,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_893566fa-545c-4a3d-85cc-1b08676bf95e",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784209266314,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_fb8a6e84-1425-42f8-b3f2-69232fc5fc63",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784209557106,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_b5a61838-4890-426d-9e97-6d0c499408d5",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784209856975,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_eebf4e6d-d2b1-4834-ba45-5f3f0fd67cdf",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784210060378,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_ccd2c5e2-6487-4102-9182-5a4df55ca57b",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784210069616,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_87556e5f-fc0b-406f-bc4b-ecafb7ac7b21",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784210360886,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_e58933d4-8dd0-4b3b-87b9-006611ced423",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784210660058,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_4ece7b25-ce8a-4025-b3a3-dc00b09ca5ff",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784210960224,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_a211d97a-73c9-4274-94c1-018a3e3d05e3",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784211262253,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_936ab727-b91d-47ee-a048-46a144ae97d5",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784211560255,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_ff64c0fa-fdca-4e1e-bf5f-7e4f2ee633fe",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784211721208,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_1a0070e0-9c73-4966-93b6-7c69a2df423f",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784211730327,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_7edcbbf4-dc08-4a3c-afd1-53c52fde6c8b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784212021112,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_a06744d9-8a31-4b38-8bed-9cc0eccb8179",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784212355204,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_f27a8da8-2640-4901-8ffb-db13781db409",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784212364305,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_b729aebc-089a-41c3-b1c2-7bfd02a2d951",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784212654872,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_dfb38437-c7f1-4b23-838c-1c20c616a7a0",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784212954767,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_8f1f77eb-7819-4aaf-9f88-dfef87e0062a",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784213254718,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_02935cc1-a811-4fc3-8590-60a19133a850",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784213855121,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_fea11196-7f3c-4880-8c74-dc0cd72531b0",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784214157009,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_af37d3f8-2fe2-40e5-8d47-1f44e8cbf95d",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784214270322,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_09071b49-eb86-4186-9a4b-1319fd06264c",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784214279585,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_da9f251e-4913-4b8a-b1d6-40bd5c22952b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784214570574,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_0defad12-c554-4a25-a073-b6843fb3d689",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784214870106,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_a6da880b-a9be-44b2-8f95-fb846a348403",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784215170050,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_6c7c1d53-19c2-4f92-b025-c0889f49ea4a",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784215470218,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_dee7e47c-1779-4d10-8adc-099f7b919bf1",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784215589614,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_82bea4ce-7e9f-461f-9d0b-f6cc730f710e",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784215599113,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_e4fbecc8-3a58-40a6-9a46-94427f10671d",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784215889925,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_c2adeaa9-0afe-4b37-bc00-407db93ed776",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784216189679,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_465b3302-eaae-421a-ac7b-3828510d7b58",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784216234247,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_66d0cb52-7dcd-4db2-9872-2b6a4d1482bb",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784216243255,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_c5583910-4f19-45fc-a8fd-e436ed995e78",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784216533753,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_3a9de657-65ee-4669-8201-7e79d618e8f6",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784216705531,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_c31e4cb0-73c9-46cd-bdcb-3f8b254b76e8",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784216714854,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_8f980621-a976-4bc8-bf3d-a8232714989b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784217005508,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_aed956c3-03a5-43e5-9c5e-9728ef806615",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784217305406,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_2a1f1717-71f7-4317-be5a-366a4a1ef9b0",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784217606167,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_3bcd0e99-3e14-436b-b20a-a5bdd4da7c05",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784217910239,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_83a7c3c8-5143-4b94-92ca-9172a8326960",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784217919614,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_0b8508e2-4662-44d9-a954-4fa139995bb3",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784218210163,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_744afe78-f598-4740-acea-b61d51954058",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784219507485,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_92622670-22d9-4e56-b886-90b06277cbbd",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784219516676,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_47d6b3ac-18ea-4d4c-aaac-4d83ee0b4701",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784219602335,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_46875238-7120-40c9-8a19-e25cacaf5870",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784219611513,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_5f45ca1c-6b7e-4007-87c0-97474ff11265",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784219901637,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_209b2328-67ca-43cd-900a-04deb2f2e94b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784220201622,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_4df5a961-a030-44ff-8edc-12ae270d587f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784220501662,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_fe17de67-1a1b-450d-87ce-42649758eeb2",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784220801733,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_5e8cf300-48cc-49c1-afa0-276c1f0d63b4",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784221102410,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_bdecebeb-916a-4a5d-99f8-abd2404d68fd",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784221401688,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_6bce95d0-a5a3-4cf1-a052-46fe9347193f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784221568870,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_9b958a0d-a64f-4b01-9004-bcc283adcf51",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784221577979,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_6101d2fe-f58e-4f09-862a-268918bd5207",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784221868673,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_cfc4df84-b350-40a5-9a76-b75d4f147afa",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784222358675,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_0693148d-463c-4eb9-8681-85eefdc5f8d7",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784222359430,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_96713aba-8330-496b-a5f7-9e934dd229ae",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784222662076,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_b29078b5-43a4-4887-abdd-00342d6c893d",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784222946751,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_c8f73031-86b5-461b-9fc9-e3e58a5467f8",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784223075800,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_9da67323-4958-445d-8776-ff31c98d610d",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784223085066,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_ff9bc6ad-b0b5-4653-b191-7fc514cef55a",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784223375636,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_0edae4fb-53f4-45af-a5df-ae63363bfd2b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784223675469,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_916e3442-779b-4e20-bb25-70c260aea5c5",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784223975455,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_217b7d46-dcd5-48df-85db-53770ca693bc",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784224275462,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_99d9115b-d6ed-4040-beb1-cee4da1a2789",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784224575479,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_9230d397-9301-44a5-9ff7-d8202ffa7281",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784224875557,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_8e989432-4325-494e-9ddd-6dc25003259e",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784225175522,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_737e6f32-9951-4d4a-be2c-18902cc199e9",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784225475483,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_0c6dbb4a-6ec1-46f6-9611-15ed8660b247",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784226075599,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_4adf7b50-0080-49a6-9765-2ccaab6f091b",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784226377896,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_081e3812-c7a5-43b5-8c25-3cb9a839140f",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784226677198,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_5bca0471-3b07-4250-96b7-b49f94f74295",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784226751325,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_71248a77-828e-43df-b3a4-f0a87ed416bf",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784226760716,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_38d2407a-90a0-4d5d-ab48-df9846b2d391",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784227051347,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_364a1eb2-f13d-4821-b44a-75bc556c97e2",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784227092680,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_46e0e75c-dac5-4c75-a0dc-ad89b8ab00d1",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784227101583,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_f5a5fc36-9d7b-4193-b4a1-9127b59f12f8",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784227403411,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_c84b7506-fb26-46ec-9824-dfc79351390d",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784227438606,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_5bd3a276-1bba-4586-8da6-09a96d90b988",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784227448071,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_4e9e31ac-a9e3-4e13-92bd-503cd74c3007",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784227738514,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_1061c47b-cabe-4362-b001-c9ddc05cc050",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784228038418,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_6815a8e3-0489-4746-a216-2da50d18f8cf",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784228339969,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_91181042-aff4-481c-bdc6-51e865490039",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784228641473,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_cdccce95-61d8-4107-a8e9-912680b7a8d2",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784228943129,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_6354086a-ce15-4518-b784-c0c5c02597c8",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784229239616,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
+    },
+    {
+      "id": "audit_aa5f4bf1-0a7b-460a-9fc9-ce7fe955d5f4",
+      "userId": "user_mlaframboisemm",
+      "action": "LIQUIDITY_BUFFER_REFILL_SUCCESS",
+      "timestamp": 1784229338127,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Auto-Refill Executed: Moved $5000.00 USD from internal database ledger to active Stripe payout pipeline to satisfy $5000 USD minimum threshold constraint."
     }
   ]
 }

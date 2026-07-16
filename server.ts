@@ -7133,7 +7133,19 @@ function initializeInterbankVault() {
       if (dbErr) {
         console.error("Failed to initialize settled_clearinghouse SQLite schema:", dbErr.message);
       } else {
-        console.log("Sovereigns Interbank Vault SQLite DB initialized successfully.");
+        dbInstance.run(`
+          CREATE TABLE IF NOT EXISTS node_bindings (
+            secure_ref TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL,
+            last_verified INTEGER NOT NULL
+          );
+        `, (bindErr) => {
+          if (bindErr) {
+            console.error("Failed to initialize node_bindings SQLite schema:", bindErr.message);
+          } else {
+            console.log("Sovereigns Interbank Vault SQLite DB schemas initialized successfully.");
+          }
+        });
       }
     });
   });
@@ -7893,16 +7905,16 @@ export const bankAccountStream = new EventEmitter();
 
 export function mapTransactionToNode(cardId: string): string {
   const normalized = String(cardId || '').toUpperCase();
-  if (normalized.includes('4910') || normalized.includes('CHEQUING')) {
-    return 'TANGERINE_CHEQUING_4910';
+  if (normalized.includes('9879') || normalized.includes('CHEQUING')) {
+    return 'TANGERINE_CHEQUING_9879';
   }
-  if (normalized.includes('8271') || normalized.includes('SAVINGS')) {
-    return 'TANGERINE_SAVINGS_8271';
+  if (normalized.includes('0336') || normalized.includes('SAVINGS')) {
+    return 'TANGERINE_SAVINGS_0336';
   }
-  if (normalized.includes('1042') || normalized.includes('JOINT')) {
-    return 'TANGERINE_JOINT_1042';
+  if (normalized.includes('9886') || normalized.includes('JOINT')) {
+    return 'TANGERINE_JOINT_9886';
   }
-  return 'TANGERINE_CHEQUING_4910'; // Default fallback node
+  return 'TANGERINE_CHEQUING_9879'; // Default fallback node
 }
 
 bankAccountStream.on('transaction', async (event: { cardId: string; amount: number; userId?: string }) => {
@@ -7949,6 +7961,65 @@ bankAccountStream.on('transaction', async (event: { cardId: string; amount: numb
     
   } catch (err: any) {
     console.error(`[STREAM] Failed to process transaction event for Node ${node}:`, err.message);
+  }
+});
+
+export async function secureRegisterCard(cardToken: string, nodeID: string, userId?: string) {
+  const masterKey = process.env.SOVEREIGN_ENCRYPTION_KEY || 'default-sovereign-master-key-32chars';
+  const resolvedUser = userId || 'guest_gateway';
+  
+  // 1. Encryption: Secure the raw identifier using AES-256
+  const encryptedToken = encryptLedgerDataWithKey({ cardToken }, masterKey);
+
+  // 2. The Log: Create an immutable entry in the signed project ledger
+  await recordLedgerEntry({
+    type: "transfer",
+    status: "executed",
+    payload: {
+      action: "card.registration",
+      method: "vault",
+      nodeId: nodeID,
+      userId: resolvedUser,
+      referenceNotes: `Link established securely with encrypted token signature`,
+      clearinghouseHash: "0x" + crypto.randomBytes(32).toString("hex")
+    },
+    result: {
+      state: "reconciled",
+      recordedAt: new Date().toISOString(),
+      txHash: "0x" + crypto.randomBytes(32).toString("hex")
+    }
+  });
+
+  // 3. The Connection: Bind the identity to your Ledger Node in SQLite database
+  return new Promise<void>((resolve, reject) => {
+    interbankDb.run(
+      'INSERT OR REPLACE INTO node_bindings (secure_ref, node_id, last_verified) VALUES (?, ?, ?)',
+      [encryptedToken, nodeID, Date.now()],
+      (err) => {
+        if (err) {
+          console.error(`[VAULT] Failed to insert node binding for ${nodeID}:`, err.message);
+          reject(err);
+        } else {
+          console.log(`[VAULT] Node ${nodeID} is now live and linked securely.`);
+          resolve();
+        }
+      }
+    );
+  });
+}
+
+app.post('/api/card/register', requireAuth, async (req: any, res: any) => {
+  const { cardToken, nodeID } = req.body || {};
+  if (!cardToken || !nodeID) {
+    return res.status(400).json({ error: 'VALIDATION_ERROR', message: 'cardToken and nodeID are required.' });
+  }
+
+  try {
+    const userId = req.user && req.user.id ? String(req.user.id) : 'guest_gateway';
+    await secureRegisterCard(cardToken, nodeID, userId);
+    res.json({ success: true, message: `Node ${nodeID} is now live and linked.` });
+  } catch (err: any) {
+    res.status(500).json({ error: 'REGISTRATION_FAILED', message: err.message || String(err) });
   }
 });
 

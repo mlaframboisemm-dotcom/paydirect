@@ -34,6 +34,41 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
   const [simulatorSuccess, setSimulatorSuccess] = useState<string | null>(null);
   const [simulatorError, setSimulatorError] = useState<string | null>(null);
 
+  // Secure Vault Registration state
+  const [cardTokenInput, setCardTokenInput] = useState('');
+  const [selectedNode, setSelectedNode] = useState('TANGERINE_CHEQUING_9879');
+  const [vaultLoading, setVaultLoading] = useState(false);
+  const [vaultSuccess, setVaultSuccess] = useState<string | null>(null);
+  const [vaultError, setVaultError] = useState<string | null>(null);
+
+  const handleRegisterCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setVaultError(null);
+    setVaultSuccess(null);
+    if (!cardTokenInput.trim()) {
+      setVaultError('Card token identifier is required.');
+      return;
+    }
+    setVaultLoading(true);
+    try {
+      const res = await fetch('/api/card/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardToken: cardTokenInput, nodeID: selectedNode })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Registration failed');
+      }
+      setVaultSuccess(`Successfully bound and cryptographically locked token signature to Node ${selectedNode}.`);
+      setCardTokenInput('');
+    } catch (err: any) {
+      setVaultError(err.message);
+    } finally {
+      setVaultLoading(false);
+    }
+  };
+
   const purchaseOptions = [
     { name: 'Starbucks Coffee & Croissant', price: 6.85 },
     { name: 'Organic Grocery Basket', price: 54.20 },
@@ -221,9 +256,9 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
                 onChange={(e) => setSelectedNode(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#0052FF]"
               >
-                <option value="TANGERINE_CHEQUING_4910">Tangerine Chequing (*4910)</option>
-                <option value="TANGERINE_SAVINGS_8271">Tangerine Savings (*8271)</option>
-                <option value="TANGERINE_JOINT_1042">Tangerine Joint (*1042)</option>
+                <option value="TANGERINE_CHEQUING_9879">Tangerine Chequing (*9879)</option>
+                <option value="TANGERINE_SAVINGS_0336">Tangerine Savings (*0336)</option>
+                <option value="TANGERINE_JOINT_9886">Tangerine Joint (*9886)</option>
               </select>
             </div>
             <button

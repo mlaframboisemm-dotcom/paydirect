@@ -170,5 +170,21 @@
     "createdAt": "2026-07-12T03:07:29.484Z",
     "expiresAt": 1783912049469,
     "verifiedAt": "2026-07-12T03:07:29.494Z"
+  },
+  "e2e-1784158301388@example.com": {
+    "userId": "user_7c97ff78-0a29-4491-99f8-0eb155f9fbe5",
+    "email": "e2e-1784158301388@example.com",
+    "tokenHash": "efda318452bf0fc987e0a3320f7f737ff9d5f06b3d03a4c646db0c147179ec1a",
+    "createdAt": "2026-07-15T23:31:43.876Z",
+    "expiresAt": 1784244703862,
+    "verifiedAt": "2026-07-15T23:31:43.898Z"
+  },
+  "e2e-1784220924222@example.com": {
+    "userId": "user_c60604a9-0902-4c34-9863-f1a3232c4f1a",
+    "email": "e2e-1784220924222@example.com",
+    "tokenHash": "6b58bc0f5aebe1ab314c368c96d4dd143ab07ce144b830622969dea0e2d759c9",
+    "createdAt": "2026-07-16T16:55:24.666Z",
+    "expiresAt": 1784307324658,
+    "verifiedAt": "2026-07-16T16:55:24.694Z"
   }
 }
