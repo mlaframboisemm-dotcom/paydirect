@@ -598,7 +598,11 @@ export default function CashTransferModal({
       }
 
       setWithdrawProgressStep(3);
-      showToast(`Stripe payout of CA$${amountCad.toFixed(2)} dispatched successfully!`, 'success');
+      if (resData.status === 'syncing') {
+        showToast(resData.message || 'Liquidity buffer replenishing. Payout will settle automatically.', 'info');
+      } else {
+        showToast(`Stripe payout of CA$${amountCad.toFixed(2)} dispatched successfully!`, 'success');
+      }
       
       onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
 

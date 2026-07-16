@@ -601,8 +601,13 @@ export default function App() {
       });
       const data = await res.json();
       if (res.ok) {
-        setStripePayoutSuccess(`Payout of CA$${amountNum.toFixed(2)} initiated successfully to your connected bank account!`);
-        showToast(`Stripe payout of CA$${amountNum.toFixed(2)} dispatched!`, 'success');
+        if (data.status === 'syncing') {
+          setStripePayoutSuccess(data.message || 'Liquidity buffer replenishing. Payout will execute automatically.');
+          showToast(data.message || 'Liquidity buffer replenishing.', 'info');
+        } else {
+          setStripePayoutSuccess(`Payout of CA$${amountNum.toFixed(2)} initiated successfully to your connected bank account!`);
+          showToast(`Stripe payout of CA$${amountNum.toFixed(2)} dispatched!`, 'success');
+        }
         setStripePayoutAmount('');
         fetchStripeBalance();
         syncCoinbaseBalances();
