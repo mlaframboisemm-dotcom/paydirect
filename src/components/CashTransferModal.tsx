@@ -591,7 +591,10 @@ export default function CashTransferModal({
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.message || resData.error || 'Failed to dispatch Stripe payout.');
+        const errorMsg = typeof resData.error === 'object' && resData.error !== null
+          ? (resData.error.message || resData.error.code || JSON.stringify(resData.error))
+          : (resData.message || resData.error || 'Failed to dispatch Stripe payout.');
+        throw new Error(errorMsg);
       }
 
       setWithdrawProgressStep(3);

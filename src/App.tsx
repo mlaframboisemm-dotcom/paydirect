@@ -607,7 +607,10 @@ export default function App() {
         fetchStripeBalance();
         syncCoinbaseBalances();
       } else {
-        setStripePayoutError(data.message || data.error || 'Failed to dispatch Stripe payout.');
+        const errorMsg = typeof data.error === 'object' && data.error !== null
+          ? (data.error.message || data.error.code || JSON.stringify(data.error))
+          : (data.message || data.error || 'Failed to dispatch Stripe payout.');
+        setStripePayoutError(errorMsg);
       }
     } catch (err: any) {
       setStripePayoutError(err.message || 'Payout request failed.');

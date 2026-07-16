@@ -92,7 +92,9 @@ export async function syncAllStripeBalances() {
     console.log(`[STRIPE AGGREGATOR] Successfully aggregated balance across connected accounts. Available: $${GLOBAL_STRIPE_BALANCE.available} USD, Pending: $${GLOBAL_STRIPE_BALANCE.pending} USD`);
     
     // Auto-Refill check
-    await checkAndRefillLiquidity();
+    if (process.env.NODE_ENV !== 'test') {
+      await checkAndRefillLiquidity();
+    }
   } catch (error) {
     console.error('[STRIPE AGGREGATOR] Error during balance aggregation sync:', error);
   }
