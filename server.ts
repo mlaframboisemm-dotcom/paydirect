@@ -7459,6 +7459,9 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   const { state, code } = req.query || {};
   if (!state) return res.status(400).send('Missing state');
 
+  const resolvedState = Array.isArray(state) ? String(state[0]) : String(state);
+  const resolvedCode = Array.isArray(code) ? String(code[0]) : String(code || 'MOCK_CODE');
+
   function buildRedirectUrl(target: string, params: Record<string, string>) {
     try {
       const url = new URL(target);
@@ -7471,28 +7474,28 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
     }
   }
 
-  const transfer = ESCROW_LEDGER.get(String(state));
+  const transfer = ESCROW_LEDGER.get(resolvedState);
   if (!transfer) {
     // Redirect back to frontend with error
     const frontend = process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
     return res.redirect(buildRedirectUrl(frontend, { error: 'INVALID_STATE' }));
   }
   if (transfer.expiresAt && Date.now() > transfer.expiresAt) {
-    ESCROW_LEDGER.delete(String(state));
+    ESCROW_LEDGER.delete(resolvedState);
     const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
     return res.redirect(buildRedirectUrl(frontend, { error: 'ESCROW_EXPIRED' }));
   }
 
   // Store the authorization code for later token exchange / finalization
   transfer.status = 'AUTHORIZATION_RECEIVED';
-  transfer.authCode = code || 'MOCK_CODE';
-  ESCROW_LEDGER.set(String(state), transfer);
+  transfer.authCode = resolvedCode;
+  ESCROW_LEDGER.set(resolvedState, transfer);
 
   const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
-    transfer_id: String(state),
-    code: String(code || 'MOCK_CODE')
+    transfer_id: resolvedState,
+    code: resolvedCode
   }));
 });
 
@@ -7587,15 +7590,18 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
 
 app.get("/api/v1/interac/callback", (req: any, res: any) => {
   const { transfer_id, state, code } = req.query || {};
-  const transferId = String(transfer_id || state || '');
+  const rawTransferId = transfer_id || state || '';
+  const resolvedTransferId = Array.isArray(rawTransferId) ? String(rawTransferId[0]) : String(rawTransferId);
+  const resolvedCode = Array.isArray(code) ? String(code[0]) : String(code || 'MOCK_CODE');
+
   let transfer: any = null;
 
-  if (transferId) {
-    transfer = ESCROW_LEDGER.get(transferId);
+  if (resolvedTransferId) {
+    transfer = ESCROW_LEDGER.get(resolvedTransferId);
     if (transfer) {
       transfer.status = 'AUTHORIZATION_RECEIVED';
-      transfer.authCode = code || 'MOCK_CODE';
-      ESCROW_LEDGER.set(transferId, transfer);
+      transfer.authCode = resolvedCode;
+      ESCROW_LEDGER.set(resolvedTransferId, transfer);
     }
   }
 
@@ -7615,8 +7621,8 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
 
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
-    transfer_id: transferId,
-    code: String(code || 'MOCK_CODE')
+    transfer_id: resolvedTransferId,
+    code: resolvedCode
   }));
 });
 

@@ -1285,9 +1285,20 @@
                 
                 closeWebviewModal();
                 
-                const separator = currentRedirectUri.includes('?') ? '&' : '?';
                 const tokenCode = `MOCK_OAUTH_TOKEN_${mfaCode}_${Math.floor(100000 + Math.random() * 900000)}`;
-                const returnUrl = `${currentRedirectUri}${separator}state=${currentSessionTransferId}&transfer_id=${currentSessionTransferId}&code=${tokenCode}`;
+                let targetUrl;
+                try {
+                    targetUrl = new URL(currentRedirectUri);
+                } catch (e) {
+                    targetUrl = new URL(currentRedirectUri, window.location.origin);
+                }
+                targetUrl.searchParams.set("state", currentSessionTransferId);
+                targetUrl.searchParams.set("transfer_id", currentSessionTransferId);
+                targetUrl.searchParams.set("code", tokenCode);
+
+                const returnUrl = currentRedirectUri.startsWith('/') 
+                    ? targetUrl.pathname + targetUrl.search 
+                    : targetUrl.toString();
                 window.location.href = returnUrl;
                 return;
             }
