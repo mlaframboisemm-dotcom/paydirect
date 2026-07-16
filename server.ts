@@ -7364,7 +7364,7 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
   // Simulate interbank clearing processing latency
   await new Promise((resolve) => setTimeout(resolve, 1200));
 
-  const clearinghouse_reference_hash = "HDLS-RAIL-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+  const clearinghouse_reference_hash = "0x" + crypto.randomBytes(32).toString("hex");
   const sign_indicator = transfer.operation === "DEPOSIT" ? "+" : "-";
   const amountDelta = `${sign_indicator}$${transfer.amount.toFixed(2)} CAD`;
   const fxRate = resolveFxRateFromPayload((transfer as any)?.fxRate, DEFAULT_USD_CAD_RATE);

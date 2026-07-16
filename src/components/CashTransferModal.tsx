@@ -194,7 +194,8 @@ export default function CashTransferModal({
       window.history.replaceState({}, document.title, window.location.pathname);
       
       const finalizeRedirectionCallback = async () => {
-        const bankKey = activeSelectedBankKey || 'TD';
+        const bankKey = activeSelectedBankKey || localStorage.getItem('cb_active_selected_bank_key') || 'Tangerine';
+        const bankName = activeSelectedBankName || localStorage.getItem('cb_active_selected_bank_name') || 'Tangerine';
         showToast('Clearing interbank OAuth authorization code...', 'info');
         
         try {
@@ -227,7 +228,7 @@ export default function CashTransferModal({
               amount: amountUsd,
               fiatAmount: amountUsd,
               timestamp: Date.now(),
-              details: `Sovereigns Gateway DEPOSIT cleared via bank redirect callback (Ref: ${clearinghouseHash})`
+              details: `Sovereigns Gateway DEPOSIT cleared via ${bankName} redirect callback (Ref: ${clearinghouseHash})`
             });
             onUpdateUsdBalance(usdBalance + amountUsd);
             showToast(`Interbank settlement finalized! Credited $${amountUsd.toFixed(2)} USD`, 'success');
@@ -239,7 +240,7 @@ export default function CashTransferModal({
               amount: amountUsd,
               fiatAmount: amountUsd,
               timestamp: Date.now(),
-              details: `Sovereigns Gateway WITHDRAWAL cleared via bank redirect callback (Ref: ${clearinghouseHash})`
+              details: `Sovereigns Gateway WITHDRAWAL cleared via ${bankName} redirect callback (Ref: ${clearinghouseHash})`
             });
             onUpdateUsdBalance(usdBalance - amountUsd);
             showToast(`Interbank withdrawal finalized! Debited $${amountUsd.toFixed(2)} USD`, 'success');
