@@ -749,10 +749,9 @@ export default function App() {
   // Auto-login to mlaframboisemm@gmail.com on startup
   useEffect(() => {
     const autoLogin = async () => {
-      const savedEmail = localStorage.getItem('cb_auth_email');
-      const savedAuthenticated = localStorage.getItem('cb_auth_authenticated') === 'true';
+      const hasToken = hasSessionToken();
 
-      if (!savedAuthenticated || savedEmail !== 'mlaframboisemm@gmail.com') {
+      if (!hasToken) {
         try {
           const response = await fetch(buildApiUrl('/api/auth/auto-login'), {
             method: 'POST',
