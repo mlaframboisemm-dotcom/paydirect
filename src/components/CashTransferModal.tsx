@@ -97,7 +97,7 @@ export default function CashTransferModal({
 
   // e-Transfer and Canadian network states
   const [depositMethod, setDepositMethod] = useState<'bank' | 'etransfer'>(citizenship === 'CA' ? 'etransfer' : 'bank');
-  const [withdrawMethod, setWithdrawMethod] = useState<'bank' | 'etransfer'>(citizenship === 'CA' ? 'etransfer' : 'bank');
+  const [withdrawMethod, setWithdrawMethod] = useState<'bank' | 'etransfer' | 'stripe'>(citizenship === 'CA' ? 'etransfer' : 'bank');
   const [etransferBankName, setEtransferBankName] = useState('TD Canada Trust');
   const [etransferEmail, setEtransferEmail] = useState(() => localStorage.getItem('cb_auth_email') || '');
   const [etransferRef, setEtransferRef] = useState(() => 'CA' + Math.floor(100000 + Math.random() * 900000).toString());
@@ -559,6 +559,57 @@ export default function CashTransferModal({
       setIsEtransferVerifying(false);
       setEtransferStep(0);
       setLocalError(`Deposit failed: ${e.message}`);
+    }
+  };
+
+  // Handle Stripe payout execution
+  const handleExecuteStripePayout = async () => {
+    setLocalError(null);
+    const amountCad = parseFloat(withdrawAmount);
+    if (isNaN(amountCad) || amountCad <= 0) {
+      setLocalError('Please enter a valid amount to withdraw.');
+      return;
+    }
+
+    const amountUsd = cadToUsd(amountCad);
+    if (!canCoverWithdrawal(amountUsd, usdBalance)) {
+      setLocalError(`Insufficient USD cash balance. You have US$${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} available.`);
+      return;
+    }
+
+    setIsWithdrawing(true);
+    setWithdrawProgressStep(1);
+
+    try {
+      const res = await fetch(buildApiUrl('/api/stripe/payout'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ amount: amountCad })
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.message || resData.error || 'Failed to dispatch Stripe payout.');
+      }
+
+      setWithdrawProgressStep(3);
+      showToast(`Stripe payout of CA$${amountCad.toFixed(2)} dispatched successfully!`, 'success');
+      
+      onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
+
+      if (onRefreshBalances) {
+        onRefreshBalances();
+      }
+
+      setTimeout(() => {
+        setIsWithdrawing(false);
+        setWithdrawProgressStep(0);
+        onClose();
+      }, 1000);
+    } catch (e: any) {
+      setIsWithdrawing(false);
+      setWithdrawProgressStep(0);
+      setLocalError(e.message || 'Payout failed.');
     }
   };
 
@@ -1886,18 +1937,18 @@ export default function CashTransferModal({
                   ) : (
                     <>
                       {/* Method Toggle */}
-                      <div className="bg-gray-100 p-1 rounded-xl grid grid-cols-2 gap-1 select-none mb-3">
+                       <div className="bg-gray-100 p-1 rounded-xl grid grid-cols-3 gap-1 select-none mb-3">
                         <button
                           type="button"
                           onClick={() => {
                             setWithdrawMethod('bank');
                             setLocalError(null);
                           }}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                          className={`py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                             withdrawMethod === 'bank' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'
                           }`}
                         >
-                          Direct Bank Transfer (CAD) 🇨🇦
+                          Bank Transfer
                         </button>
                         <button
                           type="button"
@@ -1905,11 +1956,23 @@ export default function CashTransferModal({
                             setWithdrawMethod('etransfer');
                             setLocalError(null);
                           }}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                          className={`py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                             withdrawMethod === 'etransfer' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'
                           }`}
                         >
-                          Interac e-Transfer (CAD) 🇨🇦
+                          e-Transfer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWithdrawMethod('stripe');
+                            setLocalError(null);
+                          }}
+                          className={`py-1.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                            withdrawMethod === 'stripe' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800'
+                          }`}
+                        >
+                          Stripe Payout
                         </button>
                       </div>
 
@@ -2037,6 +2100,64 @@ export default function CashTransferModal({
                             Continue to Secure Bank Sign-In
                           </button>
                         </>
+                      ) : withdrawMethod === 'stripe' ? (
+                        /* STRIPE PAYOUT WITHDRAW VIEW */
+                        <div className="space-y-4">
+                          <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[10px] font-bold text-gray-400 uppercase">Enter Payout Amount (CAD)</label>
+                              <span className="text-[10px] font-bold text-gray-500 font-mono">
+                                Limit: CA${usdToCad(usdBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })} (US${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})
+                              </span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="text-3xl font-extrabold text-gray-400 mr-1">CA$</span>
+                              <input
+                                type="number"
+                                placeholder="0.00"
+                                value={withdrawAmount}
+                                onChange={(e) => setWithdrawAmount(e.target.value)}
+                                className="w-full bg-transparent text-3xl font-black text-gray-900 border-none outline-none focus:ring-0 p-0 font-mono"
+                              />
+                            </div>
+                            <div className="mt-2 text-right">
+                              <button
+                                onClick={() => setWithdrawAmount(usdToCad(usdBalance).toFixed(2))}
+                                className="text-[10px] font-bold text-[#0052FF] hover:underline cursor-pointer"
+                              >
+                                Maximize Outflow
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-2 font-medium">
+                              Approx wallet debit: US${(cadToUsd(parseFloat(withdrawAmount) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })} at FX {usdCadRate.toFixed(4)}
+                            </p>
+                          </div>
+
+                          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-2">
+                            <h4 className="text-xs font-bold text-emerald-800 flex items-center space-x-1.5">
+                              <Sparkles className="h-4 w-4" />
+                              <span>Direct Stripe Connected Account Payout</span>
+                            </h4>
+                            <p className="text-[10px] text-emerald-700 leading-relaxed font-medium">
+                              This will trigger a manual payout of your Stripe balance directly to your own connected bank account in Canada. The funds will be settled instantly or within 1-2 business days depending on your bank.
+                            </p>
+                          </div>
+
+                          {localError && (
+                            <div className="p-2.5 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs font-semibold flex items-center space-x-2">
+                              <AlertCircle className="h-4 w-4 shrink-0" />
+                              <span>{localError}</span>
+                            </div>
+                          )}
+
+                          <button
+                            onClick={handleExecuteStripePayout}
+                            disabled={!withdrawAmount || isWithdrawing}
+                            className="w-full py-3 bg-[#635BFF] hover:bg-[#4E46E5] disabled:bg-gray-300 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-colors flex items-center justify-center space-x-2"
+                          >
+                            <span>{isWithdrawing ? 'Dispatching Stripe Payout...' : 'Submit Stripe Payout Request'}</span>
+                          </button>
+                        </div>
                       ) : (
                         /* INTERAC E-TRANSFER WITHDRAW VIEW */
                         <div className="space-y-3">

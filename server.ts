@@ -6255,13 +6255,41 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
       const holdingsMap = new Map();
       // Seed from sqlite database balance for the logged in user
       let cashBalance = 0;
-      try {
-        const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
-        if (wallets && wallets.length > 0) {
-          cashBalance = Number(wallets[0].balance || 0);
+      
+      const stripeKey = process.env.STRIPE_SECRET_KEY;
+      if (stripeKey) {
+        try {
+          const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${stripeKey}`,
+              'Accept': 'application/json'
+            }
+          });
+          if (balanceRes.ok) {
+            const balanceJson = await balanceRes.json() as any;
+            const available = balanceJson.available?.[0]?.amount || 0;
+            const pending = balanceJson.pending?.[0]?.amount || 0;
+            const totalStripeBalance = (available + pending) / 100;
+            
+            db.execute('INSERT OR REPLACE INTO wallets (user_id, asset_symbol, balance) VALUES (?, ?, ?)', [req.user.id, 'USD', totalStripeBalance]);
+            cashBalance = totalStripeBalance;
+            console.log(`[STRIPE SYNC] Synced wallet balance for user ${req.user.id} to Stripe balance: $${totalStripeBalance} USD`);
+          }
+        } catch (stripeErr) {
+          console.warn('Failed to sync Stripe balance to SQLite wallet:', stripeErr);
         }
-      } catch (dbErr) {
-        console.warn('Failed to retrieve USD wallet balance from DB:', dbErr);
+      }
+
+      if (!stripeKey || cashBalance === 0) {
+        try {
+          const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+          if (wallets && wallets.length > 0) {
+            cashBalance = Number(wallets[0].balance || 0);
+          }
+        } catch (dbErr) {
+          console.warn('Failed to retrieve USD wallet balance from DB:', dbErr);
+        }
       }
 
       // Attempt to derive ETH balance from configured Marshall wallet when available
@@ -7872,6 +7900,121 @@ app.post('/api/stripe/finalize-session', requireAuth, async (req: any, res) => {
   } catch (err: any) {
     console.error('Stripe finalization error:', err);
     res.status(500).json({ error: 'STRIPE_FINALIZATION_FAILED', message: err.message || String(err) });
+  }
+});
+
+app.get('/api/stripe/balance', requireAuth, async (req: any, res) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return res.status(501).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured on this server.' });
+  }
+
+  try {
+    const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!balanceRes.ok) {
+      const errText = await balanceRes.text();
+      throw new Error(errText || 'Failed to retrieve Stripe balance');
+    }
+
+    const balanceJson = await balanceRes.json() as any;
+    const available = balanceJson.available?.[0]?.amount || 0;
+    const pending = balanceJson.pending?.[0]?.amount || 0;
+
+    res.json({
+      available: available / 100,
+      pending: pending / 100,
+      total: (available + pending) / 100
+    });
+  } catch (err: any) {
+    console.error('Stripe balance fetch error:', err);
+    res.status(500).json({ error: 'STRIPE_BALANCE_FAILED', message: err.message || String(err) });
+  }
+});
+
+app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return res.status(501).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured on this server.' });
+  }
+
+  try {
+    const { amount } = req.body || {};
+    const amountNum = Number(amount);
+    if (!amount || Number.isNaN(amountNum) || amountNum <= 0) {
+      return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Payout amount must be a positive number.' });
+    }
+
+    const amountCents = Math.round(amountNum * 100);
+
+    const form = new URLSearchParams();
+    form.set('amount', String(amountCents));
+    form.set('currency', 'cad');
+
+    const payoutRes = await fetch('https://api.stripe.com/v1/payouts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: form.toString()
+    });
+
+    if (!payoutRes.ok) {
+      const errText = await payoutRes.text();
+      throw new Error(errText || 'Failed to trigger Stripe payout');
+    }
+
+    const payoutJson = await payoutRes.json() as any;
+
+    try {
+      const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [req.user.id]) as any[];
+      const usdWallet = walletRows.find((w: any) => w.assetSymbol.toUpperCase() === 'USD');
+      if (usdWallet) {
+        const currentBalance = Number(usdWallet.balance || 0);
+        const newBalance = Math.max(0, currentBalance - amountNum);
+        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBalance, req.user.id, 'USD']);
+      }
+    } catch (dbErr: any) {
+      console.error('Failed to update wallet after Stripe payout:', dbErr);
+    }
+
+    try {
+      const clearinghouse_reference_hash = '0x' + crypto.randomBytes(32).toString('hex');
+      await recordLedgerEntry({
+        type: "transfer",
+        status: "executed",
+        payload: {
+          action: "settlement.withdrawal",
+          method: "stripe",
+          amount: amountNum,
+          currency: "CAD",
+          userId: req.user.id,
+          referenceNotes: `Stripe payout triggered to connected bank account. Payout ID: ${payoutJson.id}`,
+          clearinghouseHash: clearinghouse_reference_hash
+        },
+        result: {
+          state: "reconciled",
+          recordedAt: new Date().toISOString(),
+          trackingReferenceId: clearinghouse_reference_hash,
+          amountDelta: `-$${amountNum.toFixed(2)} CAD`
+        }
+      });
+    } catch (ledgerErr) {
+      console.error('Failed to record Stripe payout in ledger:', ledgerErr);
+    }
+
+    res.json({ success: true, payout: payoutJson });
+  } catch (err: any) {
+    console.error('Stripe payout error:', err);
+    res.status(500).json({ error: 'STRIPE_PAYOUT_FAILED', message: err.message || String(err) });
   }
 });
 
