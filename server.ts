@@ -6706,13 +6706,23 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
     return res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'Admin privileges are required to execute treasury send operations.' });
   }
 
-  const { symbol, amount, toAddress } = req.body;
+  const { symbol, amount, toAddress, currency, to } = req.body;
+  const cleanSymbol = String(symbol || currency || 'ETH').toUpperCase();
+  const targetAddress = toAddress || to;
+  const amountVal = parseFloat(amount);
   
-  if (!toAddress || !ethers.isAddress(toAddress)) {
-    return res.status(400).json({ error: 'Invalid destination Ethereum address' });
+  const isEvm = ['ETH', 'USDC', 'POL', 'BNB', 'LINK', 'PEPE', 'SHIB'].includes(cleanSymbol);
+  
+  if (isEvm) {
+    if (!targetAddress || !ethers.isAddress(targetAddress)) {
+      return res.status(400).json({ error: 'Invalid destination Ethereum/EVM address' });
+    }
+  } else {
+    if (!targetAddress || typeof targetAddress !== 'string' || targetAddress.trim().length < 25) {
+      return res.status(400).json({ error: `Invalid destination ${cleanSymbol} address` });
+    }
   }
   
-  const amountVal = parseFloat(amount);
   if (isNaN(amountVal) || amountVal <= 0) {
     return res.status(400).json({ error: 'Invalid transfer amount' });
   }
@@ -6729,8 +6739,8 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
           method: 'wallet_send',
           userId: req.user.id,
           amount: amountVal,
-          currency: symbol,
-          recipient: toAddress
+          currency: cleanSymbol,
+          recipient: targetAddress
         },
         result: {
           txHash,
@@ -6741,7 +6751,7 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
         success: true,
         hash: txHash,
         from: '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f',
-        to: toAddress,
+        to: targetAddress,
         amount
       });
     }
@@ -6768,7 +6778,7 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
     }
 
     const tx = await wallet.sendTransaction({
-      to: toAddress,
+      to: targetAddress,
       value: amountInWei
     });
     const txHash = tx.hash;
@@ -6778,7 +6788,7 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
       'ethereum',
       txHash,
       amount.toString(),
-      toAddress,
+      targetAddress,
       req.user.id
     );
 
@@ -6791,8 +6801,8 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
           method: 'wallet_send',
           userId: req.user.id,
           amount: amountVal,
-          currency: symbol,
-          recipient: toAddress
+          currency: cleanSymbol,
+          recipient: targetAddress
         },
         result: {
           txHash,
