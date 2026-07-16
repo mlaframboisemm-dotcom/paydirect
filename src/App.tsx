@@ -200,8 +200,7 @@ export default function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const auth = localStorage.getItem('cb_auth_authenticated') === 'true';
-    const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
-    return auth && !!token;
+    return auth && hasSessionToken();
   });
   const [userEmail, setUserEmail] = useState<string>(() => {
     return localStorage.getItem('cb_auth_email') || '';
