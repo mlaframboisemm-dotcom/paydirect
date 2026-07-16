@@ -19,6 +19,7 @@ import DeveloperHub from './components/DeveloperHub';
 import OnboardingKyc from './components/OnboardingKyc';
 import AuthScreen from './components/AuthScreen';
 import EmailInbox, { InboxEmail } from './components/EmailInbox';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { convertUsdToCad, DEFAULT_USD_CAD_RATE } from './lib/financial-hardening';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -1533,14 +1534,16 @@ export default function App() {
               />
 
               {/* Sidebar Trade widget */}
-              <TradeWidget
-                coins={coins}
-                holdings={holdings}
-                usdBalance={usdBalance}
-                onExecuteTrade={handleExecuteTrade}
-                selectedAssetSymbol={selectedAssetSymbol}
-                citizenship={citizenship}
-              />
+              <ErrorBoundary name="TradeWidget">
+                <TradeWidget
+                  coins={coins}
+                  holdings={holdings}
+                  usdBalance={usdBalance}
+                  onExecuteTrade={handleExecuteTrade}
+                  selectedAssetSymbol={selectedAssetSymbol}
+                  citizenship={citizenship}
+                />
+              </ErrorBoundary>
 
               {/* Coinbase News / Tips widget */}
               <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs">
@@ -1728,14 +1731,16 @@ export default function App() {
 
             {/* Sidebar Trade widget */}
             <div className="lg:col-span-4">
-              <TradeWidget
-                coins={coins}
-                holdings={holdings}
-                usdBalance={usdBalance}
-                onExecuteTrade={handleExecuteTrade}
-                selectedAssetSymbol={selectedAssetSymbol}
-                citizenship={citizenship}
-              />
+              <ErrorBoundary name="TradeWidgetSidebar">
+                <TradeWidget
+                  coins={coins}
+                  holdings={holdings}
+                  usdBalance={usdBalance}
+                  onExecuteTrade={handleExecuteTrade}
+                  selectedAssetSymbol={selectedAssetSymbol}
+                  citizenship={citizenship}
+                />
+              </ErrorBoundary>
             </div>
 
           </div>
@@ -1744,91 +1749,101 @@ export default function App() {
         {/* --- Tab 3: Learning Rewards Hub --- */}
         {currentTab === 'learn' && (
           <div className="max-w-4xl mx-auto">
-            <EarnRewards quizzes={quizzes} onCompleteQuiz={handleCompleteQuiz} />
+            <ErrorBoundary name="EarnRewardsTab">
+              <EarnRewards quizzes={quizzes} onCompleteQuiz={handleCompleteQuiz} />
+            </ErrorBoundary>
           </div>
         )}
 
         {/* --- Tab: KYC Onboarding & Regional Limits --- */}
         {currentTab === 'onboarding' && (
           <div className="max-w-4xl mx-auto">
-            <OnboardingKyc
-              onVerificationSuccess={(level) => {
-                setKycLevel(level);
-                showToast(`KYC Onboarding complete! Level Upgraded to Tier ${level}.`, 'success');
-              }}
-              showToast={showToast}
-            />
+            <ErrorBoundary name="KycOnboardingTab">
+              <OnboardingKyc
+                onVerificationSuccess={(level) => {
+                  setKycLevel(level);
+                  showToast(`KYC Onboarding complete! Level Upgraded to Tier ${level}.`, 'success');
+                }}
+                showToast={showToast}
+              />
+            </ErrorBoundary>
           </div>
         )}
 
         {/* --- Tab 4: Debit Card simulation --- */}
         {currentTab === 'card' && (
           <div className="max-w-5xl mx-auto">
-            <CoinbaseCard
-              holdings={holdings}
-              coins={coins}
-              onDebitCardSpend={handleDebitCardSpend}
-            />
+            <ErrorBoundary name="DebitCardTab">
+              <CoinbaseCard
+                holdings={holdings}
+                coins={coins}
+                onDebitCardSpend={handleDebitCardSpend}
+              />
+            </ErrorBoundary>
           </div>
         )}
 
         {/* --- Tab: Address Hub --- */}
         {currentTab === 'address' && (
           <div className="max-w-7xl mx-auto">
-            <AddressHub
-              coins={coins}
-              holdings={holdings}
-              onAddTransaction={(type, symbol, amount, fiat, details) => {
-                const coin = coins.find((c) => c && c.symbol === symbol);
-                if (!coin) return;
-                
-                // Track standard holdings addition if on-chain faucet credited
-                setHoldings((prev) => {
-                  const existing = prev.find((h) => h.symbol === symbol);
-                  if (existing) {
-                    const totalAmount = existing.amount + amount;
-                    const weightedAvg = ((existing.amount * existing.avgBuyPrice) + (amount * coin.price)) / totalAmount;
-                    return prev.map((h) =>
-                      h.symbol === symbol ? { ...h, amount: totalAmount, avgBuyPrice: weightedAvg } : h
-                    );
-                  } else {
-                    return [...prev, { symbol, amount, avgBuyPrice: coin.price }];
-                  }
-                });
+            <ErrorBoundary name="AddressHubTab">
+              <AddressHub
+                coins={coins}
+                holdings={holdings}
+                onAddTransaction={(type, symbol, amount, fiat, details) => {
+                  const coin = coins.find((c) => c && c.symbol === symbol);
+                  if (!coin) return;
+                  
+                  // Track standard holdings addition if on-chain faucet credited
+                  setHoldings((prev) => {
+                    const existing = prev.find((h) => h.symbol === symbol);
+                    if (existing) {
+                      const totalAmount = existing.amount + amount;
+                      const weightedAvg = ((existing.amount * existing.avgBuyPrice) + (amount * coin.price)) / totalAmount;
+                      return prev.map((h) =>
+                        h.symbol === symbol ? { ...h, amount: totalAmount, avgBuyPrice: weightedAvg } : h
+                      );
+                    } else {
+                      return [...prev, { symbol, amount, avgBuyPrice: coin.price }];
+                    }
+                  });
 
-                const tx: Transaction = {
-                  id: `tx-chain-${Date.now()}`,
-                  type: 'RECEIVE',
-                  assetSymbol: symbol,
-                  amount: amount,
-                  fiatAmount: fiat,
-                  timestamp: Date.now(),
-                  details: details,
-                  hash: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
-                  status: 'completed',
-                  blockHeight: 849012 + Math.floor(Math.random() * 5000),
-                  fromAddress: '0xfa839c0183...f9a8',
-                  toAddress: symbol === 'ETH' ? '0x71C7656EC7ab88b098defB751B7401B5f6d1476B' : 'bc1q9rny26szrgl26u64mdg0cuhvpt2p77jwh792ka',
-                  ledgerDebit: `Cryptocurrency Vault Holding (${symbol})`,
-                  ledgerCredit: 'On-Chain Miner/Validator Coinbase'
-                };
-                setTransactions((prev) => [tx, ...prev]);
-              }}
-              showToast={showToast}
-            />
+                  const tx: Transaction = {
+                    id: `tx-chain-${Date.now()}`,
+                    type: 'RECEIVE',
+                    assetSymbol: symbol,
+                    amount: amount,
+                    fiatAmount: fiat,
+                    timestamp: Date.now(),
+                    details: details,
+                    hash: `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`,
+                    status: 'completed',
+                    blockHeight: 849012 + Math.floor(Math.random() * 5000),
+                    fromAddress: '0xfa839c0183...f9a8',
+                    toAddress: symbol === 'ETH' ? '0x71C7656EC7ab88b098defB751B7401B5f6d1476B' : 'bc1q9rny26szrgl26u64mdg0cuhvpt2p77jwh792ka',
+                    ledgerDebit: `Cryptocurrency Vault Holding (${symbol})`,
+                    ledgerCredit: 'On-Chain Miner/Validator Coinbase'
+                  };
+                  setTransactions((prev) => [tx, ...prev]);
+                }}
+                showToast={showToast}
+              />
+            </ErrorBoundary>
           </div>
         )}
 
         {/* --- Tab: Developer Hub --- */}
         {currentTab === 'api' && (
           <div className="max-w-7xl mx-auto">
-            <DeveloperHub
-              coins={coins}
-              holdings={holdings}
-              usdBalance={usdBalance}
-              showToast={showToast}
-              onRefreshBalances={syncCoinbaseBalances}
-            />
+            <ErrorBoundary name="DeveloperHubTab">
+              <DeveloperHub
+                coins={coins}
+                holdings={holdings}
+                usdBalance={usdBalance}
+                showToast={showToast}
+                onRefreshBalances={syncCoinbaseBalances}
+              />
+            </ErrorBoundary>
           </div>
         )}
 
