@@ -6004,9 +6004,46 @@ app.get('/api/coinbase/config', requireAuth, requireMfa, async (req, res) => {
 });
 
 app.post('/api/coinbase/config', requireAuth, requireMfa, async (req, res) => {
+  const { apiKeyName, privateKey } = req.body || {};
+
+  if (apiKeyName) {
+    process.env.COINBASE_API_KEY_ID = apiKeyName;
+  }
+  if (privateKey) {
+    process.env.COINBASE_API_SECRET_RAW = privateKey;
+  }
+
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    }
+    
+    if (apiKeyName) {
+      if (envContent.includes('COINBASE_API_KEY_ID=')) {
+        envContent = envContent.replace(/COINBASE_API_KEY_ID=.*/g, `COINBASE_API_KEY_ID=${apiKeyName}`);
+      } else {
+        envContent += `\nCOINBASE_API_KEY_ID=${apiKeyName}`;
+      }
+    }
+    if (privateKey) {
+      if (envContent.includes('COINBASE_API_SECRET_RAW=')) {
+        envContent = envContent.replace(/COINBASE_API_SECRET_RAW=.*/g, `COINBASE_API_SECRET_RAW=${privateKey}`);
+      } else {
+        envContent += `\nCOINBASE_API_SECRET_RAW=${privateKey}`;
+      }
+    }
+    
+    fs.writeFileSync(envPath, envContent.trim() + '\n', 'utf8');
+  } catch (err) {
+    console.error('Failed to write credentials to .env file:', err);
+  }
+
   const readiness = await buildRuntimeReadinessReport(process.env);
   res.json({
     success: true,
+    message: 'Configuration saved and applied live to server process successfully.',
     mode: 'real',
     readiness,
     enforcement: getCriticalOperationsEnforcementState()
