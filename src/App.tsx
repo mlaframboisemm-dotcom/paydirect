@@ -196,6 +196,7 @@ export default function App() {
   // Toast notifications for workflow actions
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(false);
 
   // Real Coinbase Mode states
   const [realCoinbaseMode, setRealCoinbaseMode] = useState<boolean>(false);
@@ -830,8 +831,19 @@ export default function App() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      const dismissed = localStorage.getItem('sovereign_pwa_dismissed');
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    const dismissed = localStorage.getItem('sovereign_pwa_dismissed');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile && !dismissed) {
+      setShowInstallBanner(true);
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -1195,31 +1207,43 @@ export default function App() {
           setIsOpen={setIsEmailInboxOpen}
         />
 
-        {deferredPrompt && (
-          <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col">
+        {showInstallBanner && (
+          <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col animate-fade-in">
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-2.5">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm border border-blue-100">
                   S
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-gray-900">Install Sovereign App</h4>
-                  <p className="text-[10px] text-gray-500 mt-0.5">Download to your desktop or mobile home screen</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">Download PWA or direct Android app package</p>
                 </div>
               </div>
               <button 
-                onClick={() => setDeferredPrompt(null)}
-                className="text-gray-400 hover:text-gray-500 cursor-pointer"
+                onClick={() => {
+                  localStorage.setItem('sovereign_pwa_dismissed', 'true');
+                  setShowInstallBanner(false);
+                }}
+                className="text-gray-400 hover:text-gray-500 cursor-pointer p-0.5 hover:bg-gray-100 rounded"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <button
-              onClick={handleInstallPWA}
-              className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center"
-            >
-              Download PWA
-            </button>
+            <div className="space-y-1.5 pt-1">
+              <button
+                onClick={handleInstallPWA}
+                className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center block shadow-sm"
+              >
+                Download PWA
+              </button>
+              <a
+                href="/sovereign-app.apk"
+                download="sovereign-app.apk"
+                className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg border border-white/5 transition-all text-center cursor-pointer block shadow-sm"
+              >
+                Download Android (APK)
+              </a>
+            </div>
           </div>
         )}
 
@@ -2439,31 +2463,43 @@ export default function App() {
         isOpen={isEmailInboxOpen}
         setIsOpen={setIsEmailInboxOpen}
       />
-      {deferredPrompt && (
-        <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col">
+      {showInstallBanner && (
+        <div className="fixed bottom-6 left-6 z-50 bg-white border border-gray-250 rounded-2xl p-4 shadow-2xl space-y-3 max-w-xs animate-bounce flex flex-col animate-fade-in">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-2.5">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052FF] flex items-center justify-center font-extrabold text-sm shrink-0 shadow-sm border border-blue-100">
                 S
               </div>
               <div>
                 <h4 className="text-xs font-bold text-gray-900">Install Sovereign App</h4>
-                <p className="text-[10px] text-gray-500 mt-0.5">Download to your desktop or mobile home screen</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Download PWA or direct Android app package</p>
               </div>
             </div>
             <button 
-              onClick={() => setDeferredPrompt(null)}
-              className="text-gray-400 hover:text-gray-500 cursor-pointer"
+              onClick={() => {
+                localStorage.setItem('sovereign_pwa_dismissed', 'true');
+                setShowInstallBanner(false);
+              }}
+              className="text-gray-400 hover:text-gray-500 cursor-pointer p-0.5 hover:bg-gray-100 rounded"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-          <button
-            onClick={handleInstallPWA}
-            className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center"
-          >
-            Download PWA
-          </button>
+          <div className="space-y-1.5 pt-1">
+            <button
+              onClick={handleInstallPWA}
+              className="w-full py-2 bg-[#0052FF] hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer text-center block shadow-sm"
+            >
+              Download PWA
+            </button>
+            <a
+              href="/sovereign-app.apk"
+              download="sovereign-app.apk"
+              className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg border border-white/5 transition-all text-center cursor-pointer block shadow-sm"
+            >
+              Download Android (APK)
+            </a>
+          </div>
         </div>
       )}
     </div>
