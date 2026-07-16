@@ -41,6 +41,27 @@ export async function syncAllStripeBalances() {
       }
     }
 
+    // Fetch pending Stripe Top-ups to prevent asset gaps in consolidated balance
+    try {
+      const topupsRes = await fetch('https://api.stripe.com/v1/topups?status=pending&limit=100', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${stripeKey}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (topupsRes.ok) {
+        const topupsJson = await topupsRes.json() as any;
+        for (const tu of topupsJson.data || []) {
+          const amt = tu.amount || 0;
+          const curr = (tu.currency || 'usd').toLowerCase();
+          totalPending += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+        }
+      }
+    } catch (tuErr) {
+      console.warn('[STRIPE AGGREGATOR] Failed to fetch pending topups:', tuErr);
+    }
+
     // 2. Fetch all connected accounts
     const accountsRes = await fetch('https://api.stripe.com/v1/accounts?limit=100', {
       method: 'GET',

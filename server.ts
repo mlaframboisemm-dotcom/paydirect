@@ -8075,6 +8075,27 @@ app.get('/api/stripe/balance', requireAuth, async (req: any, res) => {
       pendingUsd += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
     }
 
+    // Fetch pending Stripe Top-ups to prevent asset gaps in consolidated balance
+    try {
+      const topupsRes = await fetch('https://api.stripe.com/v1/topups?status=pending&limit=100', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${stripeKey}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (topupsRes.ok) {
+        const topupsJson = await topupsRes.json() as any;
+        for (const tu of topupsJson.data || []) {
+          const amt = tu.amount || 0;
+          const curr = (tu.currency || 'usd').toLowerCase();
+          pendingUsd += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+        }
+      }
+    } catch (tuErr) {
+      console.warn('[STRIPE BALANCE] Failed to fetch pending topups:', tuErr);
+    }
+
     // Proactive Sync: If Stripe balance falls below threshold, trigger background sync immediately
     if (availableUsd < MIN_LIQUIDITY_THRESHOLD) {
       console.log(`[STRIPE BALANCE] Live available USD ($${availableUsd.toFixed(2)}) is below threshold ($${MIN_LIQUIDITY_THRESHOLD}). Triggering proactive Auto-Refill check in background...`);
