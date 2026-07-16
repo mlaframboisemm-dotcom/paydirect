@@ -62,9 +62,6 @@ export default function Header({
     { id: 'onboarding', label: 'KYC & Limits' },
     { id: 'learn', label: 'Learning Rewards', badge: 'Earn $12' },
     { id: 'card', label: 'Coinbase Card' },
-    { id: 'stripe', label: 'Stripe Hub' },
-    { id: 'address', label: 'Address Hub' },
-    { id: 'api', label: 'Developer Hub' },
     { id: 'history', label: 'Transactions' }
   ];
 
@@ -419,6 +416,36 @@ export default function Header({
                     >
                       <CreditCard className="h-4 w-4 text-gray-400" />
                       <span>Coinbase Card</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('stripe');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
+                    >
+                      <CreditCard className="h-4 w-4 text-[#635BFF]" />
+                      <span>Stripe Hub</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('address');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
+                    >
+                      <Wallet className="h-4 w-4 text-indigo-500" />
+                      <span>Address Hub</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCurrentTab('api');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
+                    >
+                      <Compass className="h-4 w-4 text-emerald-500" />
+                      <span>Developer Hub</span>
                     </button>
                     <button
                       onClick={() => {
