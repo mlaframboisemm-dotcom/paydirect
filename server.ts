@@ -5305,6 +5305,103 @@ app.post('/api/auth/auto-login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/google', async (req, res) => {
+  const { idToken } = req.body || {};
+  if (!idToken) {
+    return res.status(400).json({ error: 'MISSING_TOKEN', message: 'Google ID token is missing.' });
+  }
+
+  try {
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      return res.status(501).json({ error: 'NOT_CONFIGURED', message: 'Google Sign-In is not configured on this server.' });
+    }
+
+    const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!verifyRes.ok) {
+      return res.status(401).json({ error: 'INVALID_TOKEN', message: 'Google ID token validation failed.' });
+    }
+
+    const payload: any = await verifyRes.json();
+    
+    // Verify audience (client ID)
+    if (payload.aud !== googleClientId) {
+      return res.status(401).json({ error: 'INVALID_AUDIENCE', message: 'Token audience mismatch.' });
+    }
+    if (payload.iss !== 'https://accounts.google.com' && payload.iss !== 'accounts.google.com') {
+      return res.status(401).json({ error: 'INVALID_ISSUER', message: 'Token issuer mismatch.' });
+    }
+    
+    const email = String(payload.email).trim().toLowerCase();
+    const name = payload.name || email.split('@')[0];
+    
+    // Find or create user in SQLite database
+    const users = db.execute('SELECT * FROM users WHERE email = ?', [email]) as any[];
+    let user = users && users[0];
+    
+    if (!user) {
+      const userId = `user_${crypto.randomUUID()}`;
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passwordHash = crypto.pbkdf2Sync(crypto.randomBytes(24).toString('hex'), salt, 100000, 64, 'sha512').toString('hex');
+      const twoFactorSecret = generateBase32Secret();
+
+      db.execute(
+        'INSERT INTO users (id, name, email, passwordHash, salt, twoFactorSecret, twoFactorEnabled, kycLevel, citizenship, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [userId, name, email, passwordHash, salt, twoFactorSecret, false, 3, 'CA', true, 'live', true, email]
+      );
+      
+      // Auto lock account to identity for security
+      const createdUser = (db.execute('SELECT * FROM users WHERE email = ?', [email]) as any[])[0];
+      await lockAccountToIdentity(createdUser, 'register');
+
+      // Initialize wallets
+      db.execute(
+        'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [`wallet-${userId}-usd`, userId, 'USD', 0, '', '', true, 'live', true, email]
+      );
+
+      // Log registration audit log
+      db.execute(
+        'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [`audit_${crypto.randomUUID()}`, userId, 'REGISTER', Date.now(), String(req.ip || req.socket.remoteAddress || ''), 'success', `Google OAuth auto-registration completed for ${email}`]
+      );
+
+      user = createdUser;
+    }
+
+    const { token, sessionId, expiresIn } = issueSessionForUser({
+      id: user.id,
+      email: user.email,
+      name: user.name
+    }, true);
+
+    const secureCookie = 'Secure; ';
+    res.setHeader('Set-Cookie', `cb_session=${encodeURIComponent(token)}; HttpOnly; ${secureCookie}SameSite=None; Path=/; Max-Age=${expiresIn}`);
+
+    // Log login audit log
+    db.execute(
+      'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [`audit_${crypto.randomUUID()}`, user.id, 'LOGIN', Date.now(), String(req.ip || req.socket.remoteAddress || ''), 'success', `Google OAuth authentication succeeded for ${email}`]
+    );
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        region: user.citizenship || 'CA',
+        kycLevel: user.kycLevel !== undefined ? Number(user.kycLevel) : 3
+      }
+    });
+  } catch (err: any) {
+    console.error('[Google Login Route Error]', err);
+    return res.status(500).json({ error: 'GOOGLE_AUTH_FAILED', message: err?.message || String(err) });
+  }
+});
+
+
 app.post('/api/auth/login', validateRequest(ValidationSchemas.AuthLoginSchema), async (req, res) => {
   const { email, password, mfaCode } = req.body || {};
   if (!email || !password) {

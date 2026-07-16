@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, Lock, Mail, User, Landmark, Sparkles, RefreshCw, 
   ArrowRight, ShieldAlert, Check, HelpCircle, Eye, EyeOff 
@@ -52,6 +52,77 @@ export default function AuthScreen({
   // Loading state
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('');
+
+  const handleGoogleLoginCallback = async (response: any) => {
+    setIsLoading(true);
+    setLoadingStep('Verifying Google Identity credentials with secure gateway...');
+    try {
+      const res = await fetch(buildApiUrl('/api/auth/google'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: response.credential }),
+        credentials: 'include'
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        showToast(result.message || result.error || 'Google Sign-In verification failed.', 'error');
+        return;
+      }
+      
+      // Save session credentials
+      if (result.token) {
+        sessionStorage.setItem('cb_auth_jwt_token', result.token);
+        localStorage.setItem('cb_auth_jwt_token', result.token);
+        localStorage.setItem('cb_auth_authenticated', 'true');
+        localStorage.removeItem('cb_explicit_logout');
+      }
+      
+      onLoginSuccess({
+        name: result.user.name,
+        email: result.user.email,
+        region: result.user.region,
+        isNewUser: false,
+        kycLevel: result.user.kycLevel
+      });
+      showToast(`Welcome back, ${result.user.name}! Authenticated via Google.`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Google Sign-In connection failed.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
+    const loadGoogleButton = () => {
+      if ((window as any).google?.accounts?.id) {
+        const client_id = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '825946-googleoauthplaceholder.apps.googleusercontent.com';
+        (window as any).google.accounts.id.initialize({
+          client_id,
+          callback: handleGoogleLoginCallback
+        });
+        const container = document.getElementById('google-signin-btn');
+        if (container) {
+          (window as any).google.accounts.id.renderButton(
+            container,
+            { theme: 'outline', size: 'large', width: '380', text: 'signin_with' }
+          );
+        }
+      }
+    };
+
+    if (!script) {
+      script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+      script.onload = loadGoogleButton;
+    } else {
+      const timer = setTimeout(loadGoogleButton, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isResetPassword]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,6 +438,17 @@ export default function AuthScreen({
               <span>{isResetPassword ? 'Reset Password & Unlock Account' : isSignUp ? 'Verify & Create Coinbase Vault' : 'Secure Account Sign In'}</span>
               <ArrowRight className="h-4 w-4" />
             </button>
+
+            {!isResetPassword && (
+              <div className="flex flex-col items-center mt-4">
+                <div className="flex items-center w-full my-3">
+                  <div className="flex-1 border-t border-gray-100"></div>
+                  <span className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">or</span>
+                  <div className="flex-1 border-t border-gray-100"></div>
+                </div>
+                <div id="google-signin-btn" className="w-full flex justify-center h-[40px]"></div>
+              </div>
+            )}
           </form>
         )}
 
