@@ -93,7 +93,7 @@ async function main() {
       fs.unlinkSync(lockPath);
     }
 
-    serverProc = spawn('npx', ['tsx', 'server.ts'], {
+    serverProc = spawn('node', ['dist/server.cjs'], {
       cwd: repoRoot,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],

@@ -664,6 +664,12 @@ class RelationalLedgerDatabase {
       return { affectedRows: 1, insertId: id };
     }
 
+    // 9.5 SELECT * FROM transactions
+    if (formattedSql === 'SELECT * FROM transactions') {
+      const targetState = this.transactionSnapshot || this.state;
+      return targetState.transactions;
+    }
+
     // 10. SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC
     if (formattedSql.startsWith('SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC')) {
       const [userId] = params;
@@ -683,6 +689,12 @@ class RelationalLedgerDatabase {
 
       if (!this.transactionSnapshot) this.save();
       return { affectedRows: 1, insertId: id };
+    }
+
+    // 11.5 SELECT * FROM audit_logs
+    if (formattedSql === 'SELECT * FROM audit_logs') {
+      const targetState = this.transactionSnapshot || this.state;
+      return targetState.auditLogs;
     }
 
     // 12. SELECT * FROM audit_logs WHERE user_id = ? ORDER BY timestamp DESC

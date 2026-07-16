@@ -58,7 +58,7 @@ async function main() {
 
   fs.writeFileSync(dbPath, JSON.stringify({ users: [], wallets: [], transactions: [], auditLogs: [] }, null, 2), 'utf-8');
 
-  const serverProc = spawn('npx', ['tsx', 'server.ts'], {
+  const serverProc = spawn('node', ['dist/server.cjs'], {
     cwd: repoRoot,
     shell: true,
     stdio: ['ignore', 'pipe', 'pipe'],

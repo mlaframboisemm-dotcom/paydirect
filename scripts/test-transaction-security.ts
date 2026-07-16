@@ -91,7 +91,7 @@ async function main() {
     );
     fs.writeFileSync(verificationPath, JSON.stringify({}, null, 2), 'utf-8');
 
-    serverProc = spawn('npx', ['tsx', 'server.ts'], {
+    serverProc = spawn('node', ['dist/server.cjs'], {
       cwd: repoRoot,
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
