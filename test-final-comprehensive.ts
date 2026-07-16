@@ -167,7 +167,7 @@ async function runTests() {
   console.log('\n=== E-Transfer Operations ===');
   await test('E-Transfer List', 'etransfer', '/api/exchanges/etransfer/list', 'GET');
   await test('E-Transfer Direct Deposit', 'etransfer', '/api/exchanges/etransfer/deposit-direct', 'POST',
-    JSON.stringify({ amount: 100, targetBank: 'RBC' }));
+    JSON.stringify({ amount: 100, bankName: 'RBC' }));
 
   // ===== ERROR HANDLING =====
   console.log('\n=== Error Handling ===');
