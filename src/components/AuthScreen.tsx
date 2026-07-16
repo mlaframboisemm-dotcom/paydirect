@@ -40,6 +40,9 @@ export default function AuthScreen({
   showToast,
   onTriggerEmail
 }: AuthScreenProps) {
+  const client_id = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '';
+  const isGoogleEnabled = client_id && !client_id.includes('placeholder') && client_id.trim() !== '';
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResetPassword, setIsResetPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -95,6 +98,7 @@ export default function AuthScreen({
   };
 
   useEffect(() => {
+    if (!isGoogleEnabled) return;
     let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]') as HTMLScriptElement;
     const loadGoogleButton = () => {
       if ((window as any).google?.accounts?.id) {
@@ -445,7 +449,7 @@ export default function AuthScreen({
               <ArrowRight className="h-4 w-4" />
             </button>
 
-            {!isResetPassword && (
+            {!isResetPassword && isGoogleEnabled && (
               <div className="flex flex-col items-center mt-4">
                 <div className="flex items-center w-full my-3">
                   <div className="flex-1 border-t border-gray-100"></div>
