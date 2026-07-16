@@ -693,7 +693,7 @@ export default function App() {
   // --- Calculations for Portfolio Sums ---
   const cryptoTotalValue = useMemo(() => {
     return holdings.reduce((sum, hold) => {
-      const coin = coins.find((c) => c.symbol === hold.symbol);
+      const coin = coins.find((c) => c && c.symbol === hold.symbol);
       const coinPrice = coin ? coin.price : 0;
       return sum + (hold.amount * coinPrice);
     }, 0);
@@ -704,7 +704,7 @@ export default function App() {
   const previousNetWorth = useMemo(() => {
     // Computes previous value based on 24h change ratios for portfolio items
     return holdings.reduce((sum, hold) => {
-      const coin = coins.find((c) => c.symbol === hold.symbol);
+      const coin = coins.find((c) => c && c.symbol === hold.symbol);
       const coinPrevPrice = coin ? coin.price / (1 + coin.change24h / 100) : 0;
       return sum + (hold.amount * coinPrevPrice);
     }, 0) + usdBalance;
@@ -714,7 +714,7 @@ export default function App() {
   const netWorthChangePercent = previousNetWorth === 0 ? 0 : (netWorthChangeUSD / previousNetWorth) * 100;
 
   // --- Custom interactive aggregations for the core portfolio area chart ---
-  const currentCoin = coins.find((c) => c.symbol === selectedAssetSymbol) || null;
+  const currentCoin = coins.find((c) => c && c.symbol === selectedAssetSymbol) || null;
 
   // Toggle watchlist coin helper
   const handleToggleWatchlist = (symbol: string) => {
@@ -737,7 +737,7 @@ export default function App() {
       targetSymbol?: string;
     }
   ) => {
-    const coin = coins.find((c) => c.symbol === params.symbol);
+    const coin = coins.find((c) => c && c.symbol === params.symbol);
     if (!coin) return;
 
     try {
@@ -779,7 +779,7 @@ export default function App() {
     fiatAmount: number,
     details: string
   ) => {
-    const coin = coins.find((c) => c.symbol === symbol);
+    const coin = coins.find((c) => c && c.symbol === symbol);
     if (!coin) return;
 
     if (type === 'SEND') {
@@ -849,7 +849,7 @@ export default function App() {
     cashbackSymbol: string,
     cashbackPercent: number
   ): boolean => {
-    const cbCoin = coins.find((c) => c.symbol === cashbackSymbol);
+    const cbCoin = coins.find((c) => c && c.symbol === cashbackSymbol);
     if (!cbCoin) return false;
 
     if (backingSymbol === 'USD') {
@@ -861,7 +861,7 @@ export default function App() {
       const backingHolding = holdings.find((h) => h.symbol === backingSymbol);
       if (!backingHolding) return false;
 
-      const coinPrice = coins.find((c) => c.symbol === backingSymbol)?.price || 1;
+      const coinPrice = coins.find((c) => c && c.symbol === backingSymbol)?.price || 1;
       const cryptoNeeded = fiatAmount / coinPrice;
 
       if (cryptoNeeded > backingHolding.amount) return false;
@@ -894,7 +894,7 @@ export default function App() {
       id: `tx-visa-${Date.now()}`,
       type: 'SELL',
       assetSymbol: backingSymbol,
-      amount: backingSymbol === 'USD' ? fiatAmount : fiatAmount / (coins.find((c) => c.symbol === backingSymbol)?.price || 1),
+      amount: backingSymbol === 'USD' ? fiatAmount : fiatAmount / (coins.find((c) => c && c.symbol === backingSymbol)?.price || 1),
       fiatAmount: fiatAmount,
       timestamp: Date.now(),
       details: `Coinbase Visa Card Spend. Earned +$${rewardFiat.toFixed(2)} cashback`
@@ -1105,7 +1105,7 @@ export default function App() {
                 {/* Quick Asset indicators pills */}
                 <div className="flex flex-wrap gap-2 mt-4">
                   {holdings.map((h) => {
-                    const c = coins.find((coin) => coin.symbol === h.symbol);
+                    const c = coins.find((coin) => coin && coin.symbol === h.symbol);
                     if (!c) return null;
                     return (
                       <button
@@ -1199,7 +1199,7 @@ export default function App() {
                       </tr>
 
                       {holdings.map((hold) => {
-                        const coin = coins.find((c) => c.symbol === hold.symbol);
+                        const coin = coins.find((c) => c && c.symbol === hold.symbol);
                         if (!coin) return null;
                         const assetVal = hold.amount * coin.price;
                         const allocation = netWorth === 0 ? 0 : (assetVal / netWorth) * 100;
@@ -1537,7 +1537,7 @@ export default function App() {
               coins={coins}
               holdings={holdings}
               onAddTransaction={(type, symbol, amount, fiat, details) => {
-                const coin = coins.find((c) => c.symbol === symbol);
+                const coin = coins.find((c) => c && c.symbol === symbol);
                 if (!coin) return;
                 
                 // Track standard holdings addition if on-chain faucet credited

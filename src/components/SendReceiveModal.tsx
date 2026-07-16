@@ -44,6 +44,20 @@ export default function SendReceiveModal({
 
   if (!isOpen) return null;
 
+  if (!coins || coins.length === 0) {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-xs" onClick={onClose} />
+        <div className="flex min-h-full items-center justify-center p-4">
+          <div className="relative transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl w-full max-w-md flex flex-col items-center justify-center text-center py-12 min-h-[400px]">
+            <div className="w-8 h-8 border-2 border-[#0052FF] border-t-transparent rounded-full animate-spin mb-4" />
+            <p className="text-xs text-gray-500 font-semibold">Loading live market rates...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const currentCoin = coins.find((c) => c.symbol === (action === 'send' ? sendSymbol : receiveSymbol)) || coins[0];
   const currentHolding = holdings.find((h) => h.symbol === sendSymbol) || { symbol: sendSymbol, amount: 0 };
 

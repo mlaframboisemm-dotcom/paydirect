@@ -29,6 +29,15 @@ export default function TradeWidget({
   onExecuteTrade,
   selectedAssetSymbol = 'BTC'
 }: TradeWidgetProps) {
+  if (!coins || coins.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center justify-center text-center py-12 min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-[#0052FF] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-xs text-gray-500 font-semibold">Loading live market rates...</p>
+      </div>
+    );
+  }
+
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'convert'>('buy');
   
   // Coin select states
