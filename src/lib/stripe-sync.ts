@@ -1,4 +1,5 @@
 import { db } from '../db/ledger.js';
+import { DEFAULT_USD_CAD_RATE } from './financial-hardening.js';
 import crypto from 'crypto';
 
 export let GLOBAL_STRIPE_BALANCE = {
@@ -26,10 +27,16 @@ export async function syncAllStripeBalances() {
 
     if (primaryRes.ok) {
       const primaryJson = await primaryRes.json() as any;
-      const available = primaryJson.available?.[0]?.amount || 0;
-      const pending = primaryJson.pending?.[0]?.amount || 0;
-      totalAvailable += available;
-      totalPending += pending;
+      for (const item of primaryJson.available || []) {
+        const amt = item.amount || 0;
+        const curr = (item.currency || 'usd').toLowerCase();
+        totalAvailable += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+      }
+      for (const item of primaryJson.pending || []) {
+        const amt = item.amount || 0;
+        const curr = (item.currency || 'usd').toLowerCase();
+        totalPending += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+      }
     }
 
     // 2. Fetch all connected accounts
@@ -59,10 +66,16 @@ export async function syncAllStripeBalances() {
 
           if (balanceRes.ok) {
             const balanceJson = await balanceRes.json() as any;
-            const available = balanceJson.available?.[0]?.amount || 0;
-            const pending = balanceJson.pending?.[0]?.amount || 0;
-            totalAvailable += available;
-            totalPending += pending;
+            for (const item of balanceJson.available || []) {
+              const amt = item.amount || 0;
+              const curr = (item.currency || 'usd').toLowerCase();
+              totalAvailable += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+            }
+            for (const item of balanceJson.pending || []) {
+              const amt = item.amount || 0;
+              const curr = (item.currency || 'usd').toLowerCase();
+              totalPending += curr === 'cad' ? (amt / DEFAULT_USD_CAD_RATE) : amt;
+            }
           }
         } catch (accountErr) {
           console.error(`[STRIPE AGGREGATOR] Failed to fetch balance for connected account ${account.id}:`, accountErr);
