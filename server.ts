@@ -8104,9 +8104,40 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
         });
       }
 
-      // Execute auto-refill: Debit reservoir database wallet balance, Credit active Stripe pipeline balance cache
+      // Execute auto-refill: Debit reservoir database wallet balance
       const newDbBalance = Number((externalCash - refillNeeded).toFixed(2));
       db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newDbBalance, req.user.id, 'USD']);
+
+      // Natively trigger a real Stripe Top-up to add funds to the Stripe balance natively from the connected bank!
+      try {
+        console.log(`[PAYOUT ROUTER] Initiating real Stripe Top-up of $${refillNeeded.toFixed(2)} USD...`);
+        const topupForm = new URLSearchParams();
+        topupForm.set('amount', String(Math.round(refillNeeded * 100)));
+        topupForm.set('currency', 'usd');
+        topupForm.set('description', `Treasidity Auto-Refill top-up of $${refillNeeded.toFixed(2)} USD.`);
+
+        const topupRes = await fetch('https://api.stripe.com/v1/topups', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: topupForm.toString()
+        });
+
+        if (!topupRes.ok) {
+          const errText = await topupRes.text();
+          console.error('[PAYOUT ROUTER] Stripe native Top-up call rejected:', errText);
+          throw new Error(`Stripe native Top-up failed: ${errText}`);
+        }
+
+        const topupJson = await topupRes.json() as any;
+        console.log(`[PAYOUT ROUTER] Stripe native Top-up successfully created! ID: ${topupJson.id}, Status: ${topupJson.status}`);
+      } catch (topupErr: any) {
+        console.error('[PAYOUT ROUTER ERROR] Failed to complete native Stripe top-up refill:', topupErr);
+        throw new Error(topupErr.message || 'Auto-Refill Top-up failed.');
+      }
       
       GLOBAL_STRIPE_BALANCE.available += refillNeeded;
       console.log(`[PAYOUT ROUTER] Auto-Refill successful! Deducted $${refillNeeded.toFixed(2)} USD from reservoir database wallet. New database balance: $${newDbBalance.toFixed(2)} USD. Active Stripe available: $${GLOBAL_STRIPE_BALANCE.available.toFixed(2)} USD.`);
@@ -8142,45 +8173,14 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       body: form.toString()
     });
 
-    let payoutJson: any;
-
     if (!payoutRes.ok) {
       const errText = await payoutRes.text();
-      let errJson: any;
-      try { errJson = JSON.parse(errText); } catch {}
-
-      if (errJson?.error?.code === 'balance_insufficient') {
-        console.warn('[PAYOUT ROUTER] Stripe returned balance_insufficient. Falling back to simulated ledger settlement as Master Authority.');
-
-        payoutJson = {
-          id: `po_sim_${crypto.randomUUID().substring(0, 14)}`,
-          object: 'payout',
-          amount: amountCents,
-          arrival_date: Math.floor(Date.now() / 1000) + 86400,
-          created: Math.floor(Date.now() / 1000),
-          currency: 'cad',
-          status: 'in_transit',
-          type: 'bank_account'
-        };
-
-        db.execute(
-          'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [
-            `audit_${crypto.randomUUID()}`,
-            req.user.id,
-            'PAYOUT_SIMULATED_SUCCESS',
-            Date.now(),
-            '127.0.0.1',
-            'success',
-            `Payout Simulated: Stripe returned balance_insufficient, but ledger acted as Master Authority to settle CA$${amountNum.toFixed(2)} payout.`
-          ]
-        );
-      } else {
-        throw new Error(errText || 'Failed to trigger Stripe payout');
-      }
-    } else {
-      payoutJson = await payoutRes.json() as any;
+      // Throw the raw Stripe error directly to report exact live API response
+      const errJson = JSON.parse(errText);
+      return res.status(payoutRes.status).json(errJson);
     }
+
+    const payoutJson = await payoutRes.json() as any;
 
     // Decrement the active Stripe balance cache by the paid out amount
     GLOBAL_STRIPE_BALANCE.available = Math.max(0, GLOBAL_STRIPE_BALANCE.available - amountNum);
