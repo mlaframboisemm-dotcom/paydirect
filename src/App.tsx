@@ -116,6 +116,7 @@ export default function App() {
   const hasLoggedPriceFetchError = useRef(false);
   const hasLoggedBalanceSyncError = useRef(false);
   const hasLoggedEmailSyncError = useRef(false);
+  const isAutoLoggingIn = useRef(false);
   // --- Persistent LocalState initialization ---
   const [coins, setCoins] = useState<Coin[]>(() => {
     const saved = localStorage.getItem('cb_coins');
@@ -751,7 +752,8 @@ export default function App() {
     const autoLogin = async () => {
       const hasToken = hasSessionToken();
 
-      if (!hasToken) {
+      if (!isAuthenticated && !hasToken && !isAutoLoggingIn.current) {
+        isAutoLoggingIn.current = true;
         try {
           const response = await fetch(buildApiUrl('/api/auth/auto-login'), {
             method: 'POST',
@@ -778,11 +780,13 @@ export default function App() {
           }
         } catch (error) {
           console.error('[Auto Login Mount Error]', error);
+        } finally {
+          isAutoLoggingIn.current = false;
         }
       }
     };
     autoLogin();
-  }, []);
+  }, [isAuthenticated]);
 
   // --- Calculations for Portfolio Sums ---
   const cryptoTotalValue = useMemo(() => {
