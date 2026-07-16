@@ -60,6 +60,8 @@ class FinalizeHandshakeSchema(BaseModel):
 def initialize_interbank_vault():
     with sqlite3.connect(DB_FILE) as conn:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor.execute("PRAGMA synchronous=NORMAL;")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS settled_clearinghouse (
                 tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT
