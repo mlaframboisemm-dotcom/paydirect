@@ -44,7 +44,9 @@ function buildApiUrl(path: string): string {
 }
 
 function buildAuthHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
+  const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
   return {
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(extraHeaders || {})
   };
 }
