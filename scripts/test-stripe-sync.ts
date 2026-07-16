@@ -84,6 +84,18 @@ const fetchedUrls: string[] = [];
     } as any;
   }
 
+  // Stripe topups
+  if (url.includes('/v1/topups')) {
+    return {
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'tu_mock1', amount: 15000, currency: 'usd', status: 'pending' }
+        ]
+      })
+    } as any;
+  }
+
   return { ok: false, text: async () => 'Not Found' } as any;
 };
 
@@ -96,17 +108,17 @@ async function runTests() {
     await syncAllStripeBalances();
 
     // Check fetched API endpoints:
-    // Should fetch 1 platform balance + 1 accounts list + 2 connected balances = 4 fetches total
+    // Should fetch 1 platform balance + 1 topups list + 1 accounts list + 2 connected balances = 5 fetches total
     console.log(`Fetch call count: ${fetchCallCount}`);
-    assert.strictEqual(fetchCallCount, 4);
+    assert.strictEqual(fetchCallCount, 5);
 
     // Verify calculated totals:
     // Platform available = 100, Connected accounts available = 50 * 2 = 100. Total available = 200.
-    // Platform pending = 20, Connected accounts pending = 10 * 2 = 20. Total pending = 40.
+    // Platform pending = 20, Connected accounts pending = 10 * 2 = 20, Top-up pending = 150. Total pending = 190.
     console.log(`Aggregated available: $${GLOBAL_STRIPE_BALANCE.available} USD`);
     console.log(`Aggregated pending: $${GLOBAL_STRIPE_BALANCE.pending} USD`);
     assert.strictEqual(GLOBAL_STRIPE_BALANCE.available, 200);
-    assert.strictEqual(GLOBAL_STRIPE_BALANCE.pending, 40);
+    assert.strictEqual(GLOBAL_STRIPE_BALANCE.pending, 190);
     console.log('✅ Test 1 Passed.');
 
     // -------------------------------------------------------------
