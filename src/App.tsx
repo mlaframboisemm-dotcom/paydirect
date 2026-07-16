@@ -1539,6 +1539,7 @@ export default function App() {
                 usdBalance={usdBalance}
                 onExecuteTrade={handleExecuteTrade}
                 selectedAssetSymbol={selectedAssetSymbol}
+                citizenship={citizenship}
               />
 
               {/* Coinbase News / Tips widget */}
@@ -1733,6 +1734,7 @@ export default function App() {
                 usdBalance={usdBalance}
                 onExecuteTrade={handleExecuteTrade}
                 selectedAssetSymbol={selectedAssetSymbol}
+                citizenship={citizenship}
               />
             </div>
 

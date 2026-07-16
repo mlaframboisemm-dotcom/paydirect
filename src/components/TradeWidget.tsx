@@ -6,6 +6,8 @@ function isReactEventTargetValue(e: React.ChangeEvent<HTMLInputElement | HTMLSel
   return e.target.value;
 }
 
+const DEFAULT_USD_CAD_RATE = 1.36;
+
 interface TradeWidgetProps {
   coins: Coin[];
   holdings: Holding[];
@@ -20,6 +22,7 @@ interface TradeWidgetProps {
     }
   ) => void;
   selectedAssetSymbol?: string;
+  citizenship?: string;
 }
 
 export default function TradeWidget({
@@ -27,7 +30,8 @@ export default function TradeWidget({
   holdings,
   usdBalance,
   onExecuteTrade,
-  selectedAssetSymbol = 'BTC'
+  selectedAssetSymbol = 'BTC',
+  citizenship = 'US'
 }: TradeWidgetProps) {
   if (!coins || coins.length === 0) {
     return (
@@ -74,6 +78,11 @@ export default function TradeWidget({
   }, [selectedAssetSymbol]);
 
   // Recalculate Fiat/Crypto inputs depending on which input is active
+  const isCAD = citizenship === 'CA';
+  const currencySymbol = isCAD ? 'CA$' : '$';
+  const rate = isCAD ? DEFAULT_USD_CAD_RATE : 1;
+  const coinPrice = selectedCoin.price * rate;
+
   useEffect(() => {
     if (activeTab === 'convert') return;
 
@@ -82,17 +91,17 @@ export default function TradeWidget({
       if (isNaN(fiat) || fiat <= 0) {
         setAmountCrypto('');
       } else {
-        setAmountCrypto((fiat / selectedCoin.price).toFixed(6));
+        setAmountCrypto((fiat / coinPrice).toFixed(6));
       }
     } else {
       const crypto = parseFloat(amountCrypto);
       if (isNaN(crypto) || crypto <= 0) {
         setAmountFiat('');
       } else {
-        setAmountFiat((crypto * selectedCoin.price).toFixed(2));
+        setAmountFiat((crypto * coinPrice).toFixed(2));
       }
     }
-  }, [amountFiat, amountCrypto, selectedCoin, isFiatInput, activeTab]);
+  }, [amountFiat, amountCrypto, coinPrice, isFiatInput, activeTab]);
 
   // Fee computations
   const fiatVal = parseFloat(amountFiat) || 0;
@@ -111,8 +120,8 @@ export default function TradeWidget({
         return;
       }
       
-      if (paymentMethod === 'cash' && totalCost > usdBalance) {
-        setErrorMessage(`Insufficient USD Cash Balance. You need $${totalCost.toFixed(2)} but only have $${usdBalance.toFixed(2)}.`);
+      if (paymentMethod === 'cash' && totalCost > usdBalance * rate) {
+        setErrorMessage(`Insufficient Cash Balance. You need ${currencySymbol}${totalCost.toFixed(2)} but only have ${currencySymbol}${(usdBalance * rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}.`);
         return;
       }
 
@@ -121,10 +130,10 @@ export default function TradeWidget({
         onExecuteTrade('BUY', {
           symbol: selectedCoin.symbol,
           amount: parseFloat(amountCrypto),
-          fiatAmount: fiatVal
+          fiatAmount: fiatVal / rate
         });
         setLoading(false);
-        setSuccessMessage(`Successfully purchased ${parseFloat(amountCrypto).toFixed(6)} ${selectedCoin.symbol} for $${totalCost.toFixed(2)}.`);
+        setSuccessMessage(`Successfully purchased ${parseFloat(amountCrypto).toFixed(6)} ${selectedCoin.symbol} for ${currencySymbol}${totalCost.toFixed(2)}.`);
         setAmountFiat('100');
       }, 1000);
     } 
@@ -146,10 +155,10 @@ export default function TradeWidget({
         onExecuteTrade('SELL', {
           symbol: selectedCoin.symbol,
           amount: cryptoAmount,
-          fiatAmount: fiatVal
+          fiatAmount: fiatVal / rate
         });
         setLoading(false);
-        setSuccessMessage(`Successfully sold ${cryptoAmount.toFixed(6)} ${selectedCoin.symbol} for $${totalCost.toFixed(2)}.`);
+        setSuccessMessage(`Successfully sold ${cryptoAmount.toFixed(6)} ${selectedCoin.symbol} for ${currencySymbol}${totalCost.toFixed(2)}.`);
         setAmountCrypto('');
         setAmountFiat('');
       }, 1000);
@@ -302,7 +311,7 @@ export default function TradeWidget({
               <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                 <span className="flex items-center"><Wallet className="w-3.5 h-3.5 mr-1" />
                   {activeTab === 'buy'
-                    ? `Cash: $${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                    ? `Cash: ${currencySymbol}${(usdBalance * rate).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                     : activeTab === 'sell'
                     ? `Available: ${currentHolding.amount.toFixed(6)} ${selectedCoin.symbol}`
                     : `Available: ${fromHolding.amount.toFixed(6)} ${fromCoin.symbol}`}
@@ -324,7 +333,7 @@ export default function TradeWidget({
                     <div className="flex-1">
                       {isFiatInput ? (
                         <div className="flex items-center">
-                          <span className="text-2xl font-bold text-gray-400 mr-0.5">$</span>
+                          <span className="text-2xl font-bold text-gray-400 mr-0.5">{currencySymbol}</span>
                           <input
                             type="number"
                             placeholder="0"
@@ -351,7 +360,7 @@ export default function TradeWidget({
                       <div className="text-xs text-gray-400 mt-1.5 font-medium">
                         {isFiatInput
                           ? `≈ ${amountCrypto || '0.00'} ${selectedCoin.symbol}`
-                          : `≈ $${parseFloat(amountFiat || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                          : `≈ ${currencySymbol}${parseFloat(amountFiat || '0').toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                       </div>
                     </div>
 
@@ -389,9 +398,17 @@ export default function TradeWidget({
                     onChange={(e) => setPaymentMethod(isReactEventTargetValue(e))}
                     className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-xs sm:text-sm font-semibold px-3 py-2.5 rounded-xl focus:outline-none cursor-pointer"
                   >
-                    <option value="cash">USD Cash Balance (${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})</option>
-                    <option value="bank">Chase Bank Checking (*4920)</option>
-                    <option value="card">Visa Platinum Credit Card (*8294)</option>
+                    <option value="cash">
+                      {isCAD
+                        ? `CAD Cash Balance (${currencySymbol}${(usdBalance * rate).toLocaleString(undefined, { minimumFractionDigits: 2 })})`
+                        : `USD Cash Balance (${currencySymbol}${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })})`}
+                    </option>
+                    <option value="bank">
+                      {isCAD ? 'Royal Bank of Canada (RBC) Checking (*4920)' : 'Chase Bank Checking (*4920)'}
+                    </option>
+                    <option value="card">
+                      {isCAD ? 'Canada TD Visa Credit Card (*8294)' : 'Visa Platinum Credit Card (*8294)'}
+                    </option>
                   </select>
                 </div>
               )}
@@ -411,15 +428,15 @@ export default function TradeWidget({
                 <div className="space-y-1.5 text-xs text-gray-500 font-medium">
                   <div className="flex justify-between">
                     <span>Purchase price</span>
-                    <span className="font-mono">${selectedCoin.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-mono">{currencySymbol}{coinPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Coinbase Fee</span>
-                    <span className="font-mono">${coinbaseFee.toFixed(2)}</span>
+                    <span className="font-mono">{currencySymbol}{coinbaseFee.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-900 font-bold">
                     <span>{activeTab === 'buy' ? 'Total Cost' : 'Payout Total'}</span>
-                    <span className="font-mono">${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    <span className="font-mono">{currencySymbol}{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               )}
