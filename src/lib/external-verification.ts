@@ -176,11 +176,8 @@ function generateCoinbaseJWT(keyId: string, secretRaw: string, path: string): st
     sign.end();
     const signatureB64 = sign.sign(pemKey, 'base64url');
     return `${unsignedToken}.${signatureB64}`;
-  } catch (err) {
-    const signatureHS256 = crypto.createHmac('sha256', secretRaw)
-      .update(unsignedToken)
-      .digest('base64url');
-    return `${unsignedToken}.${signatureHS256}`;
+  } catch (err: any) {
+    throw new Error(`COINBASE_JWT_SIGNING_FAILED: ${err.message}`);
   }
 }
 

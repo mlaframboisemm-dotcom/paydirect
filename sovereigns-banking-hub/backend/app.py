@@ -17,7 +17,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://www.sovereigns.ca",
+        "https://www.pay.sovereigns.ca",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -108,7 +113,11 @@ async def compile_bank_oauth_redirect_uri(bank_key: str, transfer_id: str, reque
     if not matched_key:
         raise HTTPException(status_code=400, detail="Target financial institution unrecognized by clearing registry.")
         
-    host = request.headers.get("host", "localhost:3000")
+    allowed_hosts = ["www.sovereigns.ca", "www.pay.sovereigns.ca", "pay.sovereigns.ca", "localhost:3000", "127.0.0.1:3000", "localhost:8000", "127.0.0.1:8000"]
+    host = request.headers.get("host", "www.pay.sovereigns.ca")
+    if host not in allowed_hosts:
+        host = "www.pay.sovereigns.ca"
+        
     protocol = "https" if request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https" else "http"
     if ":8000" in host:
         host = host.replace(":8000", ":3000")
@@ -128,7 +137,11 @@ async def interac_oauth_callback(transfer_id: str, request: Request, code: str =
     Receives authentication token from bank portal redirect and redirects user back to front-end app.
     """
     from fastapi.responses import RedirectResponse
-    host = request.headers.get("host", "localhost:3000")
+    allowed_hosts = ["www.sovereigns.ca", "www.pay.sovereigns.ca", "pay.sovereigns.ca", "localhost:3000", "127.0.0.1:3000", "localhost:8000", "127.0.0.1:8000"]
+    host = request.headers.get("host", "www.pay.sovereigns.ca")
+    if host not in allowed_hosts:
+        host = "www.pay.sovereigns.ca"
+        
     protocol = "https" if request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https" else "http"
     if ":8000" in host:
         host = host.replace(":8000", ":3000")
