@@ -585,6 +585,14 @@ export default function App() {
     setStripePayoutError(null);
     setStripePayoutSuccess(null);
     setIsProcessingStripePayout(true);
+
+    const amountUsd = amountNum / DEFAULT_USD_CAD_RATE;
+    if (amountUsd > usdBalance) {
+      setStripePayoutError(`Insufficient Consolidated Cash Balance. You have US$${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} (approx CA$${convertUsdToCad(usdBalance, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}) available across your treasury.`);
+      setIsProcessingStripePayout(false);
+      return;
+    }
+
     try {
       const res = await fetch(buildApiUrl('/api/stripe/payout'), {
         method: 'POST',
