@@ -193,6 +193,50 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
             <span>{showDetails ? 'Hide Details' : 'Show Details'}</span>
           </button>
         </div>
+
+        {/* Secure Node Binding Vault Panel */}
+        <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-xl max-w-sm mx-auto mt-6">
+          <div className="flex items-center space-x-2 mb-3">
+            <Lock className="h-4 w-4 text-[#0052FF]" />
+            <h4 className="text-xs font-bold uppercase tracking-wider">Secure Node Binding Vault</h4>
+          </div>
+          <p className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+            Encrypt your card identifier and tie it immutably to one of your connected Tangerine account ledger nodes.
+          </p>
+          <form onSubmit={handleRegisterCard} className="space-y-3">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Card Token / Identifier</label>
+              <input
+                type="text"
+                value={cardTokenInput}
+                onChange={(e) => setCardTokenInput(e.target.value)}
+                placeholder="e.g. 4532 8920 1198 4290"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#0052FF] font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Account Node</label>
+              <select
+                value={selectedNode}
+                onChange={(e) => setSelectedNode(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-[#0052FF]"
+              >
+                <option value="TANGERINE_CHEQUING_4910">Tangerine Chequing (*4910)</option>
+                <option value="TANGERINE_SAVINGS_8271">Tangerine Savings (*8271)</option>
+                <option value="TANGERINE_JOINT_1042">Tangerine Joint (*1042)</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={vaultLoading}
+              className="w-full py-2 bg-[#0052FF] hover:bg-blue-600 disabled:bg-slate-800 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+            >
+              {vaultLoading ? 'Establishing Link...' : 'Link Card Node'}
+            </button>
+          </form>
+          {vaultError && <p className="mt-3 text-[10px] text-red-400 font-semibold">{vaultError}</p>}
+          {vaultSuccess && <p className="mt-3 text-[10px] text-green-400 font-semibold">{vaultSuccess}</p>}
+        </div>
       </div>
 
       {/* Card Settings, Cashback, and Merchant Simulator - Span 7 Cols */}
