@@ -8235,10 +8235,31 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
 
       let topupJson: any;
       try {
+        let topupCurrency = 'usd';
+        let topupAmountCents = Math.round(refillNeeded * 100);
+
+        try {
+          const accRes = await fetch('https://api.stripe.com/v1/account', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${stripeKey}`, 'Accept': 'application/json' }
+          });
+          if (accRes.ok) {
+            const accJson = await accRes.json() as any;
+            if (accJson.country === 'CA' || accJson.default_currency === 'cad') {
+              topupCurrency = 'cad';
+              const refillNeededCad = refillNeeded * DEFAULT_USD_CAD_RATE;
+              topupAmountCents = Math.round(refillNeededCad * 100);
+              console.log(`[PAYOUT ROUTER] Stripe Account Country is CA. Converting USD refill ($${refillNeeded.toFixed(2)}) to CAD ($${refillNeededCad.toFixed(2)}) for Top-up.`);
+            }
+          }
+        } catch (accErr) {
+          console.warn('[PAYOUT ROUTER] Failed to query Stripe account country details:', accErr);
+        }
+
         const topupForm = new URLSearchParams();
-        topupForm.set('amount', String(Math.round(refillNeeded * 100)));
-        topupForm.set('currency', 'usd');
-        topupForm.set('description', `Treasidity Auto-Refill top-up of $${refillNeeded.toFixed(2)} USD.`);
+        topupForm.set('amount', String(topupAmountCents));
+        topupForm.set('currency', topupCurrency);
+        topupForm.set('description', `Treasidity Auto-Refill top-up of $${refillNeeded.toFixed(2)} USD (converted to ${topupCurrency.toUpperCase()}).`);
 
         const topupRes = await fetch('https://api.stripe.com/v1/topups', {
           method: 'POST',
@@ -8318,10 +8339,31 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     }
 
     // 3. Execute Stripe Payout directly when funds are natively available
-    const amountCents = Math.round(amountNum * 100);
+    let payoutCurrency = 'usd';
+    let payoutAmountCents = Math.round(amountNum * 100);
+
+    try {
+      const accRes = await fetch('https://api.stripe.com/v1/account', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${stripeKey}`, 'Accept': 'application/json' }
+      });
+      if (accRes.ok) {
+        const accJson = await accRes.json() as any;
+        payoutCurrency = (accJson.default_currency || 'usd').toLowerCase();
+        if (payoutCurrency === 'cad') {
+          // Convert USD payout request to CAD (using the rate 1.36)
+          const amountNumCad = amountNum * DEFAULT_USD_CAD_RATE;
+          payoutAmountCents = Math.round(amountNumCad * 100);
+          console.log(`[PAYOUT ROUTER] Stripe Account Payout Currency is CAD. Converting USD payout ($${amountNum.toFixed(2)}) to CAD ($${amountNumCad.toFixed(2)}) for Payout.`);
+        }
+      }
+    } catch (accErr) {
+      console.warn('[PAYOUT ROUTER] Failed to query Stripe account default currency for payout:', accErr);
+    }
+
     const form = new URLSearchParams();
-    form.set('amount', String(amountCents));
-    form.set('currency', 'cad');
+    form.set('amount', String(payoutAmountCents));
+    form.set('currency', payoutCurrency);
 
     const payoutRes = await fetch('https://api.stripe.com/v1/payouts', {
       method: 'POST',
