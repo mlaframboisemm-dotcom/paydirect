@@ -6656,6 +6656,36 @@ app.post('/api/coinbase/trade', requireAuth, tradeRateLimiter, requireMfa, async
   const cbKey = process.env.COINBASE_API_KEY_ID;
   const cbSecret = process.env.COINBASE_API_SECRET_RAW;
   if (!cbKey || !cbSecret) {
+    if (!IS_PRODUCTION) {
+      const mockOrderId = 'mock-order-' + crypto.randomBytes(8).toString('hex');
+      await recordLedgerEntry({
+        type: 'exchange_trade',
+        status: 'executed',
+        payload: {
+          action: normalizedSide.toLowerCase(),
+          userId: req.user.id,
+          symbol,
+          amount: amountNum,
+          price: fiatNum / amountNum,
+          exchange: 'coinbase',
+          orderId: mockOrderId,
+          idempotencyKey
+        },
+        result: {
+          success: true,
+          live: false
+        }
+      });
+      return res.json({
+        success: true,
+        orderId: mockOrderId,
+        status: 'FILLED',
+        side: normalizedSide,
+        symbol,
+        amount: amountNum,
+        fiatAmount: fiatNum
+      });
+    }
     return res.status(503).json({
       success: false,
       error: 'COINBASE_NOT_CONFIGURED',
