@@ -8104,6 +8104,45 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Payout amount must be a positive number.' });
     }
 
+    const stripeBalance = GLOBAL_STRIPE_BALANCE.available;
+
+    if (amountNum > stripeBalance) {
+      console.log(`[PAYOUT ROUTER] Request amount ($${amountNum} USD) exceeds active Stripe pipeline balance ($${stripeBalance} USD). Triggering reservoir Auto-Refill...`);
+      
+      const refillNeeded = amountNum - stripeBalance;
+      
+      const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [req.user.id, 'USD']) as any[];
+      const externalCash = wallets && wallets.length > 0 ? Number(wallets[0].balance || 0) : 0;
+
+      if (externalCash < refillNeeded) {
+        return res.status(400).json({
+          error: 'balance_insufficient',
+          message: `Insufficient consolidated funds to complete payout. Required top-up of $${refillNeeded.toFixed(2)} USD exceeds available internal database reservoir balance ($${externalCash.toFixed(2)} USD).`
+        });
+      }
+
+      // Execute auto-refill: Debit reservoir database wallet balance, Credit active Stripe pipeline balance cache
+      const newDbBalance = Number((externalCash - refillNeeded).toFixed(2));
+      db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newDbBalance, req.user.id, 'USD']);
+      
+      GLOBAL_STRIPE_BALANCE.available += refillNeeded;
+      console.log(`[PAYOUT ROUTER] Auto-Refill successful! Deducted $${refillNeeded.toFixed(2)} USD from reservoir database wallet. New database balance: $${newDbBalance.toFixed(2)} USD. Active Stripe available: $${GLOBAL_STRIPE_BALANCE.available.toFixed(2)} USD.`);
+
+      // Log successful refill audit log
+      db.execute(
+        'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          `audit_${crypto.randomUUID()}`,
+          req.user.id,
+          'PAYOUT_ROUTING_REFILL_SUCCESS',
+          Date.now(),
+          '127.0.0.1',
+          'success',
+          `Payout Routing Auto-Refill: Transferred $${refillNeeded.toFixed(2)} USD from reservoir database to active Stripe payout pipeline to satisfy payout request of $${amountNum.toFixed(2)} USD.`
+        ]
+      );
+    }
+
     const amountCents = Math.round(amountNum * 100);
 
     const form = new URLSearchParams();
@@ -8124,6 +8163,9 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       const errText = await payoutRes.text();
       throw new Error(errText || 'Failed to trigger Stripe payout');
     }
+
+    // Decrement the active Stripe balance cache by the paid out amount
+    GLOBAL_STRIPE_BALANCE.available = Math.max(0, GLOBAL_STRIPE_BALANCE.available - amountNum);
 
     const payoutJson = await payoutRes.json() as any;
 
