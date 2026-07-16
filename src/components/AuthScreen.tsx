@@ -33,6 +33,8 @@ function buildApiUrl(path: string): string {
   return normalized;
 }
 
+let isGoogleInitialized = false;
+
 export default function AuthScreen({
   onLoginSuccess,
   showToast,
@@ -97,10 +99,13 @@ export default function AuthScreen({
     const loadGoogleButton = () => {
       if ((window as any).google?.accounts?.id) {
         const client_id = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '825946-googleoauthplaceholder.apps.googleusercontent.com';
-        (window as any).google.accounts.id.initialize({
-          client_id,
-          callback: handleGoogleLoginCallback
-        });
+        if (!isGoogleInitialized) {
+          (window as any).google.accounts.id.initialize({
+            client_id,
+            callback: handleGoogleLoginCallback
+          });
+          isGoogleInitialized = true;
+        }
         const container = document.getElementById('google-signin-btn');
         if (container) {
           (window as any).google.accounts.id.renderButton(

@@ -5496,9 +5496,7 @@ app.post('/api/auth/login', validateRequest(ValidationSchemas.AuthLoginSchema), 
       },
       sessionId
     };
-    if (!IS_PRODUCTION) {
-      responsePayload.token = token;
-    }
+    responsePayload.token = token;
     return res.json(responsePayload);
   } catch (error: any) {
     recordLoginAttempt(userEmail, false, ipAddress, userAgent);
