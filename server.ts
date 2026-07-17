@@ -5194,6 +5194,7 @@ app.get('/api/transactions/spendability', requireAuth, requireMfa, async (req: a
     const hasNegativeWalletBalance = userWallets.some((wallet) => wallet.hasNegativeBalance);
 
     const hasWalletKey = Boolean(process.env.MARSHALL_WALLET_PRIVATE_KEY);
+    const canUseWalletSend = hasWalletKey && isAdminRequest(req);
     const hasCoinbase = Boolean(process.env.COINBASE_API_KEY_ID && process.env.COINBASE_API_SECRET_RAW);
     const hasKraken = Boolean(process.env.KRAKEN_API_KEY && process.env.KRAKEN_API_SECRET);
     const hasExchange = hasCoinbase || hasKraken;
@@ -5210,8 +5211,12 @@ app.get('/api/transactions/spendability', requireAuth, requireMfa, async (req: a
 
     const rails = {
       walletSend: {
-        spendable: hasWalletKey,
-        reason: hasWalletKey ? 'Wallet private key is configured.' : 'MARSHALL_WALLET_PRIVATE_KEY is missing.'
+        spendable: canUseWalletSend,
+        reason: canUseWalletSend
+          ? 'Wallet private key is configured and this account is authorized for wallet send operations.'
+          : !hasWalletKey
+            ? 'MARSHALL_WALLET_PRIVATE_KEY is missing.'
+            : 'This account is not authorized for wallet send operations.'
       },
       exchangeTradeAndSwap: {
         spendable: hasExchange,
@@ -7157,7 +7162,7 @@ app.post('/api/coinbase/withdraw', requireAuth, withdrawalRateLimiter, requireMf
       } else {
         const path = '/0/private/Balance';
         const nonce = Date.now().toString();
-        const postData = `nonce=.nonce`;
+        const postData = `nonce=${nonce}`;
         const signature = generateKrakenSignature(path, nonce, postData, krSecret);
         const ping = await fetch(`https://api.kraken.com${path}`, {
           method: 'POST',
@@ -8628,11 +8633,9 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       const refillNeeded = amountNum - stripeAvailable;
       console.log(`[PAYOUT ROUTER] Request ($${amountNum.toFixed(2)} USD) exceeds Stripe active balance ($${stripeAvailable.toFixed(2)} USD). Top-up required: $${refillNeeded.toFixed(2)} USD.`);
 
-      // Debit reservoir database wallet balance
-      const newDbBalance = Number((externalCash - refillNeeded).toFixed(2));
-      db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newDbBalance, req.user.id, 'USD']);
-
       let topupJson: any;
+      let stripeAccountCountry = '';
+      let stripeDefaultCurrency = 'usd';
       try {
         let topupCurrency = 'usd';
         let topupAmountCents = Math.round(refillNeeded * 100);
@@ -8644,7 +8647,18 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
           });
           if (accRes.ok) {
             const accJson = await accRes.json() as any;
-            if (accJson.country === 'CA' || accJson.default_currency === 'cad') {
+            stripeAccountCountry = String(accJson.country || '').toUpperCase();
+            stripeDefaultCurrency = String(accJson.default_currency || 'usd').toLowerCase();
+
+            if (stripeAccountCountry === 'CA' || stripeDefaultCurrency === 'cad') {
+              // Stripe Top-ups are not available for CA/CAD accounts.
+              return res.status(409).json({
+                error: 'STRIPE_LIQUIDITY_REQUIRED',
+                message: 'Your Stripe account cannot auto-create top-ups for this payout. Add available Stripe balance, then retry the payout.'
+              });
+            }
+
+            if (stripeDefaultCurrency === 'cad') {
               topupCurrency = 'cad';
               const refillNeededCad = refillNeeded * DEFAULT_USD_CAD_RATE;
               topupAmountCents = Math.round(refillNeededCad * 100);
@@ -8676,9 +8690,17 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
         }
         topupJson = await topupRes.json() as any;
         console.log(`[PAYOUT ROUTER] Stripe native Top-up initiated! ID: ${topupJson.id}, Status: ${topupJson.status}`);
+
+        // Debit reservoir database wallet balance only after Stripe Top-up request is accepted.
+        const newDbBalance = Number((externalCash - refillNeeded).toFixed(2));
+        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newDbBalance, req.user.id, 'USD']);
       } catch (topupErr: any) {
-        // Revert database balance deduction if Stripe Top-up request fails physically
-        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [externalCash, req.user.id, 'USD']);
+        if (stripeAccountCountry === 'CA' || stripeDefaultCurrency === 'cad') {
+          return res.status(409).json({
+            error: 'STRIPE_LIQUIDITY_REQUIRED',
+            message: 'Your Stripe account cannot auto-create top-ups for this payout. Add available Stripe balance, then retry the payout.'
+          });
+        }
         throw topupErr;
       }
 
