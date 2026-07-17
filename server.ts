@@ -8486,6 +8486,8 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     return res.status(501).json({ error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe is not configured on this server.' });
   }
 
+  const getWalletAssetSymbol = (wallet: any): string => String(wallet?.assetSymbol || wallet?.asset_symbol || '').toUpperCase();
+
   try {
     const { amount } = req.body || {};
     const amountNum = Number(amount);
@@ -8681,8 +8683,15 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
 
     if (!payoutRes.ok) {
       const errText = await payoutRes.text();
-      const errJson = JSON.parse(errText);
-      return res.status(payoutRes.status).json(errJson);
+      try {
+        const errJson = JSON.parse(errText);
+        return res.status(payoutRes.status).json(errJson);
+      } catch {
+        return res.status(payoutRes.status).json({
+          error: 'STRIPE_PAYOUT_FAILED',
+          message: errText || 'Stripe payout request failed.'
+        });
+      }
     }
 
     const payoutJson = await payoutRes.json() as any;
@@ -8691,7 +8700,7 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     // Update wallet balance to reflect the payout (credit back CAD value)
     try {
       const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [req.user.id]) as any[];
-      const usdWallet = walletRows.find((w: any) => w.assetSymbol.toUpperCase() === 'USD');
+      const usdWallet = walletRows.find((w: any) => getWalletAssetSymbol(w) === 'USD');
       if (usdWallet) {
         const currentBalance = Number(usdWallet.balance || 0);
         const newBalance = Number((currentBalance + amountNum).toFixed(2));
