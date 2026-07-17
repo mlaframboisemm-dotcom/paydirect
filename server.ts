@@ -170,6 +170,68 @@ function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefin
   return resolveBankPortalUrl(bankKey) || `${requestOrigin}/banking-hub/index.html`;
 }
 
+async function dispatchStripePayoutToConnectedBank(stripeKey: string, amountUsd: number, userId: string, referenceLabel: string) {
+  const normalizedAmountUsd = Number(amountUsd);
+  if (!stripeKey) {
+    throw new Error('Stripe is not configured on this server.');
+  }
+  if (!Number.isFinite(normalizedAmountUsd) || normalizedAmountUsd <= 0) {
+    throw new Error('Invalid payout amount.');
+  }
+
+  let payoutCurrency = 'usd';
+  let payoutAmountCents = Math.round(normalizedAmountUsd * 100);
+
+  try {
+    const accRes = await fetch('https://api.stripe.com/v1/account', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${stripeKey}`, 'Accept': 'application/json' }
+    });
+    if (accRes.ok) {
+      const accJson = await accRes.json() as any;
+      payoutCurrency = (accJson.default_currency || 'usd').toLowerCase();
+      if (payoutCurrency === 'cad') {
+        const amountUsdToCad = normalizedAmountUsd * DEFAULT_USD_CAD_RATE;
+        payoutAmountCents = Math.round(amountUsdToCad * 100);
+      }
+    }
+  } catch (accErr) {
+    console.warn('[PAYOUT ROUTER] Failed to query Stripe account default currency for payout:', accErr);
+  }
+
+  const form = new URLSearchParams();
+  form.set('amount', String(payoutAmountCents));
+  form.set('currency', payoutCurrency);
+  form.set('metadata[user_id]', String(userId || 'guest_gateway'));
+  form.set('metadata[reference]', referenceLabel);
+
+  const payoutRes = await fetch('https://api.stripe.com/v1/payouts', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json'
+    },
+    body: form.toString()
+  });
+
+  if (!payoutRes.ok) {
+    const errText = await payoutRes.text();
+    try {
+      const errJson = JSON.parse(errText);
+      throw Object.assign(new Error(errJson?.error?.message || errJson?.message || 'Stripe payout request failed.'), { status: payoutRes.status, payload: errJson });
+    } catch (parseErr: any) {
+      if (parseErr && typeof parseErr.status === 'number') {
+        throw parseErr;
+      }
+      throw Object.assign(new Error(errText || 'Stripe payout request failed.'), { status: payoutRes.status, payload: { error: 'STRIPE_PAYOUT_FAILED', message: errText || 'Stripe payout request failed.' } });
+    }
+  }
+
+  const payoutJson = await payoutRes.json() as any;
+  return { payoutJson, payoutCurrency, payoutAmountCents };
+}
+
 function resolveSecretManagerProjectId(): string | undefined {
   const fromEnv = firstNonEmptyEnv([
     'SOVEREIGN_SECRET_MANAGER_PROJECT_ID',
@@ -7778,6 +7840,7 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
 app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => {
   const requestOrigin = `${req.protocol}://${req.get('host')}`;
   const { transfer_id, selected_bank_key, oauth_authorization_token } = req.body || {};
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
 
   const transfer = ESCROW_LEDGER.get(transfer_id);
   if (!transfer || !['AWAITING_AUTHENTICATION', 'AUTHORIZATION_RECEIVED'].includes(transfer.status)) {
@@ -7826,6 +7889,24 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
 
   if (transfer.operation === 'WITHDRAWAL' && !canCoverWithdrawal(amountUsd, currentUsdBalance)) {
     return res.status(409).json({ error: 'INSUFFICIENT_FUNDS', message: 'Insufficient USD balance for settlement.' });
+  }
+
+  let payoutExecution: { payoutJson: any; payoutCurrency: string; payoutAmountCents: number } | null = null;
+  if (transfer.operation === 'WITHDRAWAL') {
+    try {
+      payoutExecution = await dispatchStripePayoutToConnectedBank(
+        stripeKey || '',
+        amountUsd,
+        String(transfer.userId || req.user.id || 'guest_gateway'),
+        `Interac withdrawal settlement for ${transfer_id}`
+      );
+    } catch (payoutErr: any) {
+      console.error('Failed to execute connected-bank payout:', payoutErr?.message || payoutErr);
+      return res.status(payoutErr?.status || 502).json({
+        error: 'STRIPE_PAYOUT_FAILED',
+        message: payoutErr?.message || 'Failed to execute connected-bank payout.'
+      });
+    }
   }
 
   try {
@@ -8038,7 +8119,12 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
       tracking_reference_id: clearinghouse_reference_hash,
       amount_usd: amountUsd,
       amount_cad: transfer.amount,
-      operation_type: transfer.operation
+      operation_type: transfer.operation,
+      payout: payoutExecution ? {
+        id: payoutExecution.payoutJson?.id,
+        currency: payoutExecution.payoutCurrency,
+        amount_cents: payoutExecution.payoutAmountCents
+      } : undefined
     });
 
   } catch (err: any) {
