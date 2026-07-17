@@ -111,6 +111,65 @@ function getErrorMessage(error: unknown): string {
   }
 }
 
+const CANADIAN_BANK_PORTAL_URLS: Record<string, string> = {
+  rbc: 'https://www.rbconline.ib.rbc.com',
+  td: 'https://easyweb.td.com',
+  scotiabank: 'https://www.scotiabank.com/online-banking',
+  bmo: 'https://www.bmo.com/main/personal',
+  cibc: 'https://www.cibc.com',
+  tangerine: 'https://www.tangerine.ca/app/#/transfer-in/type-of-account?locale=en_CA',
+  desjardins: 'https://www.desjardins.com/qc/en/personal.html',
+  nationalbank: 'https://www.nbc.ca',
+  simplii: 'https://online.simplii.com/ebm-resources/public/client/web/index.html',
+  vancity: 'https://www.vancity.com/Banking/WaysToBank/OnlineBanking/',
+  meridian: 'https://www.meridiancu.ca/personal/ways-to-bank/online-banking',
+  atb: 'https://www.atb.com/personal/everyday-banking/online-banking/',
+  coastcapital: 'https://www.coastcapitalsavings.com/banking/online-banking'
+};
+
+function normalizeBankLookupKey(bankKey: string): string {
+  return String(bankKey || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function resolveBankPortalUrl(bankKey: string): string | undefined {
+  const normalized = normalizeBankLookupKey(bankKey);
+  if (!normalized) return undefined;
+
+  if (CANADIAN_BANK_PORTAL_URLS[normalized]) {
+    return CANADIAN_BANK_PORTAL_URLS[normalized];
+  }
+
+  if (normalized.includes('rbc') || normalized.includes('royal')) return CANADIAN_BANK_PORTAL_URLS.rbc;
+  if (normalized.includes('td')) return CANADIAN_BANK_PORTAL_URLS.td;
+  if (normalized.includes('scotia')) return CANADIAN_BANK_PORTAL_URLS.scotiabank;
+  if (normalized.includes('bmo') || normalized.includes('montreal')) return CANADIAN_BANK_PORTAL_URLS.bmo;
+  if (normalized.includes('cibc')) return CANADIAN_BANK_PORTAL_URLS.cibc;
+  if (normalized.includes('tangerine')) return CANADIAN_BANK_PORTAL_URLS.tangerine;
+  if (normalized.includes('desjardins')) return CANADIAN_BANK_PORTAL_URLS.desjardins;
+  if (normalized.includes('national')) return CANADIAN_BANK_PORTAL_URLS.nationalbank;
+  if (normalized.includes('simplii')) return CANADIAN_BANK_PORTAL_URLS.simplii;
+  if (normalized.includes('vancity')) return CANADIAN_BANK_PORTAL_URLS.vancity;
+  if (normalized.includes('meridian')) return CANADIAN_BANK_PORTAL_URLS.meridian;
+  if (normalized.includes('atb')) return CANADIAN_BANK_PORTAL_URLS.atb;
+  if (normalized.includes('coastcapital') || normalized.includes('coast')) return CANADIAN_BANK_PORTAL_URLS.coastcapital;
+
+  return undefined;
+}
+
+function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefined, requestOrigin: string): string {
+  const rawUrl = String(configuredAuthUrl || '').trim();
+  const isLocalMockUrl = rawUrl.includes('/banking-hub/') || /https?:\/\/localhost(?::\d+)?/i.test(rawUrl);
+
+  if (isLocalMockUrl) {
+    const portalUrl = resolveBankPortalUrl(bankKey);
+    if (portalUrl) return portalUrl;
+    return rawUrl.replace('http://localhost:3000', requestOrigin);
+  }
+
+  if (rawUrl) return rawUrl;
+  return resolveBankPortalUrl(bankKey) || `${requestOrigin}/banking-hub/index.html`;
+}
+
 function resolveSecretManagerProjectId(): string | undefined {
   const fromEnv = firstNonEmptyEnv([
     'SOVEREIGN_SECRET_MANAGER_PROJECT_ID',
@@ -7393,7 +7452,7 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
     const host = req.get('host') || 'localhost:3000';
     const requestOrigin = `${protocol}://${host}`;
     const resolvedRedirectUri = process.env.FAPI_REDIRECT_URI || `${requestOrigin}/?action=finalize_interac`;
-    const resolvedAuthUrl = String(bank.authUrl || '').replace('http://localhost:3000', requestOrigin);
+    const resolvedAuthUrl = resolveBankAuthUrl(bankId, bank.authUrl, requestOrigin);
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -7458,10 +7517,34 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
     const acceptedFxRate = isWithinRateTolerance(requestedFxRate, DEFAULT_USD_CAD_RATE, configuredTolerance)
       ? requestedFxRate
       : DEFAULT_USD_CAD_RATE;
+    const amountUsd = convertCadToUsd(amountNum, acceptedFxRate);
+
+    // Optional precheck: keep disabled by default so users can complete bank sign-in redirect first.
+    const enforcePreRedirectBalanceCheck = String(process.env.ENFORCE_WITHDRAW_BALANCE_PRECHECK || '').toLowerCase() === 'true';
+    if (enforcePreRedirectBalanceCheck && req.user?.id && req.user.id !== 'guest_gateway') {
+      try {
+        const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [req.user.id]) as any[];
+        const usdWallet = walletRows.find((w: any) => {
+          const symbol = String(w.assetSymbol || w.asset_symbol || '').toUpperCase();
+          return symbol === 'USD';
+        });
+        const currentBalance = Number(usdWallet?.balance || 0);
+        if (!canCoverWithdrawal(amountUsd, currentBalance)) {
+          return res.status(409).json({
+            error: 'INSUFFICIENT_FUNDS',
+            message: 'Insufficient USD balance for settlement.'
+          });
+        }
+      } catch (dbErr: any) {
+        console.error('withdraw redirect wallet precheck error:', dbErr?.message || dbErr);
+      }
+    }
+
     ESCROW_LEDGER.set(state, {
       operation: 'WITHDRAWAL',
       amount: amountNum,
       bankId,
+      selected_bank_key: bankId,
       verifier: pkce.verifier,
       nonce,
       status: 'AWAITING_AUTHENTICATION',
@@ -7480,7 +7563,7 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
     const callbackUri = (process.env.FAPI_CALLBACK_URI || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/api/withdraw/callback' : `${requestOrigin}/api/withdraw/callback`));
     const resolvedBank = {
       ...bank,
-      authUrl: String(bank.authUrl || '').replace('http://localhost:3000', requestOrigin)
+      authUrl: resolveBankAuthUrl(bankId, bank.authUrl, requestOrigin)
     };
 
     const params = {
@@ -7544,10 +7627,12 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   ESCROW_LEDGER.set(resolvedState, transfer);
 
   const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
+  const bankKey = String(transfer.selected_bank_key || transfer.bankId || '');
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
     transfer_id: resolvedState,
-    code: resolvedCode
+    code: resolvedCode,
+    bank_key: bankKey
   }));
 });
 
@@ -7627,7 +7712,6 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
   const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host') || `localhost:${PORT}`;
   const requestOrigin = `${protocol}://${host}`;
-  const base_portal_uri = `${requestOrigin}/banking-hub/mock-login.html`;
   
   const isProductionDomain = host.toLowerCase().includes('pay.sovereigns.ca');
   const callbackBase = (isProductionDomain && process.env.FAPI_CALLBACK_URI) || `${requestOrigin}/api/v1/interac/callback`;
@@ -7635,7 +7719,17 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
   const amountStr = transfer ? String(transfer.amount) : "0.00";
   const operationTypeStr = transfer ? String(transfer.operation) : "DEPOSIT";
 
-  const secure_transport_url = `${base_portal_uri}?client_id=sovereigns_hub&redirect_uri=${encodeURIComponent(`${callbackBase}?transfer_id=${transfer_id}`)}&amount=${amountStr}&operation_type=${operationTypeStr}&bank_key=${matchedKey}&state=${transfer_id}`;
+  const basePortalUrl = CANADIAN_INTERBANK_DIRECTORY[matchedKey];
+  const qs = new URLSearchParams({
+    client_id: 'sovereigns_hub',
+    redirect_uri: `${callbackBase}?transfer_id=${transfer_id}`,
+    amount: amountStr,
+    operation_type: operationTypeStr,
+    bank_key: matchedKey,
+    state: String(transfer_id || '')
+  }).toString();
+  const separator = basePortalUrl.includes('?') ? '&' : '?';
+  const secure_transport_url = `${basePortalUrl}${separator}${qs}`;
   
   res.json({ target_redirect_url: secure_transport_url });
 });
@@ -7674,7 +7768,8 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
     transfer_id: resolvedTransferId,
-    code: resolvedCode
+    code: resolvedCode,
+    bank_key: String(transfer?.selected_bank_key || transfer?.bankId || '')
   }));
 });
 
@@ -7714,9 +7809,28 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
   const fxRate = resolveFxRateFromPayload((transfer as any)?.fxRate, DEFAULT_USD_CAD_RATE);
   const amountUsd = convertCadToUsd(transfer.amount, fxRate);
 
+  let usdWallet: any = null;
+  let currentUsdBalance = 0;
+  if (transfer.userId && transfer.userId !== 'guest_gateway') {
+    try {
+      const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [transfer.userId]) as any[];
+      usdWallet = walletRows.find((w: any) => {
+        const symbol = String(w.assetSymbol || w.asset_symbol || '').toUpperCase();
+        return symbol === 'USD';
+      });
+      currentUsdBalance = Number(usdWallet?.balance || 0);
+    } catch (dbErr: any) {
+      console.error('Failed to load wallet for finalize precheck:', dbErr.message);
+    }
+  }
+
+  if (transfer.operation === 'WITHDRAWAL' && !canCoverWithdrawal(amountUsd, currentUsdBalance)) {
+    return res.status(409).json({ error: 'INSUFFICIENT_FUNDS', message: 'Insufficient USD balance for settlement.' });
+  }
+
   try {
     // If we received an authorization code earlier in ESCROW, perform token exchange
-    if ((transfer.authCode || transfer.authorization_code) && transfer.status === 'AWAITING_AUTHENTICATION') {
+    if ((transfer.authCode || transfer.authorization_code) && ['AWAITING_AUTHENTICATION', 'AUTHORIZATION_RECEIVED'].includes(transfer.status)) {
       try {
         const registryPath = path.join(process.cwd(), 'config', 'BankRegistry.json');
         const registry = fs.existsSync(registryPath) ? JSON.parse(fs.readFileSync(registryPath, 'utf8')) : {};
@@ -7865,15 +7979,9 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
     // 1.5 Update the relational wallets database table directly to persist changes
     if (transfer.userId && transfer.userId !== "guest_gateway") {
       try {
-        const walletRows = db.execute('SELECT * FROM wallets WHERE user_id = ?', [transfer.userId]) as any[];
-        const usdWallet = walletRows.find((w: any) => w.assetSymbol.toUpperCase() === 'USD');
         if (usdWallet) {
-          const currentBalance = Number(usdWallet.balance || 0);
-          const projectedBalance = transfer.operation === "DEPOSIT" ? (currentBalance + amountUsd) : (currentBalance - amountUsd);
+          const projectedBalance = transfer.operation === "DEPOSIT" ? (currentUsdBalance + amountUsd) : (currentUsdBalance - amountUsd);
           const newBalance = transfer.operation === "WITHDRAWAL" ? Number(Math.max(0, projectedBalance).toFixed(2)) : Number(projectedBalance.toFixed(2));
-          if (transfer.operation === "WITHDRAWAL" && !canCoverWithdrawal(amountUsd, currentBalance)) {
-            return res.status(409).json({ error: 'INSUFFICIENT_FUNDS', message: 'Insufficient USD balance for settlement.' });
-          }
           db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBalance, transfer.userId, 'USD']);
           console.log(`[DATABASE] Updated wallets balance for user ${transfer.userId} to $${newBalance} USD`);
         }
