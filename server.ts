@@ -170,6 +170,11 @@ function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefin
   return resolveBankPortalUrl(bankKey) || `${requestOrigin}/banking-hub/index.html`;
 }
 
+function resolveBankFacingOperation(appOperation: string): 'DEPOSIT' | 'WITHDRAWAL' {
+  // App-side WITHDRAWAL means funds are deposited into the user's bank account.
+  return String(appOperation || '').toUpperCase() === 'WITHDRAWAL' ? 'DEPOSIT' : 'WITHDRAWAL';
+}
+
 async function dispatchStripePayoutToConnectedBank(stripeKey: string, amountUsd: number, userId: string, referenceLabel: string) {
   const normalizedAmountUsd = Number(amountUsd);
   if (!stripeKey) {
@@ -7638,9 +7643,10 @@ app.post('/api/withdraw/redirect', requireAuth, async (req: any, res: any) => {
       code_challenge: pkce.challenge,
       code_challenge_method: 'S256',
       amount: String(amountNum),
-      operation_type: 'WITHDRAWAL',
+      operation_type: resolveBankFacingOperation('WITHDRAWAL'),
       bank_key: bankId,
-      operation: 'WITHDRAWAL'
+      operation: resolveBankFacingOperation('WITHDRAWAL'),
+      app_operation: 'WITHDRAWAL'
     };
 
     const authorizationUrl = buildAuthorizationUrl(resolvedBank, params);
@@ -7779,7 +7785,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
   const callbackBase = (isProductionDomain && process.env.FAPI_CALLBACK_URI) || `${requestOrigin}/api/v1/interac/callback`;
   const transfer = ESCROW_LEDGER.get(String(transfer_id));
   const amountStr = transfer ? String(transfer.amount) : "0.00";
-  const operationTypeStr = transfer ? String(transfer.operation) : "DEPOSIT";
+  const operationTypeStr = transfer ? resolveBankFacingOperation(String(transfer.operation || 'DEPOSIT')) : "DEPOSIT";
 
   const basePortalUrl = CANADIAN_INTERBANK_DIRECTORY[matchedKey];
   const qs = new URLSearchParams({
@@ -7788,6 +7794,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
     amount: amountStr,
     operation_type: operationTypeStr,
     bank_key: matchedKey,
+    app_operation: transfer ? String(transfer.operation || 'DEPOSIT') : 'DEPOSIT',
     state: String(transfer_id || '')
   }).toString();
   const separator = basePortalUrl.includes('?') ? '&' : '?';
