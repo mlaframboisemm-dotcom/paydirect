@@ -40,6 +40,13 @@ import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
 
 dotenv.config();
+
+const credentialsEnvPath = String(process.env.SOVEREIGN_CREDENTIALS_FILE || path.join(process.cwd(), 'config', '.env.credentials')).trim();
+if (credentialsEnvPath && fs.existsSync(credentialsEnvPath)) {
+  dotenv.config({ path: credentialsEnvPath, override: false });
+  console.log(`[Config] Loaded credentials file from ${credentialsEnvPath}`);
+}
+
 const require = createRequire(
   typeof __filename === 'string'
     ? __filename

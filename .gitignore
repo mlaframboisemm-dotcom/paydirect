@@ -25,3 +25,4 @@ sovereigns-banking-hub/backend/venv/
 *.sqlite
 jwt_secret.txt
 sovereign_encryption_key.txt
+config/.env.credentials
