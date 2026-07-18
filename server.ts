@@ -372,11 +372,11 @@ function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefin
   const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 
   if (isLocalMockUrl) {
+    const portalUrl = resolveBankPortalUrl(bankKey);
+    if (portalUrl) return portalUrl;
     if (isProduction) {
       throw new Error('BANK_AUTH_PORTAL_UNRESOLVED');
     }
-    const portalUrl = resolveBankPortalUrl(bankKey);
-    if (portalUrl) return portalUrl;
     return rawUrl.replace('http://localhost:3000', requestOrigin);
   }
 
