@@ -49,6 +49,14 @@ function makeTempDbWorkspace(): string {
   return tempRoot;
 }
 
+function setTempDbPath() {
+  process.env.SOVEREIGN_DB_FILE_PATH = path.join('src', 'db', 'database.json');
+}
+
+function clearTempDbPath() {
+  delete process.env.SOVEREIGN_DB_FILE_PATH;
+}
+
 function cleanupTempWorkspace(tempPath: string) {
   try {
     fs.rmSync(tempPath, { recursive: true, force: true });
@@ -62,6 +70,7 @@ async function testNoBootstrapEnvLeavesEmptyState() {
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
+    setTempDbPath();
     setBootstrapEnv({});
 
     await importLedger('no-bootstrap-env');
@@ -73,6 +82,7 @@ async function testNoBootstrapEnvLeavesEmptyState() {
     assert(Array.isArray(db.users) && db.users.length === 0, 'Expected zero users when bootstrap env is absent.');
     assert(!fs.existsSync(lockPath), 'Bootstrap lock file must not exist when no bootstrap user was created.');
   } finally {
+    clearTempDbPath();
     process.chdir(prevCwd);
     cleanupTempWorkspace(tmp);
   }
@@ -83,6 +93,7 @@ async function testPartialBootstrapEnvFailsClosed() {
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
+    setTempDbPath();
     setBootstrapEnv({ BOOTSTRAP_ADMIN_EMAIL: 'partial@local.test' });
 
     let threw = false;
@@ -95,6 +106,7 @@ async function testPartialBootstrapEnvFailsClosed() {
 
     assert(threw, 'Expected import to fail when bootstrap env is partial.');
   } finally {
+    clearTempDbPath();
     process.chdir(prevCwd);
     cleanupTempWorkspace(tmp);
   }
@@ -105,6 +117,7 @@ async function testOneTimeBootstrapLockBehavior() {
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
+    setTempDbPath();
     setBootstrapEnv({
       BOOTSTRAP_ADMIN_EMAIL: 'admin@secure.local',
       BOOTSTRAP_ADMIN_PASSWORD: 'CorrectHorseBatteryStaple!42',
@@ -140,6 +153,7 @@ async function testOneTimeBootstrapLockBehavior() {
 
     assert(threw, 'Expected second bootstrap attempt to fail once lock exists.');
   } finally {
+    clearTempDbPath();
     process.chdir(prevCwd);
     cleanupTempWorkspace(tmp);
   }
@@ -150,6 +164,7 @@ async function testBootstrapEnvMustBeRemovedAfterProvisioning() {
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
+    setTempDbPath();
     setBootstrapEnv({
       BOOTSTRAP_ADMIN_EMAIL: 'admin@secure.local',
       BOOTSTRAP_ADMIN_PASSWORD: 'CorrectHorseBatteryStaple!42',
@@ -171,6 +186,7 @@ async function testBootstrapEnvMustBeRemovedAfterProvisioning() {
 
     assert(threw, 'Expected startup guard to fail when bootstrap env vars are left set post-provisioning.');
   } finally {
+    clearTempDbPath();
     process.chdir(prevCwd);
     cleanupTempWorkspace(tmp);
   }

@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { db } from './src/db/ledger.js';
 import { generateSessionId, signSessionToken } from './src/lib/auth-security.js';
 
@@ -11,7 +12,17 @@ if (fs.existsSync(credentialsPath)) {
   dotenv.config({ path: credentialsPath, override: false });
 }
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+interface DirectDebitResponse {
+  success?: boolean;
+  message?: string;
+  transactionId?: string;
+  wiseTransferId?: string;
+  status?: string;
+  error?: string;
+  [key: string]: any;
+}
 
 async function testWiseE2E() {
   console.log('═══════════════════════════════════════════════════════════');
@@ -21,14 +32,25 @@ async function testWiseE2E() {
   try {
     // Step 1: Create a test user
     console.log('📝 Step 1: Creating test user...');
-    const testUserId = 'test-wise-user-' + Date.now();
-    const testEmail = `wise-test-${Date.now()}@test.local`;
+    const uniqueSuffix = crypto.randomBytes(6).toString('hex');
+    const testUserId = `test-wise-user-${Date.now()}-${uniqueSuffix}`;
+    const testEmail = `wise-test-${Date.now()}-${uniqueSuffix}@test.local`;
     const testPassword = 'TestPassword123!@#';
     
     db.execute(`
-      INSERT INTO users (id, email, password_hash, mfa_enabled)
-      VALUES (?, ?, ?, ?)
-    `, [testUserId, testEmail, testPassword, 0]);
+      INSERT INTO users (id, name, email, passwordHash, salt, twoFactorSecret, twoFactorEnabled, kycLevel, citizenship)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      testUserId,
+      `Test User ${uniqueSuffix}`,
+      testEmail,
+      testPassword,
+      '',
+      '',
+      0,
+      1,
+      'US'
+    ]);
     
     console.log(`  ✓ User created: ${testUserId}`);
     console.log(`  ✓ Email: ${testEmail}\n`);
@@ -50,12 +72,21 @@ async function testWiseE2E() {
     };
 
     db.execute(`
-      INSERT INTO transactions (id, user_id, type, status, amount, currency, description, metadata, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      txId, testUserId, 'WISE_WITHDRAWAL', 'pending', 100.00, 'USD',
-      'Test Wise Direct Debit', JSON.stringify({}), 
-      new Date().toISOString(), new Date().toISOString()
+      txId,
+      testUserId,
+      'WISE_WITHDRAWAL',
+      'USD',
+      100.00,
+      100.00,
+      Date.now(),
+      JSON.stringify({ description: 'Test Wise Direct Debit Withdrawal' }),
+      '',
+      'pending',
+      100.00,
+      0.00
     ]);
 
     console.log(`  ✓ Transaction created: ${txId}`);
@@ -65,7 +96,8 @@ async function testWiseE2E() {
     // Step 3: Generate valid session token
     console.log('🔐 Step 3: Generating authentication session...');
     const sessionId = generateSessionId();
-    const sessionToken = signSessionToken(sessionId, { sub: testUserId } as any);
+    const authSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'local-dev-secret-please-change';
+    const sessionToken = signSessionToken({ sub: testUserId } as any, authSecret);
     console.log(`  ✓ Session created`);
     console.log(`  ✓ Token type: Bearer\n`);
 
@@ -73,10 +105,17 @@ async function testWiseE2E() {
     console.log('💸 Step 4: Initiating direct debit withdrawal...');
     const directDebitPayload = {
       amount: 100.00,
-      bankRouting: '123456789',  // Example routing number
-      bankAccount: '9876543210',  // Example account number
-      recipientName: 'Test Recipient',
-      currency: 'USD'
+      bankRouting: '021000021',
+      bankAccount: '9900000000',
+      recipientName: 'Production Rail Test',
+      currency: 'USD',
+      address: {
+        country: 'US',
+        city: 'New York',
+        postCode: '10001',
+        firstLine: '123 Test Street',
+        state: 'NY'
+      }
     };
 
     const directDebitRes = await fetch(
@@ -86,14 +125,15 @@ async function testWiseE2E() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${sessionToken}`,
-          'X-User-ID': testUserId
+          'X-User-ID': testUserId,
+          'X-Idempotency-Key': `wise-direct-${txId}`
         },
         body: JSON.stringify(directDebitPayload)
       }
     );
 
     console.log(`  Response Status: ${directDebitRes.status}`);
-    const directDebitData = await directDebitRes.json();
+    const directDebitData = (await directDebitRes.json()) as DirectDebitResponse;
     console.log(`  Response:`, JSON.stringify(directDebitData, null, 2));
     
     if (directDebitRes.status === 202 && directDebitData.wiseTransferId) {
@@ -130,6 +170,7 @@ async function testWiseE2E() {
     } else {
       console.log(`  ⚠️  Direct debit endpoint responded with ${directDebitRes.status}`);
       console.log(`  Response:`, directDebitData);
+      throw new Error(`Unexpected direct debit response status: ${directDebitRes.status}`);
     }
 
     console.log('\n═══════════════════════════════════════════════════════════');
@@ -145,6 +186,7 @@ async function testWiseE2E() {
   } catch (err: any) {
     console.error('❌ E2E Test failed:', err.message);
     console.error(err.stack);
+    process.exitCode = 1;
   }
 }
 

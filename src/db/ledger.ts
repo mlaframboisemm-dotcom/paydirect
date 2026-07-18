@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
 // Types for the Relational Schema
@@ -84,15 +85,38 @@ export interface DatabaseState {
   auditLogs: DBAuditLog[];
 }
 
+export interface LedgerIntegrityFinding {
+  severity: 'error' | 'warning';
+  code: string;
+  message: string;
+}
+
+export interface LedgerIntegrityReport {
+  ok: boolean;
+  generatedAt: string;
+  counts: {
+    users: number;
+    wallets: number;
+    transactions: number;
+    auditLogs: number;
+  };
+  errors: LedgerIntegrityFinding[];
+  warnings: LedgerIntegrityFinding[];
+}
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const configuredDbFilePath = String(process.env.SOVEREIGN_DB_FILE_PATH || '').trim();
 const DB_FILE_PATH = configuredDbFilePath
   ? path.resolve(process.cwd(), configuredDbFilePath)
-  : path.join(process.cwd(), 'src', 'db', 'database.json');
-const BOOTSTRAP_LOCK_FILE_PATH = path.join(process.cwd(), 'src', 'db', 'bootstrap.lock');
+  : path.join(__dirname, 'database.json');
+const BOOTSTRAP_LOCK_FILE_PATH = path.join(path.dirname(DB_FILE_PATH), 'bootstrap.lock');
 
 class RelationalLedgerDatabase {
   private state: DatabaseState;
   private transactionSnapshot: DatabaseState | null = null;
+  private lastLoadedAt = 0;
 
   private hasBootstrapEnvConfigured(): boolean {
     return Boolean(
@@ -132,6 +156,7 @@ class RelationalLedgerDatabase {
       this.enforceBootstrapEnvGuard();
       this.maybeBootstrapAdminUser();
       this.maybeBootstrapUserMlaframboise();
+      this.lastLoadedAt = fs.statSync(DB_FILE_PATH).mtimeMs;
       return;
     }
 
@@ -151,6 +176,9 @@ class RelationalLedgerDatabase {
       const tempPath = `${DB_FILE_PATH}.tmp`;
       fs.writeFileSync(tempPath, JSON.stringify(this.state, null, 2), 'utf-8');
       fs.renameSync(tempPath, DB_FILE_PATH);
+      if (fs.existsSync(DB_FILE_PATH)) {
+        this.lastLoadedAt = fs.statSync(DB_FILE_PATH).mtimeMs;
+      }
     } catch (e) {
       console.error('Failed to save relational database to disk:', e);
     }
@@ -792,7 +820,19 @@ class RelationalLedgerDatabase {
   /**
    * Helper method: Get a transaction by ID
    */
+  private reloadFromDiskIfNeeded() {
+    if (this.transactionSnapshot || !fs.existsSync(DB_FILE_PATH)) return;
+
+    const stats = fs.statSync(DB_FILE_PATH);
+    if (stats.mtimeMs <= this.lastLoadedAt) return;
+
+    const fileContent = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+    this.state = this.normalizeState(JSON.parse(fileContent));
+    this.lastLoadedAt = stats.mtimeMs;
+  }
+
   public getTransaction(txId: string): DBTransaction | undefined {
+    this.reloadFromDiskIfNeeded();
     const targetState = this.transactionSnapshot || this.state;
     return targetState.transactions.find(t => t.id === txId);
   }
@@ -814,6 +854,119 @@ class RelationalLedgerDatabase {
     };
 
     if (!this.transactionSnapshot) this.save();
+  }
+
+  public getIntegrityReport(): LedgerIntegrityReport {
+    this.reloadFromDiskIfNeeded();
+    const targetState = this.transactionSnapshot || this.state;
+
+    const findings: LedgerIntegrityFinding[] = [];
+    const warningFindings: LedgerIntegrityFinding[] = [];
+
+    const addError = (code: string, message: string) => {
+      findings.push({ severity: 'error', code, message });
+    };
+    const addWarning = (code: string, message: string) => {
+      warningFindings.push({ severity: 'warning', code, message });
+    };
+
+    const userIdSet = new Set<string>();
+    const userEmailSet = new Set<string>();
+    for (const user of targetState.users) {
+      const id = String(user.id || '').trim();
+      const email = String(user.email || '').trim().toLowerCase();
+      if (!id) addError('USER_ID_MISSING', 'Found user with missing id.');
+      if (!email) addError('USER_EMAIL_MISSING', `User ${id || '[unknown]'} is missing email.`);
+      if (id) {
+        if (userIdSet.has(id)) addError('USER_ID_DUPLICATE', `Duplicate user id detected: ${id}.`);
+        userIdSet.add(id);
+      }
+      if (email) {
+        if (userEmailSet.has(email)) addError('USER_EMAIL_DUPLICATE', `Duplicate user email detected: ${email}.`);
+        userEmailSet.add(email);
+      }
+    }
+
+    const walletIdSet = new Set<string>();
+    const walletCompositeSet = new Set<string>();
+    for (const wallet of targetState.wallets) {
+      const walletId = String(wallet.id || '').trim();
+      const userId = String(wallet.userId || '').trim();
+      const symbol = String(wallet.assetSymbol || '').trim().toUpperCase();
+      const balance = Number(wallet.balance);
+
+      if (!walletId) addError('WALLET_ID_MISSING', 'Found wallet with missing id.');
+      if (!userId) addError('WALLET_USER_MISSING', `Wallet ${walletId || '[unknown]'} is missing userId.`);
+      if (!symbol) addError('WALLET_ASSET_MISSING', `Wallet ${walletId || '[unknown]'} is missing asset symbol.`);
+      if (!Number.isFinite(balance)) addError('WALLET_BALANCE_INVALID', `Wallet ${walletId || '[unknown]'} has invalid balance.`);
+
+      if (walletId) {
+        if (walletIdSet.has(walletId)) addError('WALLET_ID_DUPLICATE', `Duplicate wallet id detected: ${walletId}.`);
+        walletIdSet.add(walletId);
+      }
+
+      const composite = `${userId}::${symbol}`;
+      if (userId && symbol) {
+        if (walletCompositeSet.has(composite)) {
+          addError('WALLET_DUPLICATE_ASSET', `Duplicate wallet for user ${userId} and asset ${symbol}.`);
+        }
+        walletCompositeSet.add(composite);
+      }
+
+      if (userId && !userIdSet.has(userId)) {
+        addError('WALLET_ORPHAN_USER', `Wallet ${walletId || '[unknown]'} references missing user ${userId}.`);
+      }
+    }
+
+    const transactionIdSet = new Set<string>();
+    const validStatuses = new Set(['pending', 'completed', 'failed', 'processing', 'settled']);
+    for (const tx of targetState.transactions) {
+      const txId = String(tx.id || '').trim();
+      const userId = String(tx.userId || '').trim();
+      const status = String(tx.status || '').trim();
+      const amount = Number(tx.amount);
+      const fiatAmount = Number(tx.fiatAmount);
+      const timestamp = Number(tx.timestamp);
+
+      if (!txId) addError('TX_ID_MISSING', 'Found transaction with missing id.');
+      if (!userId) addError('TX_USER_MISSING', `Transaction ${txId || '[unknown]'} is missing userId.`);
+      if (!Number.isFinite(amount)) addError('TX_AMOUNT_INVALID', `Transaction ${txId || '[unknown]'} has invalid amount.`);
+      if (!Number.isFinite(fiatAmount)) addError('TX_FIAT_AMOUNT_INVALID', `Transaction ${txId || '[unknown]'} has invalid fiatAmount.`);
+      if (!Number.isFinite(timestamp)) addError('TX_TIMESTAMP_INVALID', `Transaction ${txId || '[unknown]'} has invalid timestamp.`);
+      if (!validStatuses.has(status)) addError('TX_STATUS_INVALID', `Transaction ${txId || '[unknown]'} has invalid status ${status || '[empty]'}.`);
+
+      if (txId) {
+        if (transactionIdSet.has(txId)) addError('TX_ID_DUPLICATE', `Duplicate transaction id detected: ${txId}.`);
+        transactionIdSet.add(txId);
+      }
+
+      if (userId && !userIdSet.has(userId)) {
+        addWarning('TX_ORPHAN_USER', `Transaction ${txId || '[unknown]'} references missing user ${userId}.`);
+      }
+    }
+
+    const auditIdSet = new Set<string>();
+    for (const log of targetState.auditLogs) {
+      const logId = String(log.id || '').trim();
+      if (!logId) addError('AUDIT_ID_MISSING', 'Found audit log with missing id.');
+      if (logId) {
+        if (auditIdSet.has(logId)) addError('AUDIT_ID_DUPLICATE', `Duplicate audit log id detected: ${logId}.`);
+        auditIdSet.add(logId);
+      }
+    }
+
+    return {
+      ok: findings.length === 0,
+      generatedAt: new Date().toISOString(),
+      counts: {
+        users: targetState.users.length,
+        wallets: targetState.wallets.length,
+        transactions: targetState.transactions.length,
+        auditLogs: targetState.auditLogs.length
+      },
+      errors: findings,
+      warnings: warningFindings
+    };
   }
 }
 

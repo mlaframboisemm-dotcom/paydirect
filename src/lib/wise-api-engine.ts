@@ -6,8 +6,32 @@
 
 import crypto from 'crypto';
 import { createStructuredLogger } from './structured-logger.js';
+import WiseAuthProvider from './wise-auth-provider.js';
 
 const logger = createStructuredLogger('wise-api-engine');
+
+function isWiseScaRejected(response: Response): { required: boolean; oneTimeToken?: string } {
+  const approvalResult = String(response.headers.get('x-2fa-approval-result') || '').toUpperCase();
+  const oneTimeToken = String(response.headers.get('x-2fa-approval') || '').trim();
+  if (response.status === 403 && approvalResult === 'REJECTED') {
+    return {
+      required: true,
+      oneTimeToken: oneTimeToken || undefined
+    };
+  }
+  return { required: false };
+}
+
+function normalizeTransferReference(reference: string | undefined, fallback: string): string {
+  const value = String(reference || '').trim();
+  const base = value.length > 0 ? value : fallback;
+  // Keep the descriptor predictable and bank-safe (no control/special chars).
+  return base
+    .replace(/[^A-Za-z0-9 ._\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60);
+}
 
 export interface WiseRecipientPayload {
   amount: number;
@@ -16,6 +40,13 @@ export interface WiseRecipientPayload {
   routingNumber: string;
   accountNumber: string;
   accountType?: 'CHECKING' | 'SAVINGS';
+  address?: {
+    country: string;
+    city: string;
+    postCode: string;
+    firstLine: string;
+    state: string;
+  };
 }
 
 export interface WiseTransferStatus {
@@ -26,34 +57,166 @@ export interface WiseTransferStatus {
   createdAt: string;
 }
 
+export interface WiseConversionQuote {
+  quoteId: string;
+  profileId: string;
+  sourceCurrency: string;
+  targetCurrency: string;
+  sourceAmount: number;
+  targetAmount: number;
+  rate?: number;
+}
+
+export interface WiseExecutionResult {
+  transferId: string;
+  payInMethod: string;
+}
+
+interface WisePaymentOption {
+  payIn?: string;
+  disabled?: boolean;
+  [key: string]: any;
+}
+
 /**
  * Pure API Wise Connector
  * Interacts directly with Wise REST API for profile identification,
  * recipient creation, transfer routing, and active polling
  */
 export class WiseApiEngine {
-  private token: string;
   private baseUrl: string;
-  private headers: Record<string, string>;
+  private baseHeaders: Record<string, string>;
   private isSandbox: boolean;
+  private authProvider: WiseAuthProvider;
+
+  private static headersToRecord(headers?: HeadersInit): Record<string, string> {
+    if (!headers) return {};
+    if (headers instanceof Headers) {
+      const out: Record<string, string> = {};
+      headers.forEach((value, key) => {
+        out[key] = value;
+      });
+      return out;
+    }
+    if (Array.isArray(headers)) {
+      return headers.reduce((acc: Record<string, string>, [key, value]) => {
+        acc[String(key)] = String(value);
+        return acc;
+      }, {});
+    }
+    const out: Record<string, string> = {};
+    Object.entries(headers).forEach(([key, value]) => {
+      out[key] = String(value);
+    });
+    return out;
+  }
+
+  private static extractEnabledPayInMethods(quote: any): string[] {
+    const options = Array.isArray(quote?.paymentOptions)
+      ? (quote.paymentOptions as WisePaymentOption[])
+      : [];
+    return options
+      .filter((option) => option && option.disabled === false)
+      .map((option) => String(option.payIn || '').trim().toUpperCase())
+      .filter((value) => value.length > 0);
+  }
+
+  private static pickPayInMethod(
+    enabledMethods: string[],
+    preferredOrder: string[]
+  ): string | null {
+    if (enabledMethods.length === 0) {
+      return null;
+    }
+
+    const enabledSet = new Set(enabledMethods.map((value) => String(value).toUpperCase()));
+    for (const preferred of preferredOrder) {
+      const normalized = String(preferred || '').toUpperCase();
+      if (enabledSet.has(normalized)) {
+        return normalized;
+      }
+    }
+
+    return enabledMethods[0];
+  }
+
+  private static orderPayInMethods(enabledMethods: string[], preferredOrder: string[]): string[] {
+    const uniqueEnabled = Array.from(new Set(enabledMethods.map((value) => String(value).toUpperCase())));
+    const ordered: string[] = [];
+    for (const preferred of preferredOrder) {
+      const normalized = String(preferred || '').toUpperCase();
+      if (uniqueEnabled.includes(normalized) && !ordered.includes(normalized)) {
+        ordered.push(normalized);
+      }
+    }
+    for (const method of uniqueEnabled) {
+      if (!ordered.includes(method)) {
+        ordered.push(method);
+      }
+    }
+    return ordered;
+  }
+
+  private static isLikelyInvalidTokenBody(bodyText: string): boolean {
+    const normalized = String(bodyText || '').toLowerCase();
+    return normalized.includes('invalid_token')
+      || normalized.includes('unauthorized')
+      || normalized.includes('invalid_grant')
+      || normalized.includes('invalid_client');
+  }
+
+  private async wiseFetch(apiPath: string, init: RequestInit = {}, allowRetry = true): Promise<Response> {
+    const accessToken = await this.authProvider.getAccessToken(false);
+    const requestHeaders = {
+      ...this.baseHeaders,
+      ...WiseApiEngine.headersToRecord(init.headers),
+      Authorization: `Bearer ${accessToken}`
+    };
+
+    const response = await fetch(`${this.baseUrl}${apiPath}`, {
+      ...init,
+      headers: requestHeaders
+    });
+
+    if (!allowRetry || response.status !== 401 || !this.authProvider.canRefresh()) {
+      return response;
+    }
+
+    const bodyText = await response.clone().text();
+    if (!WiseApiEngine.isLikelyInvalidTokenBody(bodyText)) {
+      return response;
+    }
+
+    logger.warn('Wise request received invalid token response, refreshing and retrying once', {
+      apiPath
+    });
+
+    await this.authProvider.getAccessToken(true);
+    const refreshedToken = await this.authProvider.getAccessToken(false);
+    const retryHeaders = {
+      ...this.baseHeaders,
+      ...WiseApiEngine.headersToRecord(init.headers),
+      Authorization: `Bearer ${refreshedToken}`
+    };
+
+    return fetch(`${this.baseUrl}${apiPath}`, {
+      ...init,
+      headers: retryHeaders
+    });
+  }
 
   /**
    * @param {string} apiToken - Your Wise personal API token
    * @param {boolean} isSandbox - Toggle between Wise sandbox or live money URLs
    */
   constructor(apiToken: string, isSandbox: boolean = true) {
-    if (!apiToken || apiToken.trim().length === 0) {
-      throw new Error('Wise API token is required and cannot be empty');
-    }
-
-    this.token = apiToken;
     this.isSandbox = isSandbox;
     this.baseUrl = isSandbox
       ? 'https://api.sandbox.wise.com'
       : 'https://api.wise.com';
+    this.authProvider = new WiseAuthProvider(apiToken, isSandbox);
 
-    this.headers = {
-      'Authorization': `Bearer ${this.token}`,
+    this.baseHeaders = {
       'Content-Type': 'application/json',
       'User-Agent': 'SovereignsWiseIntegration/1.0'
     };
@@ -72,9 +235,9 @@ export class WiseApiEngine {
     logger.debug('Fetching Wise profile ID');
 
     try {
-      const response = await fetch(`${this.baseUrl}/v1/profiles`, {
+      const response = await this.wiseFetch('/v1/profiles', {
         method: 'GET',
-        headers: this.headers
+        headers: this.baseHeaders
       });
 
       if (!response.ok) {
@@ -83,6 +246,13 @@ export class WiseApiEngine {
           status: response.status,
           error
         });
+        const tokenError = String(error?.error || '').toLowerCase();
+        if (response.status === 401 && (tokenError === 'invalid_token' || tokenError === 'unauthorized' || tokenError === 'invalid_grant')) {
+          throw new Error('WISE_TOKEN_INVALID: Wise access token is invalid, expired, revoked, or replaced');
+        }
+        if (response.status === 429) {
+          throw new Error('WISE_RATE_LIMITED: Wise API rate limit exceeded while fetching profile');
+        }
         throw new Error(`Wise profiles fetch failed: ${error.message || response.statusText}`);
       }
 
@@ -122,15 +292,16 @@ export class WiseApiEngine {
         type: 'aba', // US ACH routing
         accountHolderName: payload.recipientName,
         details: {
-          routingNumber: payload.routingNumber,
+          abartn: payload.routingNumber,
           accountNumber: payload.accountNumber,
-          accountType: payload.accountType || 'CHECKING'
+          accountType: payload.accountType || 'CHECKING',
+          ...(payload.address ? { address: payload.address } : {})
         }
       };
 
-      const response = await fetch(`${this.baseUrl}/v1/recipients`, {
+      const response = await this.wiseFetch('/v1/accounts', {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify(recipientPayload)
       });
 
@@ -159,7 +330,7 @@ export class WiseApiEngine {
    * @param payload - Transaction details with recipient bank info
    * @returns Wise transfer ID for status tracking
    */
-  async executeDirectDebit(ledgerId: string, payload: WiseRecipientPayload): Promise<string> {
+  async executeDirectDebit(ledgerId: string, payload: WiseRecipientPayload): Promise<WiseExecutionResult> {
     logger.info('Executing direct debit transaction', {
       ledgerId,
       amount: payload.amount,
@@ -175,15 +346,14 @@ export class WiseApiEngine {
 
       // Step 3: Generate inbound funding quote
       logger.debug('Generating funding quote');
-      const quoteResponse = await fetch(`${this.baseUrl}/v3/profiles/${profileId}/quotes`, {
+      const quoteResponse = await this.wiseFetch(`/v3/profiles/${profileId}/quotes`, {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify({
           sourceCurrency: payload.currency,
           targetCurrency: payload.currency,
           targetAmount: payload.amount,
-          profile: profileId,
-          payInMethod: 'DIRECT_DEBIT'
+          profile: profileId
         })
       });
 
@@ -194,17 +364,41 @@ export class WiseApiEngine {
       }
 
       const quote = await quoteResponse.json();
+      const enabledPayInMethods = WiseApiEngine.extractEnabledPayInMethods(quote);
+      const selectedPayInMethod = WiseApiEngine.pickPayInMethod(enabledPayInMethods, [
+        'DIRECT_DEBIT',
+        'BALANCE',
+        'BANK_TRANSFER'
+      ]);
+      const payInCandidates = WiseApiEngine.orderPayInMethods(enabledPayInMethods, [
+        'DIRECT_DEBIT',
+        'BALANCE',
+        'BANK_TRANSFER'
+      ]);
+
+      if (!selectedPayInMethod) {
+        throw new Error('DIRECT_DEBIT_UNAVAILABLE: No enabled Wise payment option found for this quote');
+      }
+
       logger.debug('Quote generated', { quoteId: quote.id, rate: quote.rate });
 
       // Step 4: Create transfer object
       logger.debug('Creating transfer object');
-      const transferResponse = await fetch(`${this.baseUrl}/v1/transfers`, {
+      const transferReference = normalizeTransferReference(
+        (payload as any)?.reference,
+        `Ledger direct debit ${ledgerId}`
+      );
+
+      const transferResponse = await this.wiseFetch('/v1/transfers', {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify({
           targetAccount: recipientId,
           quoteUuid: quote.id,
-          customerTransactionId: crypto.randomUUID() // Enforces idempotency
+          customerTransactionId: crypto.randomUUID(), // Enforces idempotency
+          details: {
+            reference: transferReference
+          }
         })
       });
 
@@ -217,41 +411,83 @@ export class WiseApiEngine {
       const transfer = await transferResponse.json();
       logger.debug('Transfer created', { transferId: transfer.id });
 
-      // Step 5: Fund the transfer with DIRECT_DEBIT instruction
-      logger.debug('Funding transfer with direct debit');
-      const fundResponse = await fetch(
-        `${this.baseUrl}/v3/profiles/${profileId}/transfers/${transfer.id}/payments`,
-        {
-          method: 'POST',
-          headers: this.headers,
-          body: JSON.stringify({
-            type: 'DIRECT_DEBIT',
-            paymentMethodDetails: {
-              routingNumber: payload.routingNumber,
-              accountNumber: payload.accountNumber,
-              accountHolderName: payload.recipientName,
-              accountType: payload.accountType || 'CHECKING'
-            }
-          })
-        }
-      );
+      // Step 5: Fund using available rails in preferred order.
+      let fundedWith = selectedPayInMethod;
+      const fundingErrors: string[] = [];
 
-      if (!fundResponse.ok) {
-        const error = await fundResponse.json();
-        logger.error('Direct debit funding failed', {
+      for (const candidateMethod of payInCandidates) {
+        logger.debug('Funding transfer attempt', {
           transferId: transfer.id,
+          payInMethod: candidateMethod
+        });
+
+        const fundingPayload: Record<string, any> = {
+          type: candidateMethod
+        };
+
+        if (candidateMethod === 'DIRECT_DEBIT') {
+          fundingPayload.paymentMethodDetails = {
+            routingNumber: payload.routingNumber,
+            accountNumber: payload.accountNumber,
+            accountHolderName: payload.recipientName,
+            accountType: payload.accountType || 'CHECKING'
+          };
+        }
+
+        const fundResponse = await this.wiseFetch(
+          `/v3/profiles/${profileId}/transfers/${transfer.id}/payments`,
+          {
+            method: 'POST',
+            headers: this.baseHeaders,
+            body: JSON.stringify(fundingPayload)
+          }
+        );
+
+        if (fundResponse.ok) {
+          fundedWith = candidateMethod;
+          break;
+        }
+
+        const sca = isWiseScaRejected(fundResponse);
+        if (sca.required) {
+          throw new Error(`WISE_SCA_REQUIRED:${sca.oneTimeToken || ''}`);
+        }
+
+        const rawError = await fundResponse.text();
+        let error: any = rawError;
+        try {
+          error = JSON.parse(rawError);
+        } catch {
+          // Wise sometimes returns plain-text error codes (e.g. "invalid.request").
+        }
+
+        const reason = (typeof error === 'object' && error?.message)
+          ? String(error.message)
+          : String(error || fundResponse.statusText || 'unknown funding error');
+        fundingErrors.push(`${candidateMethod}: ${reason}`);
+
+        logger.warn('Funding rail attempt failed', {
+          transferId: transfer.id,
+          payInMethod: candidateMethod,
           error
         });
-        throw new Error(`Direct debit funding failed: ${error.message || fundResponse.statusText}`);
+      }
+
+      if (fundingErrors.length === payInCandidates.length) {
+        throw new Error(`DIRECT_DEBIT_UNAVAILABLE: No enabled Wise pay-in rail could fund transfer (${fundingErrors.join(' | ')})`);
       }
 
       logger.info('Direct debit transaction initiated successfully', {
         ledgerId,
         transferId: transfer.id,
+        payInMethod: fundedWith,
         amount: payload.amount
       });
 
-      return transfer.id;
+      return {
+        transferId: String(transfer.id),
+        payInMethod: fundedWith
+      };
     } catch (err: any) {
       logger.error('Direct debit execution failed', {
         ledgerId,
@@ -282,17 +518,24 @@ export class WiseApiEngine {
     });
 
     try {
+      const { routingNumber, ...restBankDetails } = bankDetails || {};
       const recipientPayload = {
         profile: profileId,
         currency,
         type: 'aba', // Default to US ABA, can be extended for other formats
         accountHolderName: recipientName,
-        details: bankDetails
+        details: {
+          ...restBankDetails,
+          // Wise expects ABA routing under "abartn" for US accounts.
+          ...(routingNumber && !restBankDetails?.abartn
+            ? { abartn: routingNumber }
+            : {})
+        }
       };
 
-      const response = await fetch(`${this.baseUrl}/v1/recipients`, {
+      const response = await this.wiseFetch('/v1/accounts', {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify(recipientPayload)
       });
 
@@ -302,7 +545,15 @@ export class WiseApiEngine {
           status: response.status,
           error
         });
-        throw new Error(`Outbound recipient creation failed: ${error.message || response.statusText}`);
+        const validationMessages = Array.isArray(error?.errors)
+          ? error.errors
+              .map((item: any) => String(item?.message || '').trim())
+              .filter((msg: string) => msg.length > 0)
+          : [];
+        const detail = validationMessages.length > 0
+          ? validationMessages.join('; ')
+          : String(error?.message || response.statusText || 'Unprocessable Entity');
+        throw new Error(`OUTBOUND_RECIPIENT_INVALID: ${detail}`);
       }
 
       const data = await response.json();
@@ -332,8 +583,9 @@ export class WiseApiEngine {
     sourceCurrency: string,
     targetCurrency: string,
     recipientName: string,
-    bankDetails: Record<string, any>
-  ): Promise<string> {
+    bankDetails: Record<string, any>,
+    transferReference?: string
+  ): Promise<WiseExecutionResult> {
     logger.info('Executing outbound transfer', {
       ledgerId,
       amount,
@@ -356,9 +608,9 @@ export class WiseApiEngine {
 
       // Step 3: Get outbound transfer quote
       logger.debug('Getting outbound transfer quote');
-      const quoteResponse = await fetch(`${this.baseUrl}/v3/profiles/${profileId}/quotes`, {
+      const quoteResponse = await this.wiseFetch(`/v3/profiles/${profileId}/quotes`, {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify({
           sourceCurrency,
           targetCurrency,
@@ -374,6 +626,22 @@ export class WiseApiEngine {
       }
 
       const quote = await quoteResponse.json();
+      const enabledPayInMethods = WiseApiEngine.extractEnabledPayInMethods(quote);
+      const selectedPayInMethod = WiseApiEngine.pickPayInMethod(enabledPayInMethods, [
+        'BALANCE',
+        'DIRECT_DEBIT',
+        'BANK_TRANSFER'
+      ]);
+      const payInCandidates = WiseApiEngine.orderPayInMethods(enabledPayInMethods, [
+        'BALANCE',
+        'DIRECT_DEBIT',
+        'BANK_TRANSFER'
+      ]);
+
+      if (!selectedPayInMethod) {
+        throw new Error('OUTBOUND_BALANCE_UNAVAILABLE: No enabled Wise payment option found for this transfer quote');
+      }
+
       logger.debug('Outbound quote generated', {
         quoteId: quote.id,
         rate: quote.rate,
@@ -383,13 +651,21 @@ export class WiseApiEngine {
 
       // Step 4: Create outbound transfer
       logger.debug('Creating outbound transfer');
-      const transferResponse = await fetch(`${this.baseUrl}/v1/transfers`, {
+      const resolvedReference = normalizeTransferReference(
+        transferReference,
+        `Ledger withdrawal ${ledgerId}`
+      );
+
+      const transferResponse = await this.wiseFetch('/v1/transfers', {
         method: 'POST',
-        headers: this.headers,
+        headers: this.baseHeaders,
         body: JSON.stringify({
           targetAccount: recipientId,
           quoteUuid: quote.id,
-          customerTransactionId: crypto.randomUUID()
+          customerTransactionId: crypto.randomUUID(),
+          details: {
+            reference: resolvedReference
+          }
         })
       });
 
@@ -402,37 +678,74 @@ export class WiseApiEngine {
       const transfer = await transferResponse.json();
       logger.debug('Outbound transfer created', { transferId: transfer.id });
 
-      // Step 5: Fund the transfer from Wise balance
-      logger.debug('Funding outbound transfer from Wise balance');
-      const fundResponse = await fetch(
-        `${this.baseUrl}/v3/profiles/${profileId}/transfers/${transfer.id}/payments`,
-        {
-          method: 'POST',
-          headers: this.headers,
-          body: JSON.stringify({
-            type: 'BALANCE'
-          })
-        }
-      );
+      // Step 5: Fund using available rails in preferred order.
+      let fundedWith = selectedPayInMethod;
+      const fundingErrors: string[] = [];
 
-      if (!fundResponse.ok) {
-        const error = await fundResponse.json();
-        logger.error('Outbound transfer funding failed', {
+      for (const candidateMethod of payInCandidates) {
+        logger.debug('Funding outbound transfer attempt', {
           transferId: transfer.id,
+          payInMethod: candidateMethod
+        });
+
+        const fundResponse = await this.wiseFetch(
+          `/v3/profiles/${profileId}/transfers/${transfer.id}/payments`,
+          {
+            method: 'POST',
+            headers: this.baseHeaders,
+            body: JSON.stringify({
+              type: candidateMethod
+            })
+          }
+        );
+
+        if (fundResponse.ok) {
+          fundedWith = candidateMethod;
+          break;
+        }
+
+        const sca = isWiseScaRejected(fundResponse);
+        if (sca.required) {
+          throw new Error(`WISE_SCA_REQUIRED:${sca.oneTimeToken || ''}`);
+        }
+
+        const rawError = await fundResponse.text();
+        let error: any = rawError;
+        try {
+          error = JSON.parse(rawError);
+        } catch {
+          // Wise may return string errors in some flows.
+        }
+
+        const reason = (typeof error === 'object' && error?.message)
+          ? String(error.message)
+          : String(error || fundResponse.statusText || 'unknown funding error');
+        fundingErrors.push(`${candidateMethod}: ${reason}`);
+
+        logger.warn('Outbound funding rail attempt failed', {
+          transferId: transfer.id,
+          payInMethod: candidateMethod,
           error
         });
-        throw new Error(`Transfer funding failed: ${error.message || fundResponse.statusText}`);
+      }
+
+      if (fundingErrors.length === payInCandidates.length) {
+        throw new Error(`OUTBOUND_FUNDING_UNAVAILABLE: No enabled Wise pay-in rail could fund transfer (${fundingErrors.join(' | ')})`);
       }
 
       logger.info('Outbound transfer initiated successfully', {
         ledgerId,
         transferId: transfer.id,
+        payInMethod: fundedWith,
         amount,
         sourceCurrency,
         targetCurrency
       });
 
-      return transfer.id;
+      return {
+        transferId: String(transfer.id),
+        payInMethod: fundedWith
+      };
     } catch (err: any) {
       logger.error('Outbound transfer execution failed', {
         ledgerId,
@@ -440,6 +753,54 @@ export class WiseApiEngine {
       });
       throw err;
     }
+  }
+
+  /**
+   * Creates a Wise FX quote that can be used for CAD-normalized payout routing.
+   */
+  async getConversionQuote(sourceCurrency: string, targetCurrency: string, sourceAmount: number): Promise<WiseConversionQuote> {
+    const normalizedSource = String(sourceCurrency || '').trim().toUpperCase();
+    const normalizedTarget = String(targetCurrency || '').trim().toUpperCase();
+    const normalizedAmount = Number(sourceAmount || 0);
+
+    if (!normalizedSource || !normalizedTarget || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      throw new Error('WISE_CONVERSION_INPUT_INVALID: sourceCurrency, targetCurrency, and sourceAmount>0 are required');
+    }
+
+    const profileId = await this.getProfileId();
+    const quoteResponse = await this.wiseFetch(`/v3/profiles/${profileId}/quotes`, {
+      method: 'POST',
+      headers: this.baseHeaders,
+      body: JSON.stringify({
+        sourceCurrency: normalizedSource,
+        targetCurrency: normalizedTarget,
+        sourceAmount: normalizedAmount,
+        profile: profileId
+      })
+    });
+
+    if (!quoteResponse.ok) {
+      const text = await quoteResponse.text();
+      let json: any = null;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = { raw: text };
+      }
+      const message = String(json?.message || json?.error || quoteResponse.statusText || 'Unable to create Wise conversion quote');
+      throw new Error(`WISE_CONVERSION_UNAVAILABLE: ${message}`);
+    }
+
+    const quote = await quoteResponse.json() as any;
+    return {
+      quoteId: String(quote?.id || ''),
+      profileId,
+      sourceCurrency: normalizedSource,
+      targetCurrency: normalizedTarget,
+      sourceAmount: Number(quote?.sourceAmount || normalizedAmount),
+      targetAmount: Number(quote?.targetAmount || 0),
+      rate: Number.isFinite(Number(quote?.rate)) ? Number(quote?.rate) : undefined
+    };
   }
 
   /**
@@ -451,9 +812,9 @@ export class WiseApiEngine {
     logger.debug('Checking transfer status', { transferId });
 
     try {
-      const response = await fetch(`${this.baseUrl}/v1/transfers/${transferId}`, {
+      const response = await this.wiseFetch(`/v1/transfers/${transferId}`, {
         method: 'GET',
-        headers: this.headers
+        headers: this.baseHeaders
       });
 
       if (!response.ok) {
@@ -487,6 +848,18 @@ export class WiseApiEngine {
       });
       throw err;
     }
+  }
+
+  getAuthHealth(): {
+    mode: string;
+    tokenShape: string;
+    hasToken: boolean;
+    hasCachedToken: boolean;
+    expiresAt: string | null;
+    expiresInSeconds: number | null;
+    refreshInFlight: boolean;
+  } {
+    return this.authProvider.getHealthSnapshot();
   }
 }
 

@@ -12,6 +12,15 @@ if (fs.existsSync(credentialsPath)) {
 const BASE_URL = 'http://localhost:3000';
 const isSandbox = process.env.WISE_SANDBOX_MODE === 'true';
 
+interface TransferResponse {
+  transactionId?: string;
+  wiseTransferId?: string;
+  status?: string;
+  amount?: number;
+  message?: string;
+  [key: string]: any;
+}
+
 async function execute10DollarTransfer() {
   console.log('\n╔═══════════════════════════════════════════════════════════╗');
   console.log('║          💸 EXECUTING $10 USD LIVE TRANSFER              ║');
@@ -66,7 +75,7 @@ async function execute10DollarTransfer() {
     );
 
     console.log(`📊 Response Status: ${response.status}\n`);
-    const responseData = await response.json();
+    const responseData = (await response.json()) as TransferResponse;
     console.log('Response:', JSON.stringify(responseData, null, 2));
     console.log();
 
@@ -94,7 +103,7 @@ async function execute10DollarTransfer() {
           }
         );
 
-        const statusData = await statusResponse.json();
+        const statusData = (await statusResponse.json()) as Record<string, any>;
         console.log('Status Response:', JSON.stringify(statusData, null, 2));
         console.log();
 

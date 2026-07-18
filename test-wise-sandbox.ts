@@ -14,6 +14,12 @@ if (fs.existsSync(credentialsPath)) {
 const BASE_URL = 'http://localhost:3000';
 const isSandbox = process.env.WISE_SANDBOX_MODE === 'true';
 
+interface SandboxDirectDebitResponse {
+  wiseTransferId?: string;
+  status?: string;
+  [key: string]: any;
+}
+
 async function sandboxTest() {
   console.log('\n╔═══════════════════════════════════════════════════════════╗');
   console.log('║         🧪 WISE SANDBOX DIRECT DEBIT TEST                ║');
@@ -64,8 +70,9 @@ async function sandboxTest() {
 
     // Step 3: Generate auth token
     console.log('🔐 Step 3: Generating session token...');
-    const sessionId = generateSessionId();
-    const sessionToken = signSessionToken(sessionId, { sub: testUserId } as any);
+    generateSessionId();
+    const authSecret = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'local-dev-secret-please-change';
+    const sessionToken = signSessionToken({ sub: testUserId } as any, authSecret);
     console.log(`  ✓ Session authenticated\n`);
 
     // Step 4: Call direct debit endpoint
@@ -99,7 +106,7 @@ async function sandboxTest() {
     );
 
     console.log(`Response Status: ${directDebitRes.status}`);
-    const directDebitData = await directDebitRes.json();
+    const directDebitData = (await directDebitRes.json()) as SandboxDirectDebitResponse;
     
     if (directDebitRes.status === 202) {
       console.log(`✅ Sandbox direct debit initiated!\n`);
