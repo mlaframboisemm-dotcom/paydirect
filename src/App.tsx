@@ -599,13 +599,6 @@ export default function App() {
     setStripePayoutSuccess(null);
     setIsProcessingStripePayout(true);
 
-    const amountUsd = amountNum / DEFAULT_USD_CAD_RATE;
-    if (amountUsd > stripeAvailable) {
-      setStripePayoutError(`Insufficient Stripe available balance. You have US$${stripeAvailable.toLocaleString(undefined, { minimumFractionDigits: 2 })} (approx CA$${convertUsdToCad(stripeAvailable, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}) currently available for payout.`);
-      setIsProcessingStripePayout(false);
-      return;
-    }
-
     try {
       const res = await fetch(buildApiUrl('/api/stripe/payout'), {
         method: 'POST',
@@ -617,6 +610,9 @@ export default function App() {
         if (data.status === 'syncing') {
           setStripePayoutSuccess(data.message || 'Liquidity buffer replenishing. Payout will execute automatically.');
           showToast(data.message || 'Liquidity buffer replenishing.', 'info');
+        } else if (data.status === 'PENDING_EXTERNAL_SETTLEMENT') {
+          setStripePayoutSuccess(data.message || 'Payout reserved from ledger and queued for external settlement.');
+          showToast(data.message || 'Payout queued for external settlement.', 'info');
         } else {
           setStripePayoutSuccess(`Payout of CA$${amountNum.toFixed(2)} initiated successfully to your connected bank account!`);
           showToast(`Stripe payout of CA$${amountNum.toFixed(2)} dispatched!`, 'success');

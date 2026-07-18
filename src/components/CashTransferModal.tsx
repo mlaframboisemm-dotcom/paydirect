@@ -618,11 +618,15 @@ export default function CashTransferModal({
       setWithdrawProgressStep(3);
       if (resData.status === 'syncing') {
         showToast(resData.message || 'Liquidity buffer replenishing. Payout will settle automatically.', 'info');
+      } else if (resData.status === 'PENDING_EXTERNAL_SETTLEMENT') {
+        showToast(resData.message || 'Payout reserved and queued for external settlement.', 'info');
       } else {
         showToast(`Stripe payout of CA$${amountCad.toFixed(2)} dispatched successfully!`, 'success');
       }
-      
-      onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
+
+      if (resData.status !== 'syncing') {
+        onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
+      }
 
       if (onRefreshBalances) {
         onRefreshBalances();

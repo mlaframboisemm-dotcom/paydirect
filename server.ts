@@ -8761,6 +8761,170 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       }
 
       if (stripeAvailable < amountNum) {
+        const fallbackEnabled = String(process.env.LEDGER_PAYOUT_EXTERNAL_FALLBACK_ENABLED || 'true').toLowerCase() !== 'false';
+        const shouldAttemptExternalFallback = fallbackEnabled && (!topupRequested || Boolean(topupError));
+
+        if (shouldAttemptExternalFallback) {
+          const selectedProvider = String(process.env.PAYOUT_FALLBACK_PROVIDER || (process.env.COINBASE_API_KEY_ID ? 'coinbase' : process.env.KRAKEN_API_KEY ? 'kraken' : '')).toLowerCase();
+          const hasCoinbase = !!(process.env.COINBASE_API_KEY_ID && process.env.COINBASE_API_SECRET_RAW);
+          const hasKraken = !!(process.env.KRAKEN_API_KEY && process.env.KRAKEN_API_SECRET);
+
+          if (selectedProvider === 'coinbase' || selectedProvider === 'kraken') {
+            try {
+              if (selectedProvider === 'coinbase') {
+                const cbKey = process.env.COINBASE_API_KEY_ID;
+                const cbSecret = process.env.COINBASE_API_SECRET_RAW;
+                if (!cbKey || !cbSecret || cbKey.includes('placeholder') || cbSecret.includes('placeholder')) {
+                  throw new Error('Coinbase payout fallback is not configured.');
+                }
+
+                const path = '/api/v3/brokerage/accounts';
+                const jwt = generateCoinbaseJWT(cbKey, cbSecret, path);
+                const ping = await fetch(`https://api.coinbase.com${path}`, { method: 'GET', headers: { 'Authorization': `Bearer ${jwt}` } });
+                if (!ping.ok) {
+                  throw new Error(await ping.text() || 'Coinbase account connectivity check failed.');
+                }
+              } else {
+                const krKey = process.env.KRAKEN_API_KEY;
+                const krSecret = process.env.KRAKEN_API_SECRET;
+                if (!krKey || !krSecret || krKey.includes('placeholder') || krSecret.includes('placeholder')) {
+                  throw new Error('Kraken payout fallback is not configured.');
+                }
+
+                const path = '/0/private/Balance';
+                const nonce = Date.now().toString();
+                const postData = `nonce=${nonce}`;
+                const signature = generateKrakenSignature(path, nonce, postData, krSecret);
+                const ping = await fetch(`https://api.kraken.com${path}`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'API-Key': krKey,
+                    'API-Sign': signature
+                  },
+                  body: postData
+                });
+                if (!ping.ok) {
+                  throw new Error(await ping.text() || 'Kraken account connectivity check failed.');
+                }
+              }
+
+              const requestId = `wdr_req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+              const fallbackTxId = `po_${crypto.randomUUID().substring(0, 14)}`;
+              const now = Date.now();
+              const newWalletBalance = Number((externalCash - amountNum).toFixed(2));
+
+              db.beginTransaction();
+              try {
+                const pendingDetails = {
+                  payout_status: 'PAYOUT_PENDING_EXTERNAL_SETTLEMENT',
+                  payoutAmount: amountNum,
+                  provider: selectedProvider,
+                  requestId,
+                  userId: req.user.id,
+                  requestedAt: new Date(now).toISOString()
+                };
+
+                db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newWalletBalance, req.user.id, 'USD']);
+                db.execute(
+                  `INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  [
+                    fallbackTxId,
+                    req.user.id,
+                    'SEND',
+                    'USD',
+                    amountNum,
+                    amountNum,
+                    now,
+                    JSON.stringify(pendingDetails),
+                    fallbackTxId,
+                    'pending',
+                    'user_wallet',
+                    `${selectedProvider}_gateway`
+                  ]
+                );
+
+                db.commit();
+              } catch (txErr) {
+                try {
+                  db.rollback();
+                } catch (rollbackErr) {
+                  console.error('[PAYOUT ROUTER] Failed to rollback external fallback reservation transaction:', rollbackErr);
+                }
+                throw txErr;
+              }
+
+              await recordLedgerEntry({
+                type: 'transfer',
+                status: 'pending',
+                payload: {
+                  action: 'settlement.withdrawal.requested',
+                  method: selectedProvider,
+                  amount: amountNum,
+                  currency: 'USD',
+                  userId: req.user.id,
+                  requestId,
+                  referenceNotes: `Stripe liquidity unavailable; reserved payout via ${selectedProvider} external settlement rail.`
+                },
+                result: {
+                  state: 'awaiting_external_settlement',
+                  recordedAt: new Date().toISOString()
+                }
+              });
+
+              return res.status(202).json({
+                success: true,
+                status: 'PENDING_EXTERNAL_SETTLEMENT',
+                message: `Stripe liquidity unavailable. Reserved from ledger and queued for ${selectedProvider} external settlement.`,
+                txId: fallbackTxId,
+                requestId,
+                provider: selectedProvider,
+                payoutAmountUsd: Number(amountNum.toFixed(2)),
+                stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+                treasuryExternalUsd: Number(externalCash.toFixed(2)),
+                ledgerReservedUsd: Number(amountNum.toFixed(2)),
+                topupError,
+                diagnostics: {
+                  gate: 'external_fallback',
+                  requestedUsd: Number(amountNum.toFixed(2)),
+                  ledgerUsd: Number(externalCash.toFixed(2)),
+                  stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+                  ledgerOk: true,
+                  stripeOk: false,
+                  provider: selectedProvider
+                }
+              });
+            } catch (fallbackErr: any) {
+              console.warn('[PAYOUT ROUTER] External settlement fallback unavailable:', fallbackErr);
+              return res.status(409).json({
+                error: 'EXTERNAL_SETTLEMENT_UNAVAILABLE',
+                message: fallbackErr?.message || 'External settlement fallback rail is unavailable.',
+                payoutAmountUsd: Number(amountNum.toFixed(2)),
+                stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+                treasuryExternalUsd: Number(externalCash.toFixed(2)),
+                stripeAccountCountry,
+                stripeDefaultCurrency,
+                topupsSupported,
+                topupRequested,
+                topupStatus,
+                topupId,
+                topupError,
+                pendingTopupsUsd,
+                pendingTopupsCount,
+                diagnostics: {
+                  gate: 'external_fallback',
+                  requestedUsd: Number(amountNum.toFixed(2)),
+                  ledgerUsd: Number(externalCash.toFixed(2)),
+                  stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+                  ledgerOk: true,
+                  stripeOk: false,
+                  provider: selectedProvider
+                }
+              });
+            }
+          }
+        }
+
         return res.status(409).json({
           error: 'STRIPE_LIQUIDITY_REQUIRED',
           message: topupRequested
@@ -8780,6 +8944,12 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
           topupError,
           pendingTopupsUsd,
           pendingTopupsCount,
+          fallbackEnabled,
+          fallbackProvider: String(process.env.PAYOUT_FALLBACK_PROVIDER || (process.env.COINBASE_API_KEY_ID ? 'coinbase' : process.env.KRAKEN_API_KEY ? 'kraken' : '')).toLowerCase(),
+          fallbackProviderConfigured: !!(
+            (process.env.COINBASE_API_KEY_ID && process.env.COINBASE_API_SECRET_RAW) ||
+            (process.env.KRAKEN_API_KEY && process.env.KRAKEN_API_SECRET)
+          ),
           diagnostics: {
             gate: 'stripe',
             requestedUsd: Number(amountNum.toFixed(2)),
