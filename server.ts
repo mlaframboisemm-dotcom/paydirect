@@ -357,10 +357,24 @@ function resolveBankPortalUrl(bankKey: string): string | undefined {
 }
 
 function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefined, requestOrigin: string): string {
+  const normalizedBankKey = String(bankKey || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
+  const envOverride = String(
+    process.env[`BANK_AUTH_URL_${normalizedBankKey}`]
+    || process.env[`FAPI_AUTH_URL_${normalizedBankKey}`]
+    || ''
+  ).trim();
+  if (envOverride) {
+    return envOverride;
+  }
+
   const rawUrl = String(configuredAuthUrl || '').trim();
   const isLocalMockUrl = rawUrl.includes('/banking-hub/') || /https?:\/\/localhost(?::\d+)?/i.test(rawUrl);
+  const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 
   if (isLocalMockUrl) {
+    if (isProduction) {
+      throw new Error('BANK_AUTH_PORTAL_UNRESOLVED');
+    }
     const portalUrl = resolveBankPortalUrl(bankKey);
     if (portalUrl) return portalUrl;
     return rawUrl.replace('http://localhost:3000', requestOrigin);
