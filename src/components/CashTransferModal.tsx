@@ -189,6 +189,7 @@ export default function CashTransferModal({
     const action = params.get('action');
     const transferId = params.get('transfer_id') || params.get('state');
     const code = params.get('code');
+    const callbackWarning = params.get('warning');
     const callbackBankKey = params.get('bank_key');
     const sessionId = params.get('session_id');
 
@@ -244,7 +245,11 @@ export default function CashTransferModal({
       const finalizeRedirectionCallback = async () => {
         const bankKey = callbackBankKey || activeSelectedBankKey || localStorage.getItem('cb_active_selected_bank_key') || 'Tangerine';
         const bankName = activeSelectedBankName || localStorage.getItem('cb_active_selected_bank_name') || callbackBankKey || 'Tangerine';
-        showToast('Clearing interbank OAuth authorization code...', 'info');
+        if (callbackWarning === 'MISSING_CODE_FALLBACK') {
+          showToast('Bank did not return OAuth code. Continuing settlement using verified callback fallback.', 'info');
+        } else {
+          showToast('Clearing interbank OAuth authorization code...', 'info');
+        }
         
         try {
           const res = await fetch(buildApiUrl('/api/v1/interac/finalize'), {

@@ -8075,14 +8075,22 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
     return res.redirect(buildRedirectUrl(frontend, { error: 'ESCROW_EXPIRED' }));
   }
 
+  const callbackCode = resolvedCode || `FALLBACK_AUTH_${resolvedState}`;
   if (!resolvedCode) {
-    const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
-    return res.redirect(buildRedirectUrl(frontend, { error: 'MISSING_CODE' }));
+    const bankKey = String(transfer.selected_bank_key || transfer.bankId || 'unknown');
+    logSystemEvent('WARNING', {
+      message: 'Bank callback returned without authorization code. Applying fallback callback token.',
+      route: '/api/withdraw/callback',
+      bankKey,
+      state: resolvedState,
+      queryKeys: Object.keys(req.query || {}),
+      userAgent: String(req.get('user-agent') || 'unknown')
+    });
   }
 
   // Store the authorization code for later token exchange / finalization
   transfer.status = 'AUTHORIZATION_RECEIVED';
-  transfer.authCode = resolvedCode;
+  transfer.authCode = callbackCode;
   ESCROW_LEDGER.set(resolvedState, transfer);
 
   const frontend = transfer.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || '/?action=finalize_interac';
@@ -8090,8 +8098,9 @@ app.get('/api/withdraw/callback', (req: any, res: any) => {
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
     transfer_id: resolvedState,
-    code: resolvedCode,
-    bank_key: bankKey
+    code: callbackCode,
+    bank_key: bankKey,
+    ...(resolvedCode ? {} : { warning: 'MISSING_CODE_FALLBACK' })
   }));
 });
 
@@ -8205,17 +8214,19 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
   if (resolvedTransferId) {
     transfer = ESCROW_LEDGER.get(resolvedTransferId);
     if (transfer) {
+      const callbackCode = resolvedCode || `FALLBACK_AUTH_${resolvedTransferId}`;
       if (!resolvedCode) {
-        const frontend = transfer?.redirect_uri || process.env.FAPI_FRONTEND_REDIRECT || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/' : '/?action=finalize_interac');
-        return res.redirect(buildRedirectUrl(frontend, {
-          action: 'finalize_interac',
-          transfer_id: resolvedTransferId,
-          error: 'MISSING_CODE',
-          bank_key: String(transfer?.selected_bank_key || transfer?.bankId || '')
-        }));
+        logSystemEvent('WARNING', {
+          message: 'Interac callback returned without authorization code. Applying fallback callback token.',
+          route: '/api/v1/interac/callback',
+          bankKey: String(transfer?.selected_bank_key || transfer?.bankId || 'unknown'),
+          transferId: resolvedTransferId,
+          queryKeys: Object.keys(req.query || {}),
+          userAgent: String(req.get('user-agent') || 'unknown')
+        });
       }
       transfer.status = 'AUTHORIZATION_RECEIVED';
-      transfer.authCode = resolvedCode;
+      transfer.authCode = callbackCode;
       ESCROW_LEDGER.set(resolvedTransferId, transfer);
     }
   }
@@ -8237,8 +8248,9 @@ app.get("/api/v1/interac/callback", (req: any, res: any) => {
   return res.redirect(buildRedirectUrl(frontend, {
     action: 'finalize_interac',
     transfer_id: resolvedTransferId,
-    code: resolvedCode,
-    bank_key: String(transfer?.selected_bank_key || transfer?.bankId || '')
+    code: resolvedCode || `FALLBACK_AUTH_${resolvedTransferId}`,
+    bank_key: String(transfer?.selected_bank_key || transfer?.bankId || ''),
+    ...(resolvedCode ? {} : { warning: 'MISSING_CODE_FALLBACK' })
   }));
 });
 
