@@ -573,6 +573,167 @@ async function createStripeTopupFromUsdDeficit(params: {
   };
 }
 
+async function verifyExternalPayoutProviderConnectivity(provider: 'coinbase' | 'kraken'): Promise<void> {
+  if (provider === 'coinbase') {
+    const cbKey = process.env.COINBASE_API_KEY_ID;
+    const cbSecret = process.env.COINBASE_API_SECRET_RAW;
+    if (!cbKey || !cbSecret || cbKey.includes('placeholder') || cbSecret.includes('placeholder')) {
+      throw new Error('Coinbase payout rail is not configured.');
+    }
+
+    const path = '/api/v3/brokerage/accounts';
+    const jwt = generateCoinbaseJWT(cbKey, cbSecret, path);
+    const ping = await fetch(`https://api.coinbase.com${path}`, { method: 'GET', headers: { 'Authorization': `Bearer ${jwt}` } });
+    if (!ping.ok) {
+      throw new Error(await ping.text() || 'Coinbase account connectivity check failed.');
+    }
+    return;
+  }
+
+  const krKey = process.env.KRAKEN_API_KEY;
+  const krSecret = process.env.KRAKEN_API_SECRET;
+  if (!krKey || !krSecret || krKey.includes('placeholder') || krSecret.includes('placeholder')) {
+    throw new Error('Kraken payout rail is not configured.');
+  }
+
+  const path = '/0/private/Balance';
+  const nonce = Date.now().toString();
+  const postData = `nonce=${nonce}`;
+  const signature = generateKrakenSignature(path, nonce, postData, krSecret);
+  const ping = await fetch(`https://api.kraken.com${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'API-Key': krKey,
+      'API-Sign': signature
+    },
+    body: postData
+  });
+  if (!ping.ok) {
+    throw new Error(await ping.text() || 'Kraken account connectivity check failed.');
+  }
+}
+
+async function processPendingManualPayoutSettlements(trigger: 'scheduler' | 'admin' = 'scheduler') {
+  const selectedProvider = String(process.env.PAYOUT_FALLBACK_PROVIDER || (process.env.COINBASE_API_KEY_ID ? 'coinbase' : process.env.KRAKEN_API_KEY ? 'kraken' : '')).toLowerCase();
+  if (selectedProvider !== 'coinbase' && selectedProvider !== 'kraken') {
+    return { scanned: 0, dispatched: 0, skipped: 0, failed: 0, reason: 'NO_EXTERNAL_PROVIDER_CONFIGURED' };
+  }
+
+  const pendingRows = db.execute('SELECT * FROM transactions WHERE type = ? AND status = ?', ['SEND', 'pending']) as any[];
+  const candidates = pendingRows.filter((row: any) => {
+    try {
+      const details = JSON.parse(row.details || '{}');
+      return String(details.payout_status || '').toUpperCase() === 'PAYOUT_PENDING_MANUAL_SETTLEMENT';
+    } catch {
+      return false;
+    }
+  });
+
+  if (candidates.length === 0) {
+    return { scanned: 0, dispatched: 0, skipped: 0, failed: 0 };
+  }
+
+  let dispatched = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  try {
+    await verifyExternalPayoutProviderConnectivity(selectedProvider as 'coinbase' | 'kraken');
+  } catch (providerErr: any) {
+    return {
+      scanned: candidates.length,
+      dispatched,
+      skipped: candidates.length,
+      failed,
+      reason: providerErr?.message || 'EXTERNAL_PROVIDER_UNREACHABLE'
+    };
+  }
+
+  for (const tx of candidates) {
+    let details: any = {};
+    try {
+      details = JSON.parse(tx.details || '{}');
+    } catch {
+      details = {};
+    }
+
+    const userId = String(tx.user_id || tx.userId || details.userId || '').trim();
+    if (!userId) {
+      failed++;
+      continue;
+    }
+
+    const amountNum = Number(tx.amount || details.payoutAmount || 0);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      failed++;
+      continue;
+    }
+
+    const requestId = `wdr_req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const nextDetails = {
+      ...details,
+      payout_status: 'PAYOUT_PENDING_EXTERNAL_SETTLEMENT',
+      provider: selectedProvider,
+      requestId,
+      queuedBy: trigger,
+      externalRequestedAt: new Date().toISOString()
+    };
+
+    try {
+      db.execute('UPDATE transactions SET details = ? WHERE id = ?', [JSON.stringify(nextDetails), tx.id]);
+      await recordLedgerEntry({
+        type: 'transfer',
+        status: 'pending',
+        payload: {
+          action: 'settlement.withdrawal.requested',
+          method: selectedProvider,
+          amount: amountNum,
+          currency: 'USD',
+          userId,
+          requestId,
+          referenceNotes: `Automated dispatch from manual payout queue via ${selectedProvider} rail.`
+        },
+        result: {
+          state: 'awaiting_external_settlement',
+          recordedAt: new Date().toISOString()
+        }
+      });
+
+      db.execute(
+        'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          `audit_${crypto.randomUUID()}`,
+          userId,
+          'MANUAL_PAYOUT_QUEUE_DISPATCHED',
+          Date.now(),
+          '127.0.0.1',
+          'success',
+          `Queued payout transaction ${String(tx.id)} moved to ${selectedProvider} external settlement. request_id=${requestId}`
+        ]
+      );
+
+      dispatched++;
+    } catch (dispatchErr: any) {
+      failed++;
+      const attempts = Number(details.dispatchAttempts || 0) + 1;
+      const failDetails = {
+        ...details,
+        dispatchAttempts: attempts,
+        lastDispatchError: dispatchErr?.message || 'AUTOMATED_DISPATCH_FAILED',
+        lastDispatchAttemptAt: new Date().toISOString()
+      };
+      try {
+        db.execute('UPDATE transactions SET details = ? WHERE id = ?', [JSON.stringify(failDetails), tx.id]);
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  return { scanned: candidates.length, dispatched, skipped, failed };
+}
+
 function resolveSecretManagerProjectId(): string | undefined {
   const fromEnv = firstNonEmptyEnv([
     'SOVEREIGN_SECRET_MANAGER_PROJECT_ID',
@@ -5379,6 +5540,22 @@ app.post('/api/admin/ledger/rotate-keys', requireAuth, requireMfa, async (req: a
   }
 });
 
+app.post('/api/admin/payouts/process-queue', requireAuth, requireMfa, async (req: any, res) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'This operation requires admin privileges.' });
+  }
+
+  try {
+    const result = await processPendingManualPayoutSettlements('admin');
+    return res.json({ success: true, result });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'PAYOUT_QUEUE_PROCESSING_FAILED',
+      message: err?.message || 'Failed to process payout queue.'
+    });
+  }
+});
+
 app.get('/api/transactions/spendability', requireAuth, requireMfa, async (req: any, res) => {
   try {
     const ledgerPath = process.env.SOVEREIGN_LEDGER_PATH || './ledger_db.json';
@@ -9497,6 +9674,31 @@ async function startServer() {
     setInterval(runAsymmetricForensicAudit, intervalMs);
   }
 
+  function startManualPayoutQueueWorker(intervalMs = 60 * 1000) {
+    if (String(process.env.PAYOUT_QUEUE_WORKER_ENABLED || 'true').toLowerCase() === 'false') {
+      return;
+    }
+
+    let inFlight = false;
+    const runCycle = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const result = await processPendingManualPayoutSettlements('scheduler');
+        if ((result.dispatched || 0) > 0 || (result.failed || 0) > 0) {
+          console.log(`[PAYOUT QUEUE WORKER] scanned=${result.scanned} dispatched=${result.dispatched} failed=${result.failed} skipped=${result.skipped}`);
+        }
+      } catch (err) {
+        console.error('[PAYOUT QUEUE WORKER] processing error:', err);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    setTimeout(runCycle, 15 * 1000);
+    setInterval(runCycle, intervalMs);
+  }
+
   const startListener = (port: number, attemptedPorts = new Set<number>()) => {
     const server = app.listen(port, '0.0.0.0', () => {
       logSystemEvent('STARTUP', {
@@ -9509,6 +9711,7 @@ async function startServer() {
       if (process.env.NODE_ENV !== 'test') {
         startStripeAggregationWorker();
         startReconciliationEngine();
+        startManualPayoutQueueWorker();
 
         const isWindows = process.platform === 'win32';
         const pythonExecutable = isWindows
