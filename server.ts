@@ -435,6 +435,144 @@ async function dispatchStripePayoutToConnectedBank(stripeKey: string, amountUsd:
   return { payoutJson, payoutCurrency, payoutAmountCents };
 }
 
+async function fetchStripeAccountProfile(stripeKey: string): Promise<{ country: string; defaultCurrency: string }> {
+  let country = '';
+  let defaultCurrency = 'usd';
+
+  const accRes = await fetch('https://api.stripe.com/v1/account', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!accRes.ok) {
+    throw new Error(await accRes.text() || 'Failed to query Stripe account profile.');
+  }
+
+  const accJson = await accRes.json() as any;
+  country = String(accJson.country || '').trim().toUpperCase();
+  defaultCurrency = String(accJson.default_currency || 'usd').trim().toLowerCase() || 'usd';
+  return { country, defaultCurrency };
+}
+
+async function fetchStripeAvailableUsd(stripeKey: string): Promise<number> {
+  const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!balanceRes.ok) {
+    throw new Error(await balanceRes.text() || 'Failed to retrieve Stripe balance.');
+  }
+
+  const balanceJson = await balanceRes.json() as any;
+  let availableUsd = 0;
+  for (const item of balanceJson.available || []) {
+    const amt = item.amount || 0;
+    const curr = (item.currency || 'usd').toLowerCase();
+    availableUsd += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
+  }
+
+  return Number(availableUsd.toFixed(2));
+}
+
+async function fetchPendingTopupsSummary(stripeKey: string): Promise<{ pendingUsd: number; pendingCount: number }> {
+  const topupsRes = await fetch('https://api.stripe.com/v1/topups?status=pending&limit=100', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Accept': 'application/json'
+    }
+  });
+
+  if (!topupsRes.ok) {
+    throw new Error(await topupsRes.text() || 'Failed to query Stripe pending top-ups.');
+  }
+
+  const topupsJson = await topupsRes.json() as any;
+  const topups = Array.isArray(topupsJson?.data) ? topupsJson.data : [];
+
+  let pendingUsd = 0;
+  for (const topup of topups) {
+    const amount = Number(topup?.amount || 0);
+    const currency = String(topup?.currency || 'usd').toLowerCase();
+    const normalized = currency === 'cad' ? (amount / 100 / DEFAULT_USD_CAD_RATE) : (amount / 100);
+    pendingUsd += Number.isFinite(normalized) ? normalized : 0;
+  }
+
+  return {
+    pendingUsd: Number(pendingUsd.toFixed(2)),
+    pendingCount: topups.length
+  };
+}
+
+async function createStripeTopupFromUsdDeficit(params: {
+  stripeKey: string;
+  deficitUsd: number;
+  userId: string;
+  defaultCurrency: string;
+}) {
+  const { stripeKey, deficitUsd, userId, defaultCurrency } = params;
+  const currency = defaultCurrency === 'cad' ? 'cad' : 'usd';
+  const amountInCurrency = currency === 'cad' ? (deficitUsd * DEFAULT_USD_CAD_RATE) : deficitUsd;
+  const amountCents = Math.max(1, Math.round(amountInCurrency * 100));
+
+  const form = new URLSearchParams();
+  form.set('amount', String(amountCents));
+  form.set('currency', currency);
+  form.set('description', `Auto liquidity refill for payout dispatch (${userId})`);
+  form.set('metadata[userId]', String(userId));
+  form.set('metadata[reason]', 'payout_liquidity_refill');
+  form.set('metadata[requestedUsd]', Number(deficitUsd.toFixed(2)).toString());
+
+  const source = firstNonEmptyEnv(['STRIPE_TOPUP_SOURCE', 'STRIPE_TOPUP_SOURCE_ID']);
+  if (source) {
+    form.set('source', source);
+  }
+
+  const idempotencyKey = `topup_refill_${userId}_${amountCents}_${Date.now()}`;
+  const topupRes = await fetch('https://api.stripe.com/v1/topups', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/json',
+      'Idempotency-Key': idempotencyKey
+    },
+    body: form.toString()
+  });
+
+  const rawText = await topupRes.text();
+  let parsed: any = null;
+  try {
+    parsed = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!topupRes.ok) {
+    const errorCode = String(parsed?.error?.code || parsed?.code || '').toLowerCase();
+    const notSupported = errorCode.includes('feature_not_supported') || errorCode.includes('topup_not_supported') || errorCode.includes('resource_missing');
+    throw Object.assign(new Error(parsed?.error?.message || rawText || 'Stripe top-up creation failed.'), {
+      status: topupRes.status,
+      payload: parsed || rawText,
+      notSupported
+    });
+  }
+
+  return {
+    topup: parsed,
+    currency,
+    amountCents,
+    requestedUsd: Number(deficitUsd.toFixed(2))
+  };
+}
+
 function resolveSecretManagerProjectId(): string | undefined {
   const fromEnv = firstNonEmptyEnv([
     'SOVEREIGN_SECRET_MANAGER_PROJECT_ID',
@@ -8543,89 +8681,127 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     // Fetch fresh available balance from Stripe API
     let stripeAvailable = 0;
     try {
-      const balanceRes = await fetch('https://api.stripe.com/v1/balance', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${stripeKey}`,
-          'Accept': 'application/json'
-        }
-      });
-      if (balanceRes.ok) {
-        const balanceJson = await balanceRes.json() as any;
-        for (const item of balanceJson.available || []) {
-          const amt = item.amount || 0;
-          const curr = (item.currency || 'usd').toLowerCase();
-          stripeAvailable += curr === 'cad' ? (amt / 100 / DEFAULT_USD_CAD_RATE) : (amt / 100);
-        }
-      }
+      stripeAvailable = await fetchStripeAvailableUsd(stripeKey);
     } catch (e) {
       console.warn('[PAYOUT ROUTER] Failed to fetch fresh Stripe balance, using cache:', e);
       stripeAvailable = GLOBAL_STRIPE_BALANCE.available;
     }
 
+    let stripeAccountCountry = '';
+    let stripeDefaultCurrency = 'usd';
+    try {
+      const profile = await fetchStripeAccountProfile(stripeKey);
+      stripeAccountCountry = profile.country;
+      stripeDefaultCurrency = profile.defaultCurrency;
+    } catch (accErr) {
+      console.warn('[PAYOUT ROUTER] Failed to query Stripe account details:', accErr);
+    }
+
     // Payouts must be backed by currently available Stripe funds only.
     if (stripeAvailable < amountNum) {
-      const refillNeeded = amountNum - stripeAvailable;
-      let stripeAccountCountry = '';
-      let stripeDefaultCurrency = 'usd';
+      const refillNeeded = Number((amountNum - stripeAvailable).toFixed(2));
+      const autoTopupEnabled = String(process.env.STRIPE_AUTO_TOPUP_ENABLED || 'true').toLowerCase() !== 'false';
+      let topupsSupported = false;
+      let topupRequested = false;
+      let topupStatus = '';
+      let topupId = '';
+      let topupError = '';
+      let pendingTopupsUsd = 0;
+      let pendingTopupsCount = 0;
 
-      try {
-        const accRes = await fetch('https://api.stripe.com/v1/account', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${stripeKey}`, 'Accept': 'application/json' }
-        });
-        if (accRes.ok) {
-          const accJson = await accRes.json() as any;
-          stripeAccountCountry = String(accJson.country || '').trim().toUpperCase();
-          stripeDefaultCurrency = String(accJson.default_currency || 'usd').trim().toLowerCase();
+      if (autoTopupEnabled) {
+        try {
+          const pendingTopups = await fetchPendingTopupsSummary(stripeKey);
+          pendingTopupsUsd = pendingTopups.pendingUsd;
+          pendingTopupsCount = pendingTopups.pendingCount;
+
+          if (pendingTopupsCount > 0) {
+            topupsSupported = true;
+            topupRequested = true;
+            topupStatus = 'pending';
+          } else {
+            const topupResult = await createStripeTopupFromUsdDeficit({
+              stripeKey,
+              deficitUsd: refillNeeded,
+              userId: String(req.user.id),
+              defaultCurrency: stripeDefaultCurrency
+            });
+
+            topupsSupported = true;
+            topupRequested = true;
+            topupStatus = String(topupResult.topup?.status || 'pending').toLowerCase();
+            topupId = String(topupResult.topup?.id || '');
+
+            db.execute(
+              'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+              [
+                `audit_${crypto.randomUUID()}`,
+                req.user.id,
+                'LIQUIDITY_BUFFER_REFILL_REQUESTED',
+                Date.now(),
+                req.ip || 'unknown',
+                topupStatus === 'succeeded' ? 'success' : 'pending',
+                `Stripe top-up requested for payout liquidity. topup_id=${topupId || 'n/a'} status=${topupStatus} requested_usd=${refillNeeded.toFixed(2)}`
+              ]
+            );
+
+            if (topupStatus === 'succeeded') {
+              try {
+                stripeAvailable = await fetchStripeAvailableUsd(stripeKey);
+              } catch (refreshErr) {
+                console.warn('[PAYOUT ROUTER] Top-up succeeded but Stripe balance refresh failed:', refreshErr);
+              }
+            }
+          }
+        } catch (topupErr: any) {
+          topupsSupported = !Boolean(topupErr?.notSupported);
+          topupError = topupErr?.message || 'Stripe top-up request failed.';
+          console.warn('[PAYOUT ROUTER] Failed to auto-request Stripe top-up for payout:', topupErr);
         }
-      } catch (accErr) {
-        console.warn('[PAYOUT ROUTER] Failed to query Stripe account details for liquidity response:', accErr);
       }
 
-      return res.status(409).json({
-        error: 'STRIPE_LIQUIDITY_REQUIRED',
-        message: 'Insufficient available Stripe balance for this payout. Add funds to Stripe, then retry.',
-        payoutAmountUsd: Number(amountNum.toFixed(2)),
-        stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
-        treasuryExternalUsd: Number(externalCash.toFixed(2)),
-        consolidatedUsd: Number((externalCash + stripeAvailable).toFixed(2)),
-        refillNeededUsd: Number(refillNeeded.toFixed(2)),
-        stripeAccountCountry,
-        stripeDefaultCurrency,
-        topupsSupported: false,
-        diagnostics: {
-          gate: 'stripe',
-          requestedUsd: Number(amountNum.toFixed(2)),
-          ledgerUsd: Number(externalCash.toFixed(2)),
+      if (stripeAvailable < amountNum) {
+        return res.status(409).json({
+          error: 'STRIPE_LIQUIDITY_REQUIRED',
+          message: topupRequested
+            ? 'Stripe liquidity refill has been requested. Wait for settlement, then retry payout.'
+            : 'Insufficient available Stripe balance for this payout. Add funds to Stripe, then retry.',
+          payoutAmountUsd: Number(amountNum.toFixed(2)),
           stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
-          ledgerOk: true,
-          stripeOk: false
-        }
-      });
+          treasuryExternalUsd: Number(externalCash.toFixed(2)),
+          consolidatedUsd: Number((externalCash + stripeAvailable).toFixed(2)),
+          refillNeededUsd: Number((amountNum - stripeAvailable).toFixed(2)),
+          stripeAccountCountry,
+          stripeDefaultCurrency,
+          topupsSupported,
+          topupRequested,
+          topupStatus,
+          topupId,
+          topupError,
+          pendingTopupsUsd,
+          pendingTopupsCount,
+          diagnostics: {
+            gate: 'stripe',
+            requestedUsd: Number(amountNum.toFixed(2)),
+            ledgerUsd: Number(externalCash.toFixed(2)),
+            stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+            ledgerOk: true,
+            stripeOk: false
+          }
+        });
+      }
+
     }
 
     // 3. Execute Stripe Payout directly when funds are natively available
-    let payoutCurrency = 'usd';
+    let payoutCurrency = stripeDefaultCurrency || 'usd';
     let payoutAmountCents = Math.round(amountNum * 100);
 
-    try {
-      const accRes = await fetch('https://api.stripe.com/v1/account', {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${stripeKey}`, 'Accept': 'application/json' }
-      });
-      if (accRes.ok) {
-        const accJson = await accRes.json() as any;
-        payoutCurrency = (accJson.default_currency || 'usd').toLowerCase();
-        if (payoutCurrency === 'cad') {
-          // Convert USD payout request to CAD (using the rate 1.36)
-          const amountNumCad = amountNum * DEFAULT_USD_CAD_RATE;
-          payoutAmountCents = Math.round(amountNumCad * 100);
-          console.log(`[PAYOUT ROUTER] Stripe Account Payout Currency is CAD. Converting USD payout ($${amountNum.toFixed(2)}) to CAD ($${amountNumCad.toFixed(2)}) for Payout.`);
-        }
-      }
-    } catch (accErr) {
-      console.warn('[PAYOUT ROUTER] Failed to query Stripe account default currency for payout:', accErr);
+    if (payoutCurrency === 'cad') {
+      // Convert USD payout request to CAD (using the rate 1.36)
+      const amountNumCad = amountNum * DEFAULT_USD_CAD_RATE;
+      payoutAmountCents = Math.round(amountNumCad * 100);
+      console.log(`[PAYOUT ROUTER] Stripe Account Payout Currency is CAD. Converting USD payout ($${amountNum.toFixed(2)}) to CAD ($${amountNumCad.toFixed(2)}) for Payout.`);
     }
 
     const payoutTxId = `po_${crypto.randomUUID().substring(0, 14)}`;
