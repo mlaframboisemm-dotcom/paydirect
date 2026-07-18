@@ -29,7 +29,7 @@ import { assertEnvironmentSafeForDestructiveOperation } from './src/lib/environm
 import { canCoverWithdrawal, convertCadToUsd, DEFAULT_USD_CAD_RATE, resolveFxRateFromPayload, isWithinRateTolerance } from './src/lib/financial-hardening.js';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
-import sqlite3 from 'sqlite3';
+import { createRequire } from 'module';
 import { getKilnBridge } from './server/kiln-bridge';
 import { createStructuredLogger } from './src/lib/structured-logger.js';
 import { sanitizeError, sanitizeString } from './src/lib/error-sanitizer.js';
@@ -40,6 +40,19 @@ import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
 
 dotenv.config();
+const require = createRequire(import.meta.url);
+
+function loadSqliteAdapter(): any {
+  try {
+    return require('sqlite3');
+  } catch (nativeErr: any) {
+    console.warn('[SQLite] Native sqlite3 unavailable; falling back to non-native adapter.', nativeErr?.message || nativeErr);
+    return require('./src/lib/sqlite3-mock.js');
+  }
+}
+
+const sqlite3 = loadSqliteAdapter();
+
 const DEFAULT_CALLBACK_LOG = process.env.FAPI_CALLBACK_URI || (process.env.NODE_ENV === 'production' ? 'https://www.pay.sovereigns.ca/api/v1/interac/callback' : `http://localhost:${process.env.PORT || 3000}/api/v1/interac/callback`);
 console.log("Callback URI:", DEFAULT_CALLBACK_LOG);
 
