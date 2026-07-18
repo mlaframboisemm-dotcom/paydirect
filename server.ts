@@ -51,7 +51,74 @@ function loadSqliteAdapter(): any {
     return require('sqlite3');
   } catch (nativeErr: any) {
     console.warn('[SQLite] Native sqlite3 unavailable; falling back to non-native adapter.', nativeErr?.message || nativeErr);
-    return require('./src/lib/sqlite3-mock.js');
+    class FallbackDatabase {
+      private filePath: string;
+      constructor(filePath: string, callback?: (err: Error | null) => void) {
+        this.filePath = filePath;
+        if (callback) {
+          setTimeout(() => callback(null), 0);
+        }
+      }
+
+      run(sql: string, paramsOrCallback?: any, callback?: any) {
+        let params: any[] = [];
+        let cb: any = null;
+        if (typeof paramsOrCallback === 'function') {
+          cb = paramsOrCallback;
+        } else {
+          params = paramsOrCallback || [];
+          cb = callback;
+        }
+
+        try {
+          let data: any[] = [];
+          const jsonPath = this.filePath.endsWith('.db')
+            ? this.filePath.replace(/\.db$/, '_db.json')
+            : `${this.filePath}.json`;
+
+          if (fs.existsSync(jsonPath)) {
+            const fileContent = fs.readFileSync(jsonPath, 'utf8');
+            try {
+              data = JSON.parse(fileContent);
+            } catch {
+              data = [];
+            }
+          }
+
+          const sqlUpper = sql.trim().toUpperCase();
+          if (sqlUpper.startsWith('INSERT') || sqlUpper.startsWith('CREATE') || sqlUpper.startsWith('UPDATE') || sqlUpper.startsWith('DELETE')) {
+            data.push({ sql, params, timestamp: new Date().toISOString() });
+            fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), 'utf8');
+          }
+
+          if (cb) {
+            setTimeout(() => cb(null), 0);
+          }
+        } catch (err: any) {
+          if (cb) {
+            setTimeout(() => cb(err), 0);
+          }
+        }
+      }
+
+      all(_sql: string, _paramsOrCallback?: any, callback?: any) {
+        const cb = typeof _paramsOrCallback === 'function' ? _paramsOrCallback : callback;
+        if (cb) {
+          setTimeout(() => cb(null, []), 0);
+        }
+      }
+
+      close(callback?: (err: Error | null) => void) {
+        if (callback) {
+          setTimeout(() => callback(null), 0);
+        }
+      }
+    }
+
+    return {
+      Database: FallbackDatabase,
+      verbose: () => ({ Database: FallbackDatabase })
+    };
   }
 }
 
