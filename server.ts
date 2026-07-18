@@ -247,14 +247,18 @@ async function finalizeStripeCheckoutSession(params: {
 
   const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
   if (wallets && wallets.length > 0) {
-    console.log(`[STRIPE] Finalized checkout session. Funds added directly to Stripe available balance.`);
+    const currentBalance = Number(wallets[0].balance || 0);
+    const nextBalance = Number((currentBalance + amountUsd).toFixed(2));
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextBalance, userId, 'USD']);
+    console.log(`[STRIPE] Finalized checkout session. Credited USD wallet from $${currentBalance.toFixed(2)} to $${nextBalance.toFixed(2)}.`);
   } else {
     const publicAddressEth = '0x' + crypto.randomBytes(20).toString('hex');
     const publicAddressBtc = 'bc1' + crypto.randomBytes(20).toString('hex');
     db.execute(
       'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [`wallet_${crypto.randomUUID()}`, userId, 'USD', 0, publicAddressEth, publicAddressBtc, 0, 'live', 0, '']
+      [`wallet_${crypto.randomUUID()}`, userId, 'USD', Number(amountUsd.toFixed(2)), publicAddressEth, publicAddressBtc, 0, 'live', 0, '']
     );
+    console.log(`[STRIPE] Finalized checkout session. Created USD wallet with initial credited balance $${Number(amountUsd).toFixed(2)}.`);
   }
 
   db.execute(
@@ -8485,7 +8489,42 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     if (!wallets || wallets.length === 0) {
       return res.status(400).json({ error: 'WALLET_NOT_FOUND', message: 'USD wallet was not found for this user.' });
     }
-    const externalCash = Number(wallets[0].balance || 0);
+    let externalCash = Number(wallets[0].balance || 0);
+
+    // Reconcile legacy drift: infer cleared USD from completed tx ledger and raise wallet balance if it is lower.
+    try {
+      const userTxs = db.execute('SELECT * FROM transactions WHERE user_id = ? ORDER BY timestamp DESC', [req.user.id]) as any[];
+      let derivedClearedUsd = 0;
+
+      for (const tx of userTxs) {
+        const symbol = String(tx.assetSymbol || tx.asset_symbol || '').toUpperCase();
+        const status = String(tx.status || '').toLowerCase();
+        if (symbol !== 'USD' || status !== 'completed') {
+          continue;
+        }
+
+        const amountValue = Number(tx.amount || 0);
+        if (!Number.isFinite(amountValue) || amountValue <= 0) {
+          continue;
+        }
+
+        const type = String(tx.type || '').toUpperCase();
+        if (type === 'RECEIVE') {
+          derivedClearedUsd += amountValue;
+        } else if (type === 'SEND') {
+          derivedClearedUsd -= amountValue;
+        }
+      }
+
+      derivedClearedUsd = Math.max(0, Number(derivedClearedUsd.toFixed(2)));
+      if (derivedClearedUsd > externalCash + 0.009) {
+        externalCash = derivedClearedUsd;
+        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [externalCash, req.user.id, 'USD']);
+        console.log(`[PAYOUT ROUTER] Reconciled USD wallet to cleared ledger amount: $${externalCash.toFixed(2)}.`);
+      }
+    } catch (reconcileErr) {
+      console.warn('[PAYOUT ROUTER] Failed to run pre-payout wallet reconciliation:', reconcileErr);
+    }
 
     if (amountNum > externalCash) {
       return res.status(400).json({
@@ -8543,7 +8582,7 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
         payoutAmountUsd: Number(amountNum.toFixed(2)),
         stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
         treasuryExternalUsd: Number(externalCash.toFixed(2)),
-        consolidatedUsd: Number(externalCash.toFixed(2)),
+        consolidatedUsd: Number((externalCash + stripeAvailable).toFixed(2)),
         refillNeededUsd: Number(refillNeeded.toFixed(2)),
         stripeAccountCountry,
         stripeDefaultCurrency,
