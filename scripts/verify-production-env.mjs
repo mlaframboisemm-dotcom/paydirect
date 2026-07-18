@@ -4,11 +4,13 @@ import path from 'path';
 import process from 'process';
 
 const cwd = process.cwd();
+const credentialsEnvPath = (process.env.SOVEREIGN_CREDENTIALS_FILE || path.join(cwd, 'config', '.env.credentials')).trim();
 const envFiles = [
   path.join(cwd, '.env'),
   path.join(cwd, '.env.local'),
   path.join(cwd, '.env.production'),
-  path.join(cwd, '.env.production.local')
+  path.join(cwd, '.env.production.local'),
+  credentialsEnvPath
 ];
 
 function parseEnvFile(filePath) {
