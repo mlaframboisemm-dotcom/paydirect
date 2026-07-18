@@ -4,6 +4,32 @@ To successfully deploy and pass the production readiness check on Render, you mu
 
 ---
 
+## GitHub Actions Secrets (Repository Settings)
+
+For GitHub workflows in this repository, configure repository secret values in:
+**GitHub -> Repository -> Settings -> Secrets and variables -> Actions**
+
+### Required for Wise Production Deep Check Workflow
+
+1. `WISE_API_TOKEN`
+* **Description:** Wise personal/all-access API token used by the manual deep workflow.
+* **Used by workflow:** `.github/workflows/wise-production-deep-check.yml`
+
+### Optional (only if you later wire OAuth-based Wise checks in CI)
+
+2. `WISE_CLIENT_ID`
+* **Description:** Wise OAuth client ID.
+
+3. `WISE_CLIENT_SECRET`
+* **Description:** Wise OAuth client secret.
+
+4. `WISE_CLIENT_KEY`
+* **Description:** Wise application client key used for some webhook/subscription operations.
+
+If `WISE_API_TOKEN` is missing, the workflow fails early with a clear error before running tests.
+
+---
+
 ## 🔐 Required Core Security Configurations
 
 ### 1. `NODE_ENV`
