@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.local
+!config/.env.credentials.example
 coverage/
 .DS_Store
 
