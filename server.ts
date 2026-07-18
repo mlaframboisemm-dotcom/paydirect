@@ -317,7 +317,7 @@ const CANADIAN_BANK_PORTAL_URLS: Record<string, string> = {
   scotiabank: 'https://www.scotiabank.com/online-banking',
   bmo: 'https://www.bmo.com/main/personal',
   cibc: 'https://www.cibc.com',
-  tangerine: 'https://www.tangerine.ca/app/#/transfer-in/type-of-account?locale=en_CA',
+  tangerine: 'https://www.tangerine.ca',
   desjardins: 'https://www.desjardins.com/qc/en/personal.html',
   nationalbank: 'https://www.nbc.ca',
   simplii: 'https://online.simplii.com/ebm-resources/public/client/web/index.html',
