@@ -189,6 +189,7 @@ export default function CashTransferModal({
     const action = params.get('action');
     const transferId = params.get('transfer_id') || params.get('state');
     const code = params.get('code');
+    const callbackBankKey = params.get('bank_key');
     const sessionId = params.get('session_id');
 
     if (action === 'stripe_success' && sessionId) {
@@ -241,8 +242,8 @@ export default function CashTransferModal({
       window.history.replaceState({}, document.title, window.location.pathname);
       
       const finalizeRedirectionCallback = async () => {
-        const bankKey = activeSelectedBankKey || localStorage.getItem('cb_active_selected_bank_key') || 'Tangerine';
-        const bankName = activeSelectedBankName || localStorage.getItem('cb_active_selected_bank_name') || 'Tangerine';
+        const bankKey = callbackBankKey || activeSelectedBankKey || localStorage.getItem('cb_active_selected_bank_key') || 'Tangerine';
+        const bankName = activeSelectedBankName || localStorage.getItem('cb_active_selected_bank_name') || callbackBankKey || 'Tangerine';
         showToast('Clearing interbank OAuth authorization code...', 'info');
         
         try {
@@ -299,7 +300,7 @@ export default function CashTransferModal({
       
       finalizeRedirectionCallback();
     }
-  }, [isAuthenticated, activeSelectedBankKey, onAddTransaction, onUpdateUsdBalance, usdBalance, showToast]);
+  }, [isAuthenticated, activeSelectedBankKey, activeSelectedBankName, onAddTransaction, onUpdateUsdBalance, usdBalance, showToast]);
 
   // Make sure depositBankId and withdrawBankId are updated if linked banks list changes
   useEffect(() => {
@@ -617,11 +618,15 @@ export default function CashTransferModal({
       setWithdrawProgressStep(3);
       if (resData.status === 'syncing') {
         showToast(resData.message || 'Liquidity buffer replenishing. Payout will settle automatically.', 'info');
+      } else if (resData.status === 'PENDING_EXTERNAL_SETTLEMENT' || resData.status === 'PENDING_MANUAL_SETTLEMENT') {
+        showToast(resData.message || 'Payout reserved and queued for external settlement.', 'info');
       } else {
         showToast(`Stripe payout of CA$${amountCad.toFixed(2)} dispatched successfully!`, 'success');
       }
-      
-      onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
+
+      if (resData.status !== 'syncing') {
+        onUpdateUsdBalance(Math.max(0, usdBalance - amountUsd));
+      }
 
       if (onRefreshBalances) {
         onRefreshBalances();
@@ -986,7 +991,11 @@ export default function CashTransferModal({
       const { Browser } = await import('@capacitor/browser');
       await Browser.open({ url: targetUrl });
     } catch {
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      try {
+        window.location.assign(targetUrl);
+      } catch {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
     }
   };
 
@@ -1009,6 +1018,9 @@ export default function CashTransferModal({
       setLocalError('Selected bank is not supported for direct bank authorization.');
       return;
     }
+
+    localStorage.setItem('cb_active_selected_bank_key', bankKey);
+    localStorage.setItem('cb_active_selected_bank_name', bankName || bankKey);
 
     try {
       const initRes = await fetch(buildApiUrl('/api/withdrawal/initiate'), {
@@ -1114,6 +1126,9 @@ export default function CashTransferModal({
       setLocalError('Selected bank is not supported for direct bank authorization.');
       return;
     }
+
+    localStorage.setItem('cb_active_selected_bank_key', bankKey);
+    localStorage.setItem('cb_active_selected_bank_name', bankName || bankKey);
 
     try {
       const initRes = await fetch(buildApiUrl('/api/withdraw/redirect'), {

@@ -76,7 +76,10 @@ export interface DatabaseState {
   auditLogs: DBAuditLog[];
 }
 
-const DB_FILE_PATH = path.join(process.cwd(), 'src', 'db', 'database.json');
+const configuredDbFilePath = String(process.env.SOVEREIGN_DB_FILE_PATH || '').trim();
+const DB_FILE_PATH = configuredDbFilePath
+  ? path.resolve(process.cwd(), configuredDbFilePath)
+  : path.join(process.cwd(), 'src', 'db', 'database.json');
 const BOOTSTRAP_LOCK_FILE_PATH = path.join(process.cwd(), 'src', 'db', 'bootstrap.lock');
 
 class RelationalLedgerDatabase {
@@ -652,6 +655,32 @@ class RelationalLedgerDatabase {
       return { affectedRows: 1 };
     }
 
+    // 8.6 UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?
+    if (formattedSql.startsWith('UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?')) {
+      const [passwordHash, salt, id] = params;
+      const targetState = this.transactionSnapshot || this.state;
+
+      let found = false;
+      targetState.users = targetState.users.map(u => {
+        if (u.id === id) {
+          found = true;
+          return {
+            ...u,
+            passwordHash: String(passwordHash || ''),
+            salt: String(salt || '')
+          };
+        }
+        return u;
+      });
+
+      if (!found) {
+        throw new Error(`User not found for id ${id}`);
+      }
+
+      if (!this.transactionSnapshot) this.save();
+      return { affectedRows: 1 };
+    }
+
     // 9. INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     if (formattedSql.startsWith('INSERT INTO transactions')) {
       const [id, userId, type, assetSymbol, amount, fiatAmount, timestamp, details, hash, status, ledgerDebit, ledgerCredit] = params;
@@ -677,6 +706,49 @@ class RelationalLedgerDatabase {
       return targetState.transactions
         .filter(t => t.userId === userId)
         .sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    // 10.5 SELECT * FROM transactions WHERE id = ?
+    if (formattedSql.startsWith('SELECT * FROM transactions WHERE id = ?')) {
+      const [id] = params;
+      const targetState = this.transactionSnapshot || this.state;
+      return targetState.transactions.filter(t => t.id === id);
+    }
+
+    // 10.6 SELECT * FROM transactions WHERE type = ? AND status = ?
+    if (formattedSql.startsWith('SELECT * FROM transactions WHERE type = ? AND status = ?')) {
+      const [type, status] = params;
+      const targetState = this.transactionSnapshot || this.state;
+      return targetState.transactions.filter(t => String(t.type) === String(type) && String(t.status) === String(status));
+    }
+
+    // 10.7 UPDATE transactions SET status = '...', details = ? WHERE id = ?
+    if (formattedSql.startsWith("UPDATE transactions SET status = '") && formattedSql.includes("', details = ? WHERE id = ?")) {
+      const match = formattedSql.match(/^UPDATE transactions SET status = '([^']+)', details = \? WHERE id = \?$/);
+      if (!match) {
+        throw new Error(`[LEDGER SQL ENGINE] Unsupported transaction update statement: "${sql}"`);
+      }
+
+      const nextStatus = String(match[1]);
+      const [details, id] = params;
+      const targetState = this.transactionSnapshot || this.state;
+      let found = false;
+
+      targetState.transactions = targetState.transactions.map((tx) => {
+        if (tx.id === id) {
+          found = true;
+          return {
+            ...tx,
+            status: nextStatus as DBTransaction['status'],
+            details: String(details || '')
+          };
+        }
+        return tx;
+      });
+
+      if (!found) throw new Error(`Transaction not found for id ${id}`);
+      if (!this.transactionSnapshot) this.save();
+      return { affectedRows: 1 };
     }
 
     // 11. INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)

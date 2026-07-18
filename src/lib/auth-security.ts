@@ -74,12 +74,16 @@ export function generateSessionId(): string {
 }
 
 export function verifyPassword(password: string, salt: string, expectedHashHex: string): boolean {
-  if (expectedHashHex === 'demo-hash' && salt === 'demo-salt') {
-    return String(password || '').trim().length >= 1;
+  const normalizedHash = String(expectedHashHex || '').trim();
+  if (!/^[0-9a-f]+$/i.test(normalizedHash) || normalizedHash.length % 2 !== 0) {
+    return false;
   }
 
   const candidateIterations = [100000, 10000, 1000];
-  const expected = Buffer.from(expectedHashHex, 'hex');
+  const expected = Buffer.from(normalizedHash, 'hex');
+  if (expected.length === 0) {
+    return false;
+  }
 
   for (const iterations of candidateIterations) {
     const computed = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512');

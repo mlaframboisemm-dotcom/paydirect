@@ -182,6 +182,7 @@ export default function App() {
   const [stripeAvailable, setStripeAvailable] = useState<number>(0);
   const [stripePending, setStripePending] = useState<number>(0);
   const [stripeTotal, setStripeTotal] = useState<number>(0);
+  const [hasStripeBalanceSnapshot, setHasStripeBalanceSnapshot] = useState<boolean>(false);
   const [isFetchingStripeBalance, setIsFetchingStripeBalance] = useState(false);
   const [isProcessingStripePayout, setIsProcessingStripePayout] = useState(false);
   const [stripePayoutAmount, setStripePayoutAmount] = useState('');
@@ -461,11 +462,14 @@ export default function App() {
         if (balData.holdings) {
           setHoldings(balData.holdings);
         }
-        if (typeof balData.usdBalance === 'number') {
+        if (!config.stripeConfigured && typeof balData.usdBalance === 'number') {
           setUsdBalance(balData.usdBalance);
         }
         if (balData.transactions) {
           setTransactions(balData.transactions);
+        }
+        if (config.stripeConfigured) {
+          await fetchStripeBalance(true);
         }
         if (isReal) {
           showToast('Synchronized portfolios live with Coinbase Brokerage ledger!', 'success');
@@ -561,8 +565,8 @@ export default function App() {
     return () => clearInterval(interval);
   }, [realCoinbaseMode, isAuthenticated]);
 
-  const fetchStripeBalance = async () => {
-    if (!isAuthenticated || !hasSessionToken() || !isStripeConfigured) return;
+  const fetchStripeBalance = async (force = false) => {
+    if (!isAuthenticated || !hasSessionToken() || (!isStripeConfigured && !force)) return;
     setIsFetchingStripeBalance(true);
     try {
       const res = await fetch(buildApiUrl('/api/stripe/balance'), {
@@ -573,9 +577,14 @@ export default function App() {
         const data = await res.json();
         setStripeAvailable(data.available || 0);
         setStripePending(data.pending || 0);
-        setStripeTotal(data.total || 0);
+        const stripeTotalUsd = data.total || 0;
+        const consolidatedTotalUsd = typeof data.consolidatedTotalUsd === 'number' ? data.consolidatedTotalUsd : stripeTotalUsd;
+        setStripeTotal(stripeTotalUsd);
+        setUsdBalance(consolidatedTotalUsd);
+        setHasStripeBalanceSnapshot(true);
         setIsStripeConfigured(true);
       } else if (res.status === 501) {
+        setHasStripeBalanceSnapshot(false);
         setIsStripeConfigured(false);
       }
     } catch (err) {
@@ -590,13 +599,6 @@ export default function App() {
     setStripePayoutSuccess(null);
     setIsProcessingStripePayout(true);
 
-    const amountUsd = amountNum / DEFAULT_USD_CAD_RATE;
-    if (amountUsd > usdBalance) {
-      setStripePayoutError(`Insufficient Consolidated Cash Balance. You have US$${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} (approx CA$${convertUsdToCad(usdBalance, DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}) available across your treasury.`);
-      setIsProcessingStripePayout(false);
-      return;
-    }
-
     try {
       const res = await fetch(buildApiUrl('/api/stripe/payout'), {
         method: 'POST',
@@ -608,6 +610,9 @@ export default function App() {
         if (data.status === 'syncing') {
           setStripePayoutSuccess(data.message || 'Liquidity buffer replenishing. Payout will execute automatically.');
           showToast(data.message || 'Liquidity buffer replenishing.', 'info');
+        } else if (data.status === 'PENDING_EXTERNAL_SETTLEMENT' || data.status === 'PENDING_MANUAL_SETTLEMENT') {
+          setStripePayoutSuccess(data.message || 'Payout reserved from ledger and queued for external settlement.');
+          showToast(data.message || 'Payout queued for external settlement.', 'info');
         } else {
           setStripePayoutSuccess(`Payout of CA$${amountNum.toFixed(2)} initiated successfully to your connected bank account!`);
           showToast(`Stripe payout of CA$${amountNum.toFixed(2)} dispatched!`, 'success');
@@ -924,7 +929,9 @@ export default function App() {
     }, 0);
   }, [holdings, coins]);
 
-  const netWorth = cryptoTotalValue + usdBalance;
+  const liveCashBalance = usdBalance;
+
+  const netWorth = cryptoTotalValue + liveCashBalance;
 
   const previousNetWorth = useMemo(() => {
     // Computes previous value based on 24h change ratios for portfolio items
@@ -932,8 +939,8 @@ export default function App() {
       const coin = coins.find((c) => c && c.symbol === hold.symbol);
       const coinPrevPrice = coin ? coin.price / (1 + coin.change24h / 100) : 0;
       return sum + (hold.amount * coinPrevPrice);
-    }, 0) + usdBalance;
-  }, [holdings, coins, usdBalance]);
+    }, 0) + liveCashBalance;
+  }, [holdings, coins, liveCashBalance]);
 
   const netWorthChangeUSD = netWorth - previousNetWorth;
   const netWorthChangePercent = previousNetWorth === 0 ? 0 : (netWorthChangeUSD / previousNetWorth) * 100;
@@ -1078,10 +1085,13 @@ export default function App() {
     if (!cbCoin) return false;
 
     if (backingSymbol === 'USD') {
-      if (fiatAmount > usdBalance) return false;
+      if (fiatAmount > liveCashBalance) return false;
 
       // Deduct USD cash
       setUsdBalance((prev) => prev - fiatAmount);
+      if (isStripeConfigured && hasStripeBalanceSnapshot) {
+        setStripeAvailable((prev) => Math.max(0, prev - fiatAmount));
+      }
     } else {
       const backingHolding = holdings.find((h) => h.symbol === backingSymbol);
       if (!backingHolding) return false;
@@ -1427,12 +1437,12 @@ export default function App() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="text-sm font-bold text-gray-900">
-                            ${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            ${liveCashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <span className="text-xs text-gray-500 font-mono font-semibold">
-                            {netWorth === 0 ? '0.0' : ((usdBalance / netWorth) * 100).toFixed(1)}%
+                            {netWorth === 0 ? '0.0' : ((liveCashBalance / netWorth) * 100).toFixed(1)}%
                           </span>
                         </td>
                         <td className="px-6 py-4 text-right font-mono text-gray-500 text-xs">
@@ -1562,7 +1572,7 @@ export default function App() {
                 <TradeWidget
                   coins={coins}
                   holdings={holdings}
-                  usdBalance={usdBalance}
+                  usdBalance={liveCashBalance}
                   onExecuteTrade={handleExecuteTrade}
                   selectedAssetSymbol={selectedAssetSymbol}
                   citizenship={citizenship}
@@ -1759,7 +1769,7 @@ export default function App() {
                 <TradeWidget
                   coins={coins}
                   holdings={holdings}
-                  usdBalance={usdBalance}
+                  usdBalance={liveCashBalance}
                   onExecuteTrade={handleExecuteTrade}
                   selectedAssetSymbol={selectedAssetSymbol}
                   citizenship={citizenship}
@@ -1863,7 +1873,7 @@ export default function App() {
               <DeveloperHub
                 coins={coins}
                 holdings={holdings}
-                usdBalance={usdBalance}
+                usdBalance={liveCashBalance}
                 showToast={showToast}
                 onRefreshBalances={syncCoinbaseBalances}
               />
@@ -2088,7 +2098,7 @@ export default function App() {
                 </p>
               </div>
               <button
-                onClick={fetchStripeBalance}
+                onClick={() => fetchStripeBalance()}
                 disabled={isFetchingStripeBalance}
                 className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
               >
@@ -2102,10 +2112,10 @@ export default function App() {
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-xs">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Master Ledger Reservoir</span>
                 <span className="text-xl font-black text-gray-900 mt-2 block font-mono">
-                  ${Math.max(0, usdBalance - stripeTotal).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  ${Math.max(0, usdBalance - (stripeAvailable + stripePending)).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
                 <span className="text-[9px] text-gray-500 font-bold mt-1 block">
-                  Approx. CA${convertUsdToCad(Math.max(0, usdBalance - stripeTotal), DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  Approx. CA${convertUsdToCad(Math.max(0, usdBalance - (stripeAvailable + stripePending)), DEFAULT_USD_CAD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
@@ -2278,7 +2288,7 @@ export default function App() {
                 </span>
                 <span className="text-[9px] text-gray-500 font-bold mt-1.5 flex items-center justify-end space-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse" />
-                  <span>Synced Live with Stripe</span>
+                  <span>Stripe Link Active</span>
                 </span>
               </div>
             </div>
@@ -2298,7 +2308,7 @@ export default function App() {
                   </div>
 
                   <div className="divide-y divide-gray-100">
-                    {/* Cash balance row (Stripe synced) */}
+                    {/* Stripe cash row */}
                     <div className="p-6 flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div className="w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
@@ -2306,15 +2316,15 @@ export default function App() {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-gray-900 block">USD Cash</span>
-                          <span className="text-[10px] text-gray-400 font-medium">Fiat Currency (Stripe Synced)</span>
+                          <span className="text-[10px] text-gray-400 font-medium">Fiat Currency (Unified Treasury Cash)</span>
                         </div>
                       </div>
                       <div className="text-right">
                         <span className="text-xs font-bold text-gray-900 font-mono block">
-                          ${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          ${liveCashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </span>
                         <span className="text-[10px] text-gray-400 font-mono block mt-0.5">
-                          Allocation: {netWorth > 0 ? ((usdBalance / netWorth) * 100).toFixed(1) : '0.0'}%
+                          Allocation: {netWorth > 0 ? ((liveCashBalance / netWorth) * 100).toFixed(1) : '0.0'}%
                         </span>
                       </div>
                     </div>
@@ -2428,8 +2438,13 @@ export default function App() {
       <CashTransferModal
         isOpen={isCashModalOpen}
         onClose={() => setIsCashModalOpen(false)}
-        usdBalance={usdBalance}
-        onUpdateUsdBalance={setUsdBalance}
+        usdBalance={liveCashBalance}
+        onUpdateUsdBalance={(nextBalance) => {
+          setUsdBalance(nextBalance);
+          if (isStripeConfigured) {
+            setStripeAvailable(nextBalance);
+          }
+        }}
         onAddTransaction={(tx) => setTransactions((prev) => [tx, ...prev])}
         showToast={showToast}
         initialTab={cashModalAction}
