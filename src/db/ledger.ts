@@ -655,6 +655,32 @@ class RelationalLedgerDatabase {
       return { affectedRows: 1 };
     }
 
+    // 8.6 UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?
+    if (formattedSql.startsWith('UPDATE users SET passwordHash = ?, salt = ? WHERE id = ?')) {
+      const [passwordHash, salt, id] = params;
+      const targetState = this.transactionSnapshot || this.state;
+
+      let found = false;
+      targetState.users = targetState.users.map(u => {
+        if (u.id === id) {
+          found = true;
+          return {
+            ...u,
+            passwordHash: String(passwordHash || ''),
+            salt: String(salt || '')
+          };
+        }
+        return u;
+      });
+
+      if (!found) {
+        throw new Error(`User not found for id ${id}`);
+      }
+
+      if (!this.transactionSnapshot) this.save();
+      return { affectedRows: 1 };
+    }
+
     // 9. INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     if (formattedSql.startsWith('INSERT INTO transactions')) {
       const [id, userId, type, assetSymbol, amount, fiatAmount, timestamp, details, hash, status, ledgerDebit, ledgerCredit] = params;
