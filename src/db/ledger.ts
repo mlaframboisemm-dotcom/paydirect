@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
 // Types for the Relational Schema
@@ -104,13 +103,11 @@ export interface LedgerIntegrityReport {
   warnings: LedgerIntegrityFinding[];
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const configuredDbFilePath = String(process.env.SOVEREIGN_DB_FILE_PATH || '').trim();
+const defaultDbFilePath = path.join(process.cwd(), 'src', 'db', 'database.json');
 const DB_FILE_PATH = configuredDbFilePath
   ? path.resolve(process.cwd(), configuredDbFilePath)
-  : path.join(__dirname, 'database.json');
+  : defaultDbFilePath;
 const BOOTSTRAP_LOCK_FILE_PATH = path.join(path.dirname(DB_FILE_PATH), 'bootstrap.lock');
 
 class RelationalLedgerDatabase {
