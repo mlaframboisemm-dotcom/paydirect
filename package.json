@@ -39,6 +39,7 @@
     "test:final-comprehensive": "tsx test-final-comprehensive.ts",
     "test:e2e": "tsx scripts/test-withdrawal-e2e.ts",
     "test:withdrawal:tangerine-redirect": "tsx scripts/test-withdrawal-tangerine-redirect.ts",
+    "test:withdrawal:tangerine-fallback-finalize": "tsx scripts/test-tangerine-fallback-finalize-e2e.ts",
     "test:wise-e2e-local": "tsx scripts/test-wise-e2e-local.ts",
     "verify:prod-env": "node scripts/verify-production-env.mjs",
     "test": "npm run test:verification && npm run test:auth-security && npm run test:bootstrap-security && npm run test:auth-api-security && npm run test:transaction-security",
