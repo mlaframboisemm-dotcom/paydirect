@@ -8529,7 +8529,14 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
     if (amountNum > externalCash) {
       return res.status(400).json({
         error: 'balance_insufficient',
-        message: `Insufficient digital cash available in ledger. You have US$${externalCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`
+        message: `Insufficient digital cash available in ledger. You have US$${externalCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}.`,
+        diagnostics: {
+          gate: 'ledger',
+          requestedUsd: Number(amountNum.toFixed(2)),
+          ledgerUsd: Number(externalCash.toFixed(2)),
+          ledgerOk: false,
+          stripeCheckSkipped: true
+        }
       });
     }
     
@@ -8586,7 +8593,15 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
         refillNeededUsd: Number(refillNeeded.toFixed(2)),
         stripeAccountCountry,
         stripeDefaultCurrency,
-        topupsSupported: false
+        topupsSupported: false,
+        diagnostics: {
+          gate: 'stripe',
+          requestedUsd: Number(amountNum.toFixed(2)),
+          ledgerUsd: Number(externalCash.toFixed(2)),
+          stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+          ledgerOk: true,
+          stripeOk: false
+        }
       });
     }
 
@@ -8742,7 +8757,15 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
       status: 'pending',
       message: 'Deduction verified. Payout dispatched to Stripe and pending settlement.',
       payout: payoutJson,
-      ledgerTransactionId: payoutTxId
+      ledgerTransactionId: payoutTxId,
+      diagnostics: {
+        gate: 'pass',
+        requestedUsd: Number(amountNum.toFixed(2)),
+        ledgerUsd: Number(externalCash.toFixed(2)),
+        stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+        ledgerOk: true,
+        stripeOk: true
+      }
     });
   } catch (err: any) {
     console.error('Stripe payout error:', err);
