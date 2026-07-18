@@ -40,7 +40,11 @@ import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
 
 dotenv.config();
-const require = createRequire(import.meta.url);
+const require = createRequire(
+  typeof __filename === 'string'
+    ? __filename
+    : path.join(process.cwd(), 'server.ts')
+);
 
 function loadSqliteAdapter(): any {
   try {
@@ -7213,7 +7217,7 @@ const INTERBANK_MAX_PER_WINDOW = Number.parseInt(process.env.INTERBANK_MAX_PER_W
 
 // Initialize local SQLite database for White-Label Gateway audit trailing
 function initializeInterbankVault() {
-  const dbInstance = new sqlite3.Database(GATEWAY_DB_FILE, (err) => {
+  const dbInstance = new sqlite3.Database(GATEWAY_DB_FILE, (err: Error | null) => {
     if (err) {
       console.error("Failed to connect to Sovereigns Interbank Vault SQLite:", err.message);
       return;
@@ -7222,7 +7226,7 @@ function initializeInterbankVault() {
       CREATE TABLE IF NOT EXISTS settled_clearinghouse (
         tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT
       );
-    `, (dbErr) => {
+    `, (dbErr: Error | null) => {
       if (dbErr) {
         console.error("Failed to initialize settled_clearinghouse SQLite schema:", dbErr.message);
       } else {
@@ -7232,7 +7236,7 @@ function initializeInterbankVault() {
             node_id TEXT NOT NULL,
             last_verified INTEGER NOT NULL
           );
-        `, (bindErr) => {
+        `, (bindErr: Error | null) => {
           if (bindErr) {
             console.error("Failed to initialize node_bindings SQLite schema:", bindErr.message);
           } else {
@@ -8014,7 +8018,7 @@ app.post("/api/v1/interac/finalize", requireAuth, async (req: any, res: any) => 
         `White-Label ${transfer.operation} cleared via ${selected_bank_key} OAuth redirect. Token: ${oauth_authorization_token}`,
         amountDelta
       ],
-      (dbErr) => {
+      (dbErr: Error | null) => {
         if (dbErr) {
           console.error("Failed to insert settled transaction into SQLite audit vault:", dbErr.message);
         }
@@ -8193,7 +8197,7 @@ export async function secureRegisterCard(cardToken: string, nodeID: string, user
     interbankDb.run(
       'INSERT OR REPLACE INTO node_bindings (secure_ref, node_id, last_verified) VALUES (?, ?, ?)',
       [encryptedToken, nodeID, Date.now()],
-      (err) => {
+      (err: Error | null) => {
         if (err) {
           console.error(`[VAULT] Failed to insert node binding for ${nodeID}:`, err.message);
           reject(err);
