@@ -3064,6 +3064,29 @@ function generateKrakenSignature(urlPath: string, nonce: string, postData: strin
   }
 }
 
+async function getLivePriceUSD(symbol: string): Promise<number> {
+  const cleanSymbol = String(symbol || 'ETH').toUpperCase();
+  const fallbacks: Record<string, number> = {
+    BTC: 64200.00,
+    ETH: 3350.00,
+    SOL: 145.00,
+    POL: 0.52,
+    BNB: 575.00,
+    USDC: 1.00,
+    LINK: 15.20,
+    PEPE: 0.0000125,
+    SHIB: 0.0000185
+  };
+  try {
+    const response = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${cleanSymbol}USDT`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.price) return parseFloat(data.price);
+    }
+  } catch {}
+  return fallbacks[cleanSymbol] || 1.0;
+}
+
 /**
  * Execute real order on Coinbase Advanced Trade v3
  */
@@ -3440,7 +3463,10 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
     if (cbKey && cbSecret) {
       try {
         const seed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${isBuy ? 'BUY' : 'SELL'}:${activeSymbol}:${amount}:${fiat}`).trim();
-        const orderResult = await executeCoinbaseOrder(isBuy ? 'BUY' : 'SELL', activeSymbol, amount, fiat, req.user.id, seed);
+        const price = await getLivePriceUSD(activeSymbol);
+        const calculatedFiatAmount = parseFloat(amount) * price;
+        const tradeSize = isBuy ? calculatedFiatAmount.toFixed(2) : String(amount);
+        const orderResult = await executeCoinbaseOrder(isBuy ? 'BUY' : 'SELL', activeSymbol, tradeSize, fiat, req.user.id, seed);
         results.coinbase = { success: true, live: true, data: orderResult };
         executedReal = true;
         orderIdForVerification = orderResult.id || orderResult.order_id;
@@ -7190,7 +7216,8 @@ app.post('/api/coinbase/trade', requireAuth, tradeRateLimiter, requireMfa, async
 
   try {
     const idempotencySeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:${normalizedSide}:${String(symbol)}:${String(amountNum)}:${String(fiatNum)}`).trim();
-    const orderResult = await executeCoinbaseOrder(normalizedSide as 'BUY' | 'SELL', String(symbol), String(amountNum), 'USD', req.user.id, idempotencySeed);
+    const tradeSize = normalizedSide === 'BUY' ? String(fiatNum) : String(amountNum);
+    const orderResult = await executeCoinbaseOrder(normalizedSide as 'BUY' | 'SELL', String(symbol), tradeSize, 'USD', req.user.id, idempotencySeed);
     const orderId = orderResult.id || orderResult.order_id;
 
     await recordLedgerEntry({
