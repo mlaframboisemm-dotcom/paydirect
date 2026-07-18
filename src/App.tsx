@@ -610,7 +610,7 @@ export default function App() {
         if (data.status === 'syncing') {
           setStripePayoutSuccess(data.message || 'Liquidity buffer replenishing. Payout will execute automatically.');
           showToast(data.message || 'Liquidity buffer replenishing.', 'info');
-        } else if (data.status === 'PENDING_EXTERNAL_SETTLEMENT') {
+        } else if (data.status === 'PENDING_EXTERNAL_SETTLEMENT' || data.status === 'PENDING_MANUAL_SETTLEMENT') {
           setStripePayoutSuccess(data.message || 'Payout reserved from ledger and queued for external settlement.');
           showToast(data.message || 'Payout queued for external settlement.', 'info');
         } else {

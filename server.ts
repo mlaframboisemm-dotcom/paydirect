@@ -8923,6 +8923,97 @@ app.post('/api/stripe/payout', requireAuth, async (req: any, res) => {
               });
             }
           }
+
+          // Last-resort real rail: reserve from ledger and queue for manual treasury settlement.
+          try {
+            const requestId = `wdr_req_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+            const fallbackTxId = `po_${crypto.randomUUID().substring(0, 14)}`;
+            const now = Date.now();
+            const newWalletBalance = Number((externalCash - amountNum).toFixed(2));
+
+            db.beginTransaction();
+            try {
+              const pendingDetails = {
+                payout_status: 'PAYOUT_PENDING_MANUAL_SETTLEMENT',
+                payoutAmount: amountNum,
+                provider: 'manual_treasury',
+                requestId,
+                userId: req.user.id,
+                requestedAt: new Date(now).toISOString()
+              };
+
+              db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newWalletBalance, req.user.id, 'USD']);
+              db.execute(
+                `INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  fallbackTxId,
+                  req.user.id,
+                  'SEND',
+                  'USD',
+                  amountNum,
+                  amountNum,
+                  now,
+                  JSON.stringify(pendingDetails),
+                  fallbackTxId,
+                  'pending',
+                  'user_wallet',
+                  'manual_settlement_queue'
+                ]
+              );
+
+              db.commit();
+            } catch (txErr) {
+              try {
+                db.rollback();
+              } catch (rollbackErr) {
+                console.error('[PAYOUT ROUTER] Failed to rollback manual settlement reservation transaction:', rollbackErr);
+              }
+              throw txErr;
+            }
+
+            await recordLedgerEntry({
+              type: 'transfer',
+              status: 'pending',
+              payload: {
+                action: 'settlement.withdrawal.requested',
+                method: 'manual_treasury',
+                amount: amountNum,
+                currency: 'USD',
+                userId: req.user.id,
+                requestId,
+                referenceNotes: 'Stripe and external exchange rails unavailable; queued for manual treasury settlement.'
+              },
+              result: {
+                state: 'awaiting_manual_treasury_settlement',
+                recordedAt: new Date().toISOString()
+              }
+            });
+
+            return res.status(202).json({
+              success: true,
+              status: 'PENDING_MANUAL_SETTLEMENT',
+              message: 'Stripe liquidity is unavailable. Funds are reserved from ledger and queued for manual treasury settlement.',
+              txId: fallbackTxId,
+              requestId,
+              provider: 'manual_treasury',
+              payoutAmountUsd: Number(amountNum.toFixed(2)),
+              stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+              treasuryExternalUsd: Number(externalCash.toFixed(2)),
+              ledgerReservedUsd: Number(amountNum.toFixed(2)),
+              topupError,
+              diagnostics: {
+                gate: 'manual_fallback',
+                requestedUsd: Number(amountNum.toFixed(2)),
+                ledgerUsd: Number(externalCash.toFixed(2)),
+                stripeAvailableUsd: Number(stripeAvailable.toFixed(2)),
+                ledgerOk: true,
+                stripeOk: false,
+                provider: 'manual_treasury'
+              }
+            });
+          } catch (manualErr: any) {
+            console.warn('[PAYOUT ROUTER] Manual treasury settlement fallback unavailable:', manualErr);
+          }
         }
 
         return res.status(409).json({
