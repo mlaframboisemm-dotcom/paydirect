@@ -47,16 +47,24 @@ export interface DBWallet {
 export interface DBTransaction {
   id: string;
   userId: string;
-  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE';
+  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE' | 'WISE_WITHDRAWAL';
   assetSymbol: string;
   amount: number;
   fiatAmount: number;
   timestamp: number;
   details: string;
   hash: string;
-  status: 'pending' | 'completed' | 'failed';
+  status: 'pending' | 'completed' | 'failed' | 'processing' | 'settled';
   ledgerDebit: string;
   ledgerCredit: string;
+  // Wise withdrawal fields (optional, populated only for WISE_WITHDRAWAL type)
+  wiseTransferId?: string;
+  bankRouting?: string;
+  bankAccount?: string;
+  recipientName?: string;
+  wiseProfileId?: string;
+  wiseRecipientId?: string;
+  wiseClearedAt?: string;
 }
 
 export interface DBAuditLog {
@@ -779,6 +787,33 @@ class RelationalLedgerDatabase {
     }
 
     throw new Error(`[LEDGER SQL ENGINE] Unsupported SQL statement or syntax: "${sql}"`);
+  }
+
+  /**
+   * Helper method: Get a transaction by ID
+   */
+  public getTransaction(txId: string): DBTransaction | undefined {
+    const targetState = this.transactionSnapshot || this.state;
+    return targetState.transactions.find(t => t.id === txId);
+  }
+
+  /**
+   * Helper method: Update transaction with partial fields
+   */
+  public updateTransaction(txId: string, updates: Partial<DBTransaction>): void {
+    const targetState = this.transactionSnapshot || this.state;
+    const index = targetState.transactions.findIndex(t => t.id === txId);
+    
+    if (index === -1) {
+      throw new Error(`Transaction not found: ${txId}`);
+    }
+
+    targetState.transactions[index] = {
+      ...targetState.transactions[index],
+      ...updates
+    };
+
+    if (!this.transactionSnapshot) this.save();
   }
 }
 

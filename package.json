@@ -21,6 +21,7 @@
     "test:bootstrap-security": "tsx scripts/test-bootstrap-security.ts",
     "test:auth-api-security": "tsx scripts/test-auth-api-security.ts",
     "test:transaction-security": "tsx scripts/test-transaction-security.ts",
+    "test:wise-live": "tsx test-wise-live.ts",
     "test:extended-suite": "tsx test-extended-suite.ts",
     "test:production-suite": "tsx test-production-suite.ts",
     "test:final-comprehensive": "tsx test-final-comprehensive.ts",
