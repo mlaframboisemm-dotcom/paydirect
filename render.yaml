@@ -14,9 +14,9 @@ services:
       - key: PORT
         value: 3000
       - key: APP_URL
-        value: "https://pay.sovereigns.ca"
+        value: "https://www.pay.sovereigns.ca"
       - key: WISE_WEBHOOK_CALLBACK_URL
-        value: "https://pay.sovereigns.ca/api/withdrawal/wise/webhooks"
+        value: "https://www.pay.sovereigns.ca/api/withdrawal/wise/webhooks"
       - key: WISE_WEBHOOK_PUBLIC_KEY_PATH
         value: "config/wise-webhook-public.pem"
       - key: WISE_CLIENT_ID

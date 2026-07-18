@@ -377,8 +377,7 @@ function resolveBankAuthUrl(bankKey: string, configuredAuthUrl: string | undefin
 }
 
 function resolveBankFacingOperation(appOperation: string): 'DEPOSIT' | 'WITHDRAWAL' {
-  // App-side WITHDRAWAL means funds are deposited into the user's bank account.
-  return String(appOperation || '').toUpperCase() === 'WITHDRAWAL' ? 'DEPOSIT' : 'WITHDRAWAL';
+  return String(appOperation || '').toUpperCase() === 'DEPOSIT' ? 'DEPOSIT' : 'WITHDRAWAL';
 }
 
 async function dispatchStripePayoutToConnectedBank(stripeKey: string, amountUsd: number, userId: string, referenceLabel: string) {
@@ -7891,7 +7890,7 @@ app.post('/api/withdrawal/initiate', requireAuth, withdrawalRateLimiter, validat
       client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
       client_assertion: clientAssertion,
       bank_key: bankId,
-      operation: 'DEPOSIT'
+      operation: resolveBankFacingOperation(operation)
     });
 
     const authorizationUrl = `${resolvedAuthUrl}?${params.toString()}`;

@@ -74,11 +74,11 @@ To successfully deploy and pass the production readiness check on Render, you mu
 
 ### 11. `APP_URL`
 * **Description:** Public production origin used for strict CORS and webhook URL derivation.
-* **Value:** `https://pay.sovereigns.ca`
+* **Value:** `https://www.pay.sovereigns.ca`
 
 ### 12. `WISE_WEBHOOK_CALLBACK_URL`
 * **Description:** Public HTTPS endpoint Wise will call for webhook delivery.
-* **Value:** `https://pay.sovereigns.ca/api/withdrawal/wise/webhooks`
+* **Value:** `https://www.pay.sovereigns.ca/api/withdrawal/wise/webhooks`
 
 ### 13. `WISE_WEBHOOK_PUBLIC_KEY_PATH`
 * **Description:** Local file path where the Wise public signing key PEM will be stored for webhook signature verification.
@@ -113,8 +113,8 @@ COINBASE_API_SECRET_RAW=your_real_coinbase_api_secret_raw_here
 SOVEREIGN_ADMIN_EMAILS=mlaframboisemm@gmail.com
 SOV_PIN=000000
 SOV_TERMINAL_URL=https://ais-dev-vsguby4cvne7edjk3z4bzv-522633331757.us-east1.run.app
-APP_URL=https://pay.sovereigns.ca
-WISE_WEBHOOK_CALLBACK_URL=https://pay.sovereigns.ca/api/withdrawal/wise/webhooks
+APP_URL=https://www.pay.sovereigns.ca
+WISE_WEBHOOK_CALLBACK_URL=https://www.pay.sovereigns.ca/api/withdrawal/wise/webhooks
 WISE_WEBHOOK_PUBLIC_KEY_PATH=config/wise-webhook-public.pem
 WISE_CLIENT_ID=your_wise_client_id_here
 WISE_CLIENT_SECRET=your_wise_client_secret_here
