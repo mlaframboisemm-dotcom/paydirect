@@ -109,6 +109,13 @@ addParagraph(
   '6. Integration Test Regression Coverage: Added contract tests in scripts/test-transaction-security.ts ' +
   'asserting that both unauthenticated and MFA-pending requests are correctly rejected with 401/403.'
 );
+
+addParagraph(
+  '7. Coinbase Advanced Trade Order Sizing Normalization: Normalizes order sizing parameters for the ' +
+  '/api/coinbase/trade and /api/exchanges/trade endpoints. It dynamically resolves current asset pricing ' +
+  'and maps fiatAmount (quote_size) for BUY orders and amount (base_size) for SELL orders, preventing ' +
+  'size validation rejections from the live Coinbase API.'
+);
 yPosition += 4;
 
 // Certification Status
