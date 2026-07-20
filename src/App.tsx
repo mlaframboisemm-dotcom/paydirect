@@ -177,6 +177,7 @@ export default function App() {
   const [isCashModalOpen, setIsCashModalOpen] = useState(false);
   const [cashModalAction, setCashModalAction] = useState<'deposit' | 'withdraw'>('deposit');
   const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
+  const [isHubLoaded, setIsHubLoaded] = useState(false);
 
   // Stripe Hub states
   const [stripeAvailable, setStripeAvailable] = useState<number>(0);
@@ -1878,6 +1879,31 @@ export default function App() {
                 onRefreshBalances={syncCoinbaseBalances}
               />
             </ErrorBoundary>
+          </div>
+        )}
+
+        {/* --- Tab: Unified Finance Hub --- */}
+        {currentTab === 'hub' && (
+          <div className="max-w-7xl mx-auto">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Unified Finance Hub</h3>
+                  <p className="text-xs text-gray-500 mt-1">Integrated ledger and banking hub served directly from the Coinbase backend.</p>
+                </div>
+                <span className="text-[11px] text-gray-500 font-semibold">
+                  {isHubLoaded ? 'Connected to internal hub' : 'Connecting to internal hub...'}
+                </span>
+              </div>
+              <div className="h-[78vh] min-h-[420px]">
+                <iframe
+                  title="Unified Finance Hub"
+                  src={buildApiUrl('/banking-hub')}
+                  className="w-full h-full border-0"
+                  onLoad={() => setIsHubLoaded(true)}
+                />
+              </div>
+            </div>
           </div>
         )}
 
