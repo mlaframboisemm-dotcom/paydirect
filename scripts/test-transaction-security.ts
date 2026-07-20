@@ -64,6 +64,11 @@ async function waitForServerReady(proc: ReturnType<typeof spawn>): Promise<void>
       }
     };
 
+    if (!proc.stdout || !proc.stderr) {
+      reject(new Error('Process streams are unavailable.'));
+      return;
+    }
+
     proc.stdout.on('data', handleData);
     proc.stderr.on('data', handleData);
 
