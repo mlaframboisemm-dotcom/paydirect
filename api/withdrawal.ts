@@ -168,6 +168,82 @@ function parseTransactionDetails(details: string | undefined): any {
   }
 }
 
+function tryParseJson(value: string | undefined): any {
+  const raw = String(value || '').trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function getWalletForUserAsset(userId: string, assetSymbol: string) {
+  const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, assetSymbol]) as any[];
+  return wallets.length > 0 ? wallets[0] : null;
+}
+
+function settleWiseWithdrawalTransaction(txn: any, wiseStatus: string, wiseBalanceSnapshot: any[] = []) {
+  const currentDetails = parseTransactionDetails(txn.details);
+  if (currentDetails?.wiseBalanceUpdatedAt) {
+    return currentDetails;
+  }
+
+  const userId = String(txn.userId || '');
+  const assetSymbol = String(txn.assetSymbol || 'USD').trim().toUpperCase();
+  const amount = Number(txn.amount || 0);
+
+  if (!userId) {
+    throw new Error('TRANSACTION_USER_MISSING: Transaction user information is missing');
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('TRANSACTION_AMOUNT_INVALID: Transaction amount is invalid');
+  }
+
+  const wallet = getWalletForUserAsset(userId, assetSymbol);
+  if (!wallet) {
+    throw new Error(`WALLET_NOT_FOUND: No wallet found for user ${userId} asset ${assetSymbol}`);
+  }
+
+  const previousBalance = Number(wallet.balance || 0);
+  const nextBalance = Number((previousBalance - amount).toFixed(2));
+
+  db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextBalance, userId, assetSymbol]);
+
+  const mergedDetails = {
+    ...currentDetails,
+    wiseStatus,
+    wiseTransferId: String(txn.wiseTransferId || ''),
+    wiseClearedAt: new Date().toISOString(),
+    wiseBalanceSnapshot,
+    wiseBalanceUpdatedAt: new Date().toISOString(),
+    previousLedgerBalance: previousBalance,
+    nextLedgerBalance: nextBalance,
+    ledgerDebit: String(txn.ledgerDebit || 'wallet_balance'),
+    ledgerCredit: String(txn.ledgerCredit || 'wise_outbound')
+  };
+
+  db.updateTransaction(txn.id, {
+    status: 'completed',
+    details: JSON.stringify(mergedDetails),
+    ledgerDebit: String(txn.ledgerDebit || 'wallet_balance'),
+    ledgerCredit: String(txn.ledgerCredit || 'wise_outbound')
+  });
+
+  writeAuditLog('WISE_WITHDRAWAL_SETTLED', 'success', {
+    transactionId: txn.id,
+    userId,
+    amount,
+    assetSymbol,
+    previousBalance,
+    nextBalance,
+    wiseStatus,
+    wiseBalanceSnapshot
+  }, userId, 'withdrawal-router');
+
+  return mergedDetails;
+}
+
 function writeAuditLog(action: string, status: 'success' | 'failure', details: Record<string, any>, userId = 'system:wise', ipAddress = 'wise-webhook') {
   db.execute(
     'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -644,6 +720,105 @@ function requireRouterAuth(req: any, res: any, next: any) {
   });
 }
 
+function requireLedgerApiKey(req: any, res: any, next: any) {
+  const apiKey = String(process.env.LEDGER_API_KEY || '').trim();
+  if (!apiKey) {
+    return next();
+  }
+
+  const headerKey = String(req.header('X-Ledger-Api-Key') || '').trim();
+  if (headerKey !== apiKey) {
+    return res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Missing or invalid ledger API key.'
+    });
+  }
+  return next();
+}
+
+/**
+ * GET /api/withdrawal/ledger/summary
+ * Returns a simple canonical ledger summary for external automation.
+ */
+withdrawalRouter.get('/ledger/summary', requireLedgerApiKey, (_req: any, res: any) => {
+  try {
+    const wallets = db.execute('SELECT * FROM wallets') as any[];
+    const transactions = db.execute('SELECT * FROM transactions') as any[];
+    const balances = wallets.reduce((acc: Record<string, number>, wallet: any) => {
+      const symbol = String(wallet.assetSymbol || 'UNKNOWN');
+      acc[symbol] = (acc[symbol] || 0) + Number(wallet.balance || 0);
+      return acc;
+    }, {});
+
+    return res.status(200).json({
+      success: true,
+      source: 'ledger',
+      asOf: new Date().toISOString(),
+      walletCount: wallets.length,
+      transactionCount: transactions.length,
+      balances
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'LEDGER_SUMMARY_FAILED',
+      message: String(err?.message || 'Failed to read ledger summary.')
+    });
+  }
+});
+
+/**
+ * GET /api/withdrawal/ledger/transactions
+ * Returns ledger transactions for external automation.
+ */
+withdrawalRouter.get('/ledger/transactions', requireLedgerApiKey, (req: any, res: any) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 1000);
+    const offset = Math.max(Number(req.query.offset || 0), 0);
+    const transactions = db.execute('SELECT * FROM transactions') as any[];
+    const paged = transactions.slice(offset, offset + limit);
+
+    return res.status(200).json({
+      success: true,
+      source: 'ledger',
+      asOf: new Date().toISOString(),
+      totalCount: transactions.length,
+      offset,
+      limit,
+      transactions: paged
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'LEDGER_TRANSACTIONS_FAILED',
+      message: String(err?.message || 'Failed to read ledger transactions.')
+    });
+  }
+});
+
+/**
+ * GET /api/withdrawal/ledger/wallets
+ * Returns the current ledger wallets by asset symbol.
+ */
+withdrawalRouter.get('/ledger/wallets', requireLedgerApiKey, (_req: any, res: any) => {
+  try {
+    const wallets = db.execute('SELECT * FROM wallets') as any[];
+    return res.status(200).json({
+      success: true,
+      source: 'ledger',
+      wallets,
+      walletCount: wallets.length
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: 'LEDGER_WALLETS_FAILED',
+      message: String(err?.message || 'Failed to read ledger wallets.')
+    });
+  }
+});
+
 /**
  * POST /api/withdrawal/wise/webhooks
  * Public Wise webhook receiver with RSA signature verification and replay protection.
@@ -973,6 +1148,160 @@ withdrawalRouter.get('/wise-status/:transferId', requireRouterAuth, async (req: 
   }
 });
 
+async function reconcileWiseTransaction(txId: string) {
+  const txn = db.getTransaction(txId);
+  if (!txn) {
+    throw new Error(`NOT_FOUND: Transaction ${txId} not found`);
+  }
+
+  const wiseTransferId = String(txn.wiseTransferId || '').trim();
+  if (!wiseTransferId) {
+    throw new Error('WISE_TRANSFER_ID_MISSING: Transaction has no associated Wise transfer ID');
+  }
+
+  if (!wiseApiEngine) {
+    throw new Error('SERVICE_UNAVAILABLE: Wise integration not configured');
+  }
+
+  const status = await wiseApiEngine.checkTransferStatus(wiseTransferId);
+  const normalizedStatus = String(status.status || '').toLowerCase();
+
+  if (['outgoing_payment_sent', 'completed', 'settled'].includes(normalizedStatus)) {
+    const balanceSnapshot = await wiseApiEngine.getStandardBalances().catch(() => []);
+    const settledDetails = settleWiseWithdrawalTransaction(txn, status.status, balanceSnapshot);
+
+    return {
+      transactionId: txId,
+      wiseTransferId,
+      status: 'completed',
+      wiseStatus: status.status,
+      message: 'Wise transfer has completed and ledger transaction is settled.',
+      details: settledDetails
+    };
+  }
+
+  if (['cancelled', 'rejected', 'failed', 'bounced_back', 'funds_refunded'].includes(normalizedStatus)) {
+    db.updateTransaction(txId, {
+      status: 'failed',
+      details: JSON.stringify({
+        ...(typeof txn.details === 'string' ? tryParseJson(txn.details) : txn.details || {}),
+        wiseStatus: status.status,
+        wiseTransferId,
+        failureReason: `Wise transfer ${status.status}`
+      })
+    });
+
+    return {
+      transactionId: txId,
+      wiseTransferId,
+      status: 'failed',
+      wiseStatus: status.status,
+      message: 'Wise transfer failed and ledger transaction has been marked failed.'
+    };
+  }
+
+  return {
+    transactionId: txId,
+    wiseTransferId,
+    status: 'processing',
+    wiseStatus: status.status,
+    message: 'Wise transfer is still in-flight and the ledger transaction remains processing.'
+  };
+}
+
+/**
+ * POST /api/withdrawal/wise-reconcile/:txId
+ * Reconcile an existing ledger transaction with its Wise transfer status.
+ */
+withdrawalRouter.post('/wise-reconcile/:txId', requireRouterAuth, async (req: any, res: any) => {
+  const { txId } = req.params;
+
+  try {
+    const result = await reconcileWiseTransaction(txId);
+    return res.status(200).json({ success: true, ...result });
+  } catch (err: any) {
+    const rawMessage = String(err?.message || 'Unknown error');
+    let statusCode = 500;
+    let errorCode = 'RECONCILIATION_FAILED';
+    let message = rawMessage;
+
+    if (rawMessage.startsWith('NOT_FOUND:')) {
+      statusCode = 404;
+      errorCode = 'NOT_FOUND';
+      message = rawMessage.split('NOT_FOUND:')[1].trim();
+    } else if (rawMessage.startsWith('WISE_TRANSFER_ID_MISSING:')) {
+      statusCode = 400;
+      errorCode = 'WISE_TRANSFER_ID_MISSING';
+      message = rawMessage.split('WISE_TRANSFER_ID_MISSING:')[1].trim();
+    } else if (rawMessage.startsWith('SERVICE_UNAVAILABLE:')) {
+      statusCode = 503;
+      errorCode = 'SERVICE_UNAVAILABLE';
+      message = rawMessage.split('SERVICE_UNAVAILABLE:')[1].trim();
+    }
+
+    const correlationId = crypto.randomUUID();
+    logger.error('Wise reconciliation failed', { txId, error: sanitizeError(err, correlationId).message });
+    return res.status(statusCode).json({ error: errorCode, message });
+  }
+});
+
+/**
+ * POST /api/withdrawal/wise-reconcile-all
+ * Reconcile all pending or processing Wise withdrawal ledger transactions.
+ */
+withdrawalRouter.post('/wise-reconcile-all', requireRouterAuth, requireLedgerIntegrityForMoneyMovement, async (_req: any, res: any) => {
+  if (!wiseApiEngine) {
+    return res.status(503).json({
+      error: 'SERVICE_UNAVAILABLE',
+      message: 'Wise integration not configured'
+    });
+  }
+
+  try {
+    const transactions = db.execute('SELECT * FROM transactions') as any[];
+    const candidates = transactions.filter((tx) =>
+      String(tx?.type || '') === 'WISE_WITHDRAWAL' &&
+      ['pending', 'processing'].includes(String(tx?.status || '').toLowerCase()) &&
+      String(tx?.wiseTransferId || '').trim().length > 0
+    );
+
+    const results: Array<{ txId: string; status: string; wiseStatus: string; message: string; error?: string }> = [];
+
+    for (const tx of candidates) {
+      try {
+        const outcome = await reconcileWiseTransaction(String(tx.id));
+        results.push({
+          txId: String(tx.id),
+          status: outcome.status,
+          wiseStatus: String(outcome.wiseStatus || ''),
+          message: String(outcome.message || '')
+        });
+      } catch (err: any) {
+        results.push({
+          txId: String(tx.id),
+          status: 'error',
+          wiseStatus: String(tx?.wiseStatus || ''),
+          message: `Reconciliation failed for ${tx.id}`,
+          error: String(err?.message || 'Unknown error')
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      reconciled: results.length,
+      details: results
+    });
+  } catch (err: any) {
+    const correlationId = crypto.randomUUID();
+    logger.error('Bulk Wise reconciliation failed', { error: sanitizeError(err, correlationId).message });
+    return res.status(500).json({
+      error: 'BULK_RECONCILIATION_FAILED',
+      message: sanitizeError(err, correlationId).message
+    });
+  }
+});
+
 /**
  * GET /api/withdrawal/ledger/balance
  * Returns current ledger wallet balances by asset symbol
@@ -1135,21 +1464,35 @@ async function pollWiseTransferStatus(txId: string, wiseTransferId: string) {
 
       const status = await wiseApiEngine.checkTransferStatus(wiseTransferId);
 
-      if (status.status === 'outgoing_payment_sent') {
+      if (['outgoing_payment_sent', 'completed', 'settled'].includes(String(status.status).toLowerCase())) {
         clearInterval(pollInterval);
 
-        // Mark transaction as settled
-        db.execute(
-          `UPDATE transactions SET status = ?, details = ? WHERE id = ?`,
-          ['completed', JSON.stringify({ wiseClearedAt: new Date().toISOString() }), txId]
-        );
+        try {
+          const tx = db.getTransaction(txId);
+          const balanceSnapshot = await wiseApiEngine?.getStandardBalances().catch(() => []) || [];
+          if (tx) {
+            settleWiseWithdrawalTransaction(tx, status.status, balanceSnapshot);
+          } else {
+            db.execute(
+              `UPDATE transactions SET status = ?, details = ? WHERE id = ?`,
+              ['completed', JSON.stringify({ wiseClearedAt: new Date().toISOString(), wiseStatus: status.status }), txId]
+            );
+          }
 
-        logger.info('Direct debit settled successfully', {
-          txId,
-          wiseTransferId,
-          settledAt: new Date().toISOString()
-        });
-      } else if (status.status === 'cancelled' || status.status === 'rejected') {
+          logger.info('Direct debit settled successfully', {
+            txId,
+            wiseTransferId,
+            wiseStatus: status.status,
+            settledAt: new Date().toISOString()
+          });
+        } catch (settleError: any) {
+          logger.error('Failed to settle Wise withdrawal transaction', {
+            txId,
+            wiseTransferId,
+            error: String(settleError?.message || settleError)
+          });
+        }
+      } else if (String(status.status).toLowerCase() === 'cancelled' || String(status.status).toLowerCase() === 'rejected') {
         clearInterval(pollInterval);
 
         // Mark transaction as failed and reset to pending so user can retry

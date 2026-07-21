@@ -51,7 +51,7 @@ export interface WiseRecipientPayload {
 
 export interface WiseTransferStatus {
   id: string;
-  status: 'incoming_payment_waiting' | 'processing' | 'outgoing_payment_sent' | 'cancelled' | 'rejected';
+  status: 'incoming_payment_waiting' | 'processing' | 'outgoing_payment_sent' | 'completed' | 'settled' | 'cancelled' | 'rejected';
   amount: number;
   currency: string;
   createdAt: string;
@@ -808,6 +808,24 @@ export class WiseApiEngine {
    * @param transferId - Wise transfer ID to check
    * @returns Current transfer status
    */
+  async getStandardBalances(): Promise<any[]> {
+    logger.debug('Fetching standard Wise balances');
+    const profileId = await this.getProfileId();
+    const response = await this.wiseFetch(`/v4/profiles/${profileId}/balances?types=STANDARD`, {
+      method: 'GET',
+      headers: this.baseHeaders
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      logger.error('Wise standard balance fetch failed', { status: response.status, error });
+      throw new Error(`Wise balance fetch failed: ${response.status}`);
+    }
+
+    const balanceData = await response.json();
+    return Array.isArray(balanceData) ? balanceData : [];
+  }
+
   async checkTransferStatus(transferId: string): Promise<WiseTransferStatus> {
     logger.debug('Checking transfer status', { transferId });
 
