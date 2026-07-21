@@ -96,3 +96,4 @@ Patch applied by assistant.
 2026-07-16T19:40:50.331Z - DEPOSIT_REJECTED idempotencyKey=deposit-jti-a28d512fb6200ead reason=(0%20%2C%20import_node_fetch.default)%20is%20not%20a%20function
 2026-07-16T19:42:14.798Z - DEPOSIT_INITIATED idempotencyKey=deposit-jti-70bd50cdd5b8e79f amount=250 mode=shim
 2026-07-16T19:42:16.609Z - DEPOSIT_FINALIZED transferId=jti-70bd50cdd5b8e79f referenceId=0x09a630be1794d97e61d8f9a87c493b62f40aec00979df207828fb6f74a54a930 amountUsd=183.15
+2026-07-18T23:59:29.213Z - WITHDRAWAL_FINALIZED transferId=wdr-b5c0a56cecedea4e referenceId=0xb42467753080d8478fd85e38b3082dbeab86b2eb12ded0f4850bfa0f68e0a9bb amountUsd=8.16
