@@ -1893,19 +1893,28 @@ export default function App() {
               <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Unified Finance Hub</h3>
-                  <p className="text-xs text-gray-500 mt-1">Integrated ledger and banking hub served directly from the Coinbase backend.</p>
+                  <p className="text-xs text-gray-500 mt-1">This hub must open in its own browser context for security and bank portal compatibility.</p>
                 </div>
-                <span className="text-[11px] text-gray-500 font-semibold">
-                  {isHubLoaded ? 'Connected to internal hub' : 'Connecting to internal hub...'}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hubUrl = buildApiUrl('/banking-hub');
+                    window.open(hubUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition"
+                >
+                  Open Banking Hub in New Tab
+                </button>
               </div>
-              <div className="h-[78vh] min-h-[420px]">
-                <iframe
-                  title="Unified Finance Hub"
-                  src={buildApiUrl('/banking-hub')}
-                  className="w-full h-full border-0"
-                  onLoad={() => setIsHubLoaded(true)}
-                />
+              <div className="h-[78vh] min-h-[420px] flex items-center justify-center p-6">
+                <div className="max-w-2xl text-center">
+                  <p className="text-sm text-gray-600">
+                    The banking hub cannot be displayed safely inside an embedded frame because external financial portals such as Tangerine block cross-origin framing.
+                  </p>
+                  <p className="text-sm text-gray-600 mt-3">
+                    Click the button above to open the unified finance hub in its own browser tab.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
