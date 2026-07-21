@@ -1,8 +1,11 @@
+/// <reference types="node" />
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import net from 'net';
 import crypto from 'crypto';
+import process from 'process';
+import { Buffer } from 'buffer';
 
 const repoRoot = process.cwd();
 const dbPath = path.join(repoRoot, 'src', 'db', 'database.json');
@@ -72,7 +75,7 @@ async function waitForServerReady(proc: ReturnType<typeof spawn>): Promise<void>
     proc.stdout.on('data', handleData);
     proc.stderr.on('data', handleData);
 
-    proc.on('exit', (code) => {
+    proc.on('exit', (code: number | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);

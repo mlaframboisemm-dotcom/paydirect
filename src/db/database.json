@@ -765,9 +765,74 @@
       "blockchainLinked": true,
       "lockedToEmail": "wise-outbound-test-1784409786555-d2da29ec79f3@test.local",
       "lockedAt": "2026-07-18T21:23:06.558Z"
+    },
+    {
+      "id": "user_mlaframboisemm",
+      "name": "Marcel Laframboise",
+      "email": "mlaframboisemm@gmail.com",
+      "passwordHash": "da86f565013c3e01e3870ff06947804a234182ad70916b6d59236e3d17a4189ac20b79e769d1040b9ffac3210eef9e1d0e2ca55f3025f975b112876fa99b6de0",
+      "salt": "5b079b9b7a3d0bd8ae87266498b51d38",
+      "twoFactorSecret": "W5UGWC7OEGZ44N4Q6APIAPLI",
+      "twoFactorEnabled": false,
+      "kycLevel": 3,
+      "citizenship": "CA",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-18T22:07:24.914Z",
+      "kycFullName": "marcel laframbosie",
+      "kycAddress": "475 albert st",
+      "kycCity": "oshawa",
+      "kycState": "",
+      "kycProvince": "ON",
+      "kycPostalCode": "l1h4s7",
+      "kycTaxId": "0512",
+      "kycPhone": "9057184275",
+      "kycVerifiedAt": "2026-07-21T08:31:01.580Z"
     }
   ],
-  "wallets": [],
+  "wallets": [
+    {
+      "id": "wallet-user_mlaframboisemm-usd",
+      "userId": "user_mlaframboisemm",
+      "assetSymbol": "USD",
+      "balance": 1791091.84,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-18T22:07:24.930Z"
+    },
+    {
+      "id": "wallet-user_mlaframboisemm-usdc",
+      "userId": "user_mlaframboisemm",
+      "assetSymbol": "USDC",
+      "balance": 422611769.18,
+      "publicAddressEthereum": "0x2345678901234567890abcdef1234567890abcd",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-18T22:07:24.930Z"
+    },
+    {
+      "id": "wallet-user_mlaframboisemm-eth",
+      "userId": "user_mlaframboisemm",
+      "assetSymbol": "ETH",
+      "balance": 116998.23,
+      "publicAddressEthereum": "0xabcdef1234567890abcdef1234567890abcdef12",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-18T22:07:24.930Z"
+    }
+  ],
   "transactions": [
     {
       "id": "tx-wise-1784404789550",
