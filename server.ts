@@ -9,7 +9,6 @@ import path from 'path';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import { spawn } from 'child_process';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 // @ts-ignore - ethers v6 has built-in TypeScript support
 import { ethers } from 'ethers';
@@ -5589,6 +5588,73 @@ app.post('/api/admin/ledger/rotate-keys', requireAuth, requireMfa, async (req: a
   }
 });
 
+app.get('/api/admin/ledger/summary', requireAuth, requireMfa, async (req: any, res: any) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'This operation requires admin privileges.' });
+  }
+
+  try {
+    const ledgerPath = process.env.SOVEREIGN_LEDGER_PATH || './ledger_db.json';
+    const ledgerRead = tryReadLedgerFromDisk(ledgerPath);
+    if (!ledgerRead.ok) {
+      return res.status(500).json({ error: 'LEDGER_READ_FAILED', message: ledgerRead.error || 'Unable to read ledger from disk.' });
+    }
+
+    const ledger = ledgerRead.ledger || { entries: [] };
+    const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
+    const ledgerSize = fs.existsSync(ledgerPath) ? fs.statSync(ledgerPath).size : 0;
+    const validSignatures = entries.filter((entry: any) => verifyLedgerEntrySignature(entry)).length;
+
+    return res.json({
+      success: true,
+      ledgerPath,
+      ledgerSize,
+      entryCount: entries.length,
+      validSignatureCount: validSignatures,
+      integrity: entries.length === 0 ? 'EMPTY' : validSignatures === entries.length ? 'VERIFIED' : 'COMPROMISED',
+      sampleEntry: entries.length > 0 ? entries[entries.length - 1] : null
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'LEDGER_SUMMARY_FAILED', message: error?.message || 'Failed to read ledger summary.' });
+  }
+});
+
+app.get('/api/admin/ledger/entries', requireAuth, requireMfa, async (req: any, res: any) => {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'This operation requires admin privileges.' });
+  }
+
+  try {
+    const ledgerPath = process.env.SOVEREIGN_LEDGER_PATH || './ledger_db.json';
+    const ledgerRead = tryReadLedgerFromDisk(ledgerPath);
+    if (!ledgerRead.ok) {
+      return res.status(500).json({ error: 'LEDGER_READ_FAILED', message: ledgerRead.error || 'Unable to read ledger from disk.' });
+    }
+
+    const ledger = ledgerRead.ledger || { entries: [] };
+    const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
+    const limit = Math.min(Math.max(Number(req.query.limit || 50), 1), 1000);
+    const fromIndex = Number(req.query.fromIndex || Math.max(entries.length - limit, 0));
+    const sliceStart = Number.isFinite(fromIndex) ? Math.max(0, fromIndex) : Math.max(entries.length - limit, 0);
+    const selectedEntries = entries.slice(sliceStart, sliceStart + limit).map((entry: any) => ({
+      ...entry,
+      _hmacSignatureVerified: verifyLedgerEntrySignature(entry)
+    }));
+
+    return res.json({
+      success: true,
+      ledgerPath,
+      entryCount: entries.length,
+      limit,
+      fromIndex: sliceStart,
+      returnedCount: selectedEntries.length,
+      entries: selectedEntries
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'LEDGER_ENTRIES_FAILED', message: error?.message || 'Failed to read ledger entries.' });
+  }
+});
+
 app.post('/api/admin/payouts/process-queue', requireAuth, requireMfa, async (req: any, res) => {
   if (!isAdminRequest(req)) {
     return res.status(403).json({ error: 'ADMIN_REQUIRED', message: 'This operation requires admin privileges.' });
@@ -9706,6 +9772,7 @@ async function startServer() {
   app.use('/banking-hub', express.static(path.join(process.cwd(), 'sovereigns-banking-hub', 'frontend')));
 
   if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
