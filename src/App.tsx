@@ -792,6 +792,9 @@ export default function App() {
 
   // Auto-login to mlaframboisemm@gmail.com on startup
   useEffect(() => {
+    const enableAutoLogin = import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEV_AUTO_LOGIN === 'true';
+    if (!enableAutoLogin) return;
+
     const autoLogin = async () => {
       const hasToken = hasSessionToken();
       const explicitLogout = localStorage.getItem('cb_explicit_logout') === 'true';
@@ -801,7 +804,8 @@ export default function App() {
         try {
           const response = await fetch(buildApiUrl('/api/auth/auto-login'), {
             method: 'POST',
-            headers: buildAuthHeaders({ 'Content-Type': 'application/json' })
+            headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'include'
           });
           if (response.ok) {
             const data = await response.json();

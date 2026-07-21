@@ -5369,23 +5369,43 @@ function getCookieValue(req: any, cookieName: string): string | null {
   return decodeURIComponent(match.substring(cookieName.length + 1));
 }
 
+function getAppUrlOrigin(): string {
+  try {
+    return process.env.APP_URL ? new URL(process.env.APP_URL).origin : '';
+  } catch {
+    return '';
+  }
+}
+
+function isSameOriginRequest(req: any): boolean {
+  const originHeader = String(req.headers?.origin || '').trim();
+  if (originHeader) {
+    return originHeader === getAppUrlOrigin();
+  }
+  const refererHeader = String(req.headers?.referer || req.headers?.referrer || '').trim();
+  if (refererHeader) {
+    return refererHeader.startsWith(getAppUrlOrigin());
+  }
+  return false;
+}
+
 function getRequestToken(req: any): string | null {
   const cookieToken = getCookieValue(req, 'cb_session');
   if (cookieToken) {
     return cookieToken;
   }
 
-  if (IS_PRODUCTION) {
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      console.warn('[AUTH] Rejecting Authorization header in production: cookie-based session required.');
-    }
-    return null;
-  }
-
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1];
+    if (IS_PRODUCTION) {
+      if (isSameOriginRequest(req)) {
+        return token;
+      }
+      console.warn('[AUTH] Rejecting Authorization header in production for cross-origin requests.');
+      return null;
+    }
+    return token;
   }
   return null;
 }
