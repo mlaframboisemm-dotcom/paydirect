@@ -126,7 +126,7 @@ async def compile_bank_oauth_redirect_uri(bank_key: str, transfer_id: str, reque
     base_portal_uri = f"{request_origin}/banking-hub/mock-login.html"
     callback_base = f"{request_origin}/api/v1/interac/callback"
     
-    secure_transport_url = f"{base_portal_uri}?client_id=sovereigns_hub&redirect_uri={callback_base}?transfer_id={transfer_id}&bank_key={matched_key}&state={transfer_id}"
+    secure_transport_url = f"{base_portal_uri}?client_id=sovereigns_hub&redirect_uri={callback_base}&bank_key={matched_key}&state={transfer_id}"
     return {"target_redirect_url": secure_transport_url}
 
 

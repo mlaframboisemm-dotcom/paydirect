@@ -3717,11 +3717,14 @@ app.post('/api/exchanges/swap', requireAuth, tradeRateLimiter, requireMfa, requi
     if (cbKey && cbSecret) {
       try {
         const sellSeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_SELL:${fromAsset}:${amount}:USD`).trim();
-        const buySeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_BUY:${toAsset}:${amount}:USD`).trim();
+        const priceFrom = await getLivePriceUSD(fromAsset);
+        const usdProceeds = Number(amount) * priceFrom;
+        const buySeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_BUY:${toAsset}:${usdProceeds}:USD`).trim();
+        
         // Sell fromAsset for USD
         const sellResult = await executeCoinbaseOrder('SELL', fromAsset, amount, 'USD', req.user.id, sellSeed);
-        // Buy toAsset with USD
-        const buyResult = await executeCoinbaseOrder('BUY', toAsset, amount, 'USD', req.user.id, buySeed);
+        // Buy toAsset with USD proceeds
+        const buyResult = await executeCoinbaseOrder('BUY', toAsset, String(usdProceeds), 'USD', req.user.id, buySeed);
         results.coinbase = { success: true, live: true, sell: sellResult, buy: buyResult };
         executedReal = true;
       } catch (err: any) {
@@ -3743,9 +3746,14 @@ app.post('/api/exchanges/swap', requireAuth, tradeRateLimiter, requireMfa, requi
     if (krKey && krSecret) {
       try {
         const sellSeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_SELL:${fromAsset}:${amount}:USD`).trim();
-        const buySeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_BUY:${toAsset}:${amount}:USD`).trim();
+        const priceFrom = await getLivePriceUSD(fromAsset);
+        const priceTo = await getLivePriceUSD(toAsset);
+        const usdProceeds = Number(amount) * priceFrom;
+        const toAssetVolume = usdProceeds / priceTo;
+        const buySeed = String(req.headers['x-idempotency-key'] || `${req.user.id}:SWAP_BUY:${toAsset}:${toAssetVolume}:USD`).trim();
+
         const sellResult = await executeKrakenOrder('sell', fromAsset, amount, 'USD', req.user.id, sellSeed);
-        const buyResult = await executeKrakenOrder('buy', toAsset, amount, 'USD', req.user.id, buySeed);
+        const buyResult = await executeKrakenOrder('buy', toAsset, String(toAssetVolume), 'USD', req.user.id, buySeed);
         results.kraken = { success: true, live: true, sell: sellResult, buy: buyResult };
         executedReal = true;
       } catch (err: any) {
@@ -6651,7 +6659,7 @@ async function getSovereignsGatewayBalanceAdjustment() {
           const payload = entry.payload || {};
           const amount = payload.amount || 0;
           
-          if (type === 'transfer' && payload.method === 'bank') {
+          if (type === 'transfer' && (payload.method === 'bank' || payload.method === 'wallet_send')) {
             if (payload.action === 'settlement.withdrawal') {
               adjustment -= amount;
             } else if (payload.action === 'settlement.deposit') {
@@ -6699,7 +6707,7 @@ async function getTransactionsFromLedger() {
             const action = payload.action || '';
             const method = payload.method || '';
             
-            if (action === 'settlement.withdrawal' || method === 'bank' || method === 'atm_cashout' || method === 'etransfer_withdraw' || method === 'bank_withdraw') {
+            if (action === 'settlement.withdrawal' || method === 'bank_withdraw' || method === 'atm_cashout' || method === 'etransfer_withdraw') {
               list.push({
                 id: entry.id,
                 type: 'SEND',
@@ -7439,7 +7447,7 @@ app.post('/api/coinbase/send', requireAuth, tradeRateLimiter, requireMfa, requir
         success: true,
         hash: txHash,
         from: wallet.address,
-        to: toAddress,
+        to: targetAddress,
         amount
       });
     } else {
@@ -8276,7 +8284,7 @@ app.get("/api/v1/interac/oauth-url/:bank_key", (req: any, res: any) => {
   const basePortalUrl = CANADIAN_INTERBANK_DIRECTORY[matchedKey];
   const qs = new URLSearchParams({
     client_id: 'sovereigns_hub',
-    redirect_uri: `${callbackBase}?transfer_id=${transfer_id}`,
+    redirect_uri: callbackBase,
     amount: amountStr,
     operation_type: operationTypeStr,
     bank_key: matchedKey,
