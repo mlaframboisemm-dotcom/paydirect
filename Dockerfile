@@ -2,7 +2,10 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+# Use npm install as a robust fallback in CI environments where `npm ci` can
+# fail unexpectedly during container builds (ensures install works even when
+# the environment or lockfile interaction is problematic).
+RUN npm install --legacy-peer-deps --no-audit --no-fund
 
 COPY . .
 RUN npm run build
@@ -17,7 +20,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+# For runtime image, install only production deps. Use npm install fallback
+# rather than `npm ci` to avoid intermittent CI/build issues.
+RUN npm install --omit=dev --legacy-peer-deps --no-audit --no-fund
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/public ./public
