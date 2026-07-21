@@ -38,7 +38,7 @@ COPY --from=builder /app/etransfers.json ./etransfers.json
 
 # Create Python virtual environment and install dependencies inside it
 # This avoids PEP 668 system-package-manager restrictions and utilizes precompiled wheels
-RUN python3 -m venv /app/sovereigns-banking-hub/backend/venv && /app/sovereigns-banking-hub/backend/venv/bin/pip install --upgrade pip && /app/sovereigns-banking-hub/backend/venv/bin/pip install -r /app/sovereigns-banking-hub/backend/requirements.txt
+RUN ["/bin/sh","-lc","python3 -m venv /app/sovereigns-banking-hub/backend/venv && /app/sovereigns-banking-hub/backend/venv/bin/pip install --upgrade pip && /app/sovereigns-banking-hub/backend/venv/bin/pip install -r /app/sovereigns-banking-hub/backend/requirements.txt"]
 
 EXPOSE 3000
 CMD ["node", "dist/server.cjs"]
