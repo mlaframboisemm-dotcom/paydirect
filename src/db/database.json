@@ -757,14 +757,23 @@
       "passwordHash": "TestPassword123!@#",
       "salt": "",
       "twoFactorSecret": "",
-      "twoFactorEnabled": 0,
+      "twoFactorEnabled": false,
       "kycLevel": 1,
       "citizenship": "US",
       "identityLocked": true,
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "wise-outbound-test-1784409786555-d2da29ec79f3@test.local",
-      "lockedAt": "2026-07-18T21:23:06.558Z"
+      "lockedAt": "2026-07-18T21:23:06.558Z",
+      "kycFullName": "",
+      "kycAddress": "",
+      "kycCity": "",
+      "kycState": "",
+      "kycProvince": "",
+      "kycPostalCode": "",
+      "kycTaxId": "",
+      "kycPhone": "",
+      "kycVerifiedAt": ""
     },
     {
       "id": "user_mlaframboisemm",
@@ -790,6 +799,22 @@
       "kycTaxId": "0512",
       "kycPhone": "9057184275",
       "kycVerifiedAt": "2026-07-21T08:31:01.580Z"
+    },
+    {
+      "id": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "name": "Tangerine Redirect",
+      "email": "tg-redirect-1784674195738@example.com",
+      "passwordHash": "9b6feedaaf785f6b671253881d492c494f61a371cb583546020a626861996890c8bfe528a5ce25aae77c82ba8cdd12186355913a3664ef5e140caff9c3f9a375",
+      "salt": "09c30e9f5af23b7ae6277a25a1500aaf",
+      "twoFactorSecret": "ZEEX5L3O4IMODSQR6PZ62HSB",
+      "twoFactorEnabled": false,
+      "kycLevel": 1,
+      "citizenship": "CA",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1784674195738@example.com",
+      "lockedAt": "2026-07-21T22:49:56.206Z"
     }
   ],
   "wallets": [
@@ -797,7 +822,7 @@
       "id": "wallet-user_mlaframboisemm-usd",
       "userId": "user_mlaframboisemm",
       "assetSymbol": "USD",
-      "balance": 1791091.84,
+      "balance": 1789980.73,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -831,6 +856,19 @@
       "blockchainLinked": true,
       "lockedToEmail": "mlaframboisemm@gmail.com",
       "lockedAt": "2026-07-18T22:07:24.930Z"
+    },
+    {
+      "id": "wallet-user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e-usd",
+      "userId": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "assetSymbol": "USD",
+      "balance": 0,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1784674195738@example.com",
+      "lockedAt": "2026-07-21T22:49:56.232Z"
     }
   ],
   "transactions": [
@@ -1269,5 +1307,42 @@
       "ledgerCredit": 0
     }
   ],
-  "auditLogs": []
+  "auditLogs": [
+    {
+      "id": "audit_31ad28e0-44b5-4587-9efe-af0083e53e00",
+      "userId": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784674196224,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1784674195738@example.com in live production mode."
+    },
+    {
+      "id": "audit_06dc3164-5ac2-4b48-ba82-3f5dd6bd11fd",
+      "userId": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "action": "REGISTER",
+      "timestamp": 1784674196237,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Self-service registration completed for tg-redirect-1784674195738@example.com"
+    },
+    {
+      "id": "audit_b123c1da-3562-498b-86c8-19234ed67354",
+      "userId": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784674196590,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1784674195738@example.com in live production mode."
+    },
+    {
+      "id": "audit_a54ff3f0-547b-4647-813a-1c2169970d42",
+      "userId": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
+      "action": "LOGIN",
+      "timestamp": 1784674196613,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    }
+  ]
 }

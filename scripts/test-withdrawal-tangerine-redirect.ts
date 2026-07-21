@@ -9,6 +9,15 @@ async function run() {
   process.env.NODE_ENV = 'production';
   process.env.PORT = '4011';
   process.env.BYPASS_EMAIL_VERIFICATION = 'true';
+  if (!process.env.SOVEREIGN_ENCRYPTION_KEY) {
+    process.env.SOVEREIGN_ENCRYPTION_KEY = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  }
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  }
+  if (!process.env.SOVEREIGN_ADMIN_EMAILS) {
+    process.env.SOVEREIGN_ADMIN_EMAILS = 'admin@secure.local';
+  }
 
   await import('../server.ts');
   await new Promise((resolve) => setTimeout(resolve, 4500));
