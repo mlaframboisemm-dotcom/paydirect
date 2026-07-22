@@ -798,7 +798,7 @@
       "kycPostalCode": "l1h4s7",
       "kycTaxId": "0512",
       "kycPhone": "9057184275",
-      "kycVerifiedAt": "2026-07-22T08:08:23.908Z"
+      "kycVerifiedAt": "2026-07-22T08:20:21.193Z"
     },
     {
       "id": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
@@ -2269,6 +2269,87 @@
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_5a54ab27-29fa-4ee7-b582-4bf0b3c79546",
+      "userId": "system",
+      "action": "RECONCILIATION_AUDIT_SUCCESS",
+      "timestamp": 1784708431491,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
+    },
+    {
+      "id": "audit_3518c0b8-ab56-4a8d-96f1-7ff785d06d1f",
+      "userId": "user_mlaframboisemm",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784708440393,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_20373c68-acb4-47c4-8f76-3fa4679e1e90",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1784708440394,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_a34758d0-0edb-4870-8ab0-2ddb44c53e2f",
+      "userId": "user_mlaframboisemm",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784708451610,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_e9121614-748c-4d22-ba2e-19f9a68f218f",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1784708451611,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_7b6c4967-c0ec-447a-9c73-90cfa93897e8",
+      "userId": "user_mlaframboisemm",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784708462405,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_cb9bc90f-148f-4360-ae90-b63d1693fdde",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1784708462406,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_d835d3fe-d2fd-4e03-8be5-7feffe88be1c",
+      "userId": "user_mlaframboisemm",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784708470893,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
+    },
+    {
+      "id": "audit_83efef04-d763-4ea1-a31d-ac723a0c43b0",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1784708470894,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
     }
   ]
 }

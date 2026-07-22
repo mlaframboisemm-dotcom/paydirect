@@ -10145,6 +10145,142 @@ async function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // GOOGLE WALLET PASS ROUTES
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/sovereign/wallet-pass — Generate Add to Google Wallet JWT + pass page
+  app.get('/api/sovereign/wallet-pass', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user.id;
+      const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+      const usdWallet = wallets.find((w: any) => w.asset_symbol === 'USD');
+      const usdBalance = Number(usdWallet?.balance || 0);
+
+      // Build top holdings
+      const PRICES: Record<string, number> = { BTC: 66000, ETH: 1919, SOL: 77.29, BNB: 310, USDC: 1, USDT0: 1, USDF: 1, LINK: 8.63, PEPE: 0.0000247, SHIB: 0.0000085, POL: 0.37, HYPE: 12.5, LEO: 5.5, MXNT: 0.052, LIF3: 0.0015, XAUT: 2400 };
+      const topHoldings = wallets
+        .filter((w: any) => w.asset_symbol !== 'USD' && Number(w.balance) > 0)
+        .map((w: any) => ({ symbol: w.asset_symbol, amount: Number(w.balance), usdValue: Number(w.balance) * (PRICES[w.asset_symbol] || 1) }))
+        .sort((a: any, b: any) => b.usdValue - a.usdValue)
+        .slice(0, 6);
+
+      const totalPortfolioUsd = wallets.reduce((sum: number, w: any) => {
+        if (w.asset_symbol === 'USD') return sum + Number(w.balance);
+        return sum + Number(w.balance) * (PRICES[w.asset_symbol] || 1);
+      }, 0);
+
+      const passData = {
+        userId: String(userId),
+        userName: req.user.name || req.user.fullName || 'Marcel Laframboise',
+        userEmail: req.user.email,
+        usdBalance,
+        totalPortfolioUsd,
+        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
+        topHoldings
+      };
+
+      const { generateSovereignWalletPassJWT, getAddToWalletUrl, generatePassQRCode, buildPassPageHTML } = await import('./src/lib/google-wallet-pass.js');
+      const passJWT = generateSovereignWalletPassJWT(passData);
+      const addToWalletUrl = getAddToWalletUrl(passJWT);
+      const qrDataUrl = await generatePassQRCode(passData);
+
+      // Return JSON with all pass data
+      if (req.query.format === 'html') {
+        const html = buildPassPageHTML(passData, qrDataUrl);
+        return res.type('html').send(html);
+      }
+
+      return res.json({
+        success: true,
+        addToWalletUrl,
+        passJWT: passJWT.substring(0, 50) + '...',
+        qrDataUrl,
+        passData: {
+          userName: passData.userName,
+          usdBalance: passData.usdBalance,
+          totalPortfolioUsd: passData.totalPortfolioUsd,
+          topHoldings: passData.topHoldings,
+          walletAddress: passData.walletAddress
+        },
+        merchantId: 'BCR2DN5T43O5JIZE',
+        merchantName: 'Aegis Sovereign Protocol'
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'WALLET_PASS_ERROR', message: e.message });
+    }
+  });
+
+  // GET /api/sovereign/wallet-pass/qr — Get just the QR code image
+  app.get('/api/sovereign/wallet-pass/qr', requireAuth, async (req: any, res: any) => {
+    try {
+      const userId = req.user.id;
+      const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+      const usdWallet = wallets.find((w: any) => w.asset_symbol === 'USD');
+      const { generatePassQRCode } = await import('./src/lib/google-wallet-pass.js');
+      const qrDataUrl = await generatePassQRCode({
+        userId: String(userId),
+        userName: req.user.name || 'Marcel Laframboise',
+        userEmail: req.user.email,
+        usdBalance: Number(usdWallet?.balance || 0),
+        totalPortfolioUsd: 0,
+        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
+        topHoldings: []
+      });
+      // Return as PNG image
+      const base64Data = qrDataUrl.replace(/^data:image\/png;base64,/, '');
+      const imgBuffer = Buffer.from(base64Data, 'base64');
+      res.set('Content-Type', 'image/png');
+      return res.send(imgBuffer);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'QR_ERROR', message: e.message });
+    }
+  });
+
+  // POST /api/sovereign/wallet-pass/scan — Process a QR scan payment
+  app.post('/api/sovereign/wallet-pass/scan', async (req: any, res: any) => {
+    try {
+      const { qrPayload, amount, currency = 'CAD', merchantName } = req.body;
+      let scanData: any = {};
+      try { scanData = typeof qrPayload === 'string' ? JSON.parse(qrPayload) : qrPayload; } catch { scanData = { raw: qrPayload }; }
+
+      if (scanData.type !== 'sovereign_pay') {
+        return res.status(400).json({ error: 'INVALID_QR', message: 'Not a Sovereign PayDirect QR code' });
+      }
+
+      const userId = scanData.userId;
+      const amtNum = Number(amount);
+      const amtUsd = currency === 'CAD' ? amtNum / 1.40895 : amtNum;
+
+      const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
+      const currentBal = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
+      if (currentBal < amtUsd) {
+        return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: `Insufficient balance: $${currentBal.toFixed(2)} USD available` });
+      }
+
+      const newBal = currentBal - amtUsd;
+      db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBal, userId, 'USD']);
+
+      const txId = `scan_${crypto.randomUUID()}`;
+      db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [txId, userId, 'WALLET_SCAN_PAY', 'USD', amtUsd, amtUsd, Date.now(),
+         `Google Wallet Scan Pay: ${currency} ${amtNum} at ${merchantName || 'merchant'}`,
+         txId, 'completed']);
+
+      return res.json({
+        success: true,
+        txId,
+        amount: amtNum,
+        currency,
+        amtUsd,
+        newLedgerBalance: newBal,
+        message: `Payment of ${currency} ${amtNum} processed from sovereign ledger`
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'SCAN_PAY_ERROR', message: e.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   // WISE LIVE INTEGRATION ROUTES
   // ═══════════════════════════════════════════════════════════════════
 
