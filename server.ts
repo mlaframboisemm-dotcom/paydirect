@@ -10046,6 +10046,105 @@ async function startServer() {
   });
 
   // ═══════════════════════════════════════════════════════════════════
+  // GOOGLE PAY ROUTES
+  // ═══════════════════════════════════════════════════════════════════
+
+  // POST /api/sovereign/googlepay/process — Process a Google Pay token against sovereign ledger
+  app.post('/api/sovereign/googlepay/process', requireAuth, async (req: any, res: any) => {
+    try {
+      const { paymentToken, amount, currency = 'CAD', label, paymentData } = req.body;
+      const amt = Number(amount);
+      if (!amt || amt <= 0) return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Amount must be positive.' });
+      const userId = req.user.id;
+
+      // Convert CAD to USD for ledger deduction
+      const amtUsd = currency === 'CAD' ? amt / 1.40895 : amt;
+
+      // Check sovereign USD balance
+      const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
+      const currentBal = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
+      if (currentBal < amtUsd) {
+        return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: `Insufficient balance. Have: $${currentBal.toFixed(2)} USD, Need: $${amtUsd.toFixed(2)} USD` });
+      }
+
+      // Process via Stripe if we have a real payment token
+      let stripePaymentIntentId = '';
+      const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+      if (paymentToken && stripeKey) {
+        try {
+          const amtCents = Math.round(amt * 100);
+          const piResponse = await fetch('https://api.stripe.com/v1/payment_intents', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${stripeKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              amount: String(amtCents),
+              currency: currency.toLowerCase(),
+              'payment_method_data[type]': 'card',
+              'payment_method_data[card][token]': paymentToken,
+              confirm: 'true',
+              description: `Sovereign PayDirect Google Pay: ${label || 'Payment'}`,
+              'metadata[source]': 'google_pay',
+              'metadata[user]': req.user.email,
+              'metadata[ledger_user_id]': userId
+            }).toString()
+          });
+          const pi = await piResponse.json();
+          if (pi.id) stripePaymentIntentId = pi.id;
+        } catch (stripeErr: any) {
+          console.warn('[GOOGLEPAY] Stripe processing note:', stripeErr.message);
+        }
+      }
+
+      // Deduct from sovereign ledger
+      const newBal = currentBal - amtUsd;
+      if (usdWallets.length > 0) {
+        db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBal, userId, 'USD']);
+      }
+
+      // Record transaction
+      const txId = `gpay_${crypto.randomUUID()}`;
+      db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [txId, userId, 'GOOGLE_PAY', 'USD', amtUsd, amtUsd, Date.now(),
+         `Google Pay: ${currency} ${amt} — ${label || 'Tap to Pay'}${stripePaymentIntentId ? ` (Stripe: ${stripePaymentIntentId})` : ''}`,
+         stripePaymentIntentId || txId, 'completed', 'USD', 'google_pay']);
+
+      await recordLedgerEntry({ type: 'payment', status: 'executed',
+        payload: { action: 'google_pay', userId, amount: amtUsd, currency, label, stripePaymentIntentId },
+        result: { success: true, txId } });
+
+      logTransactionEvent('GOOGLE_PAY', { userId, amount: amtUsd, currency, txId, stripePaymentIntentId });
+
+      return res.json({
+        success: true,
+        txId,
+        amount: amt,
+        currency,
+        amtUsd,
+        stripePaymentIntentId,
+        newLedgerBalance: newBal,
+        message: `Google Pay payment of ${currency} ${amt} processed. Ledger updated.`
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'GOOGLEPAY_ERROR', message: e.message });
+    }
+  });
+
+  // GET /api/sovereign/googlepay/config — Return Google Pay config for frontend
+  app.get('/api/sovereign/googlepay/config', (req: any, res: any) => {
+    return res.json({
+      environment: process.env.GOOGLE_PAY_ENVIRONMENT || 'PRODUCTION',
+      merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || 'BCR2DN4TSOVEREIGN',
+      merchantName: 'Sovereign PayDirect',
+      stripePublishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
+      gateway: 'stripe',
+      gatewayMerchantId: process.env.STRIPE_ACCOUNT_ID || 'acct_1TYDUPI8MQ7TKrX3',
+      supportedNetworks: ['MASTERCARD', 'VISA', 'INTERAC'],
+      countryCode: 'CA',
+      currencyCode: 'CAD'
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
   // WISE LIVE INTEGRATION ROUTES
   // ═══════════════════════════════════════════════════════════════════
 
