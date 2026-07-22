@@ -41,8 +41,8 @@ const GOOGLE_PAY_CONFIG = {
     }
   }],
   merchantInfo: {
-    merchantId: 'BCR2DN4TSOVEREIGN',
-    merchantName: 'Sovereign PayDirect'
+    merchantId: 'BCR2DN5T43O5JIZE',
+    merchantName: 'Aegis Sovereign Protocol'
   }
 };
 
@@ -76,7 +76,7 @@ export function GooglePayButton({
     try {
       const client = new (window as any).google.payments.api.PaymentsClient({
         environment: 'PRODUCTION',
-        merchantInfo: GOOGLE_PAY_CONFIG.merchantInfo,
+        merchantInfo: { merchantId: 'BCR2DN5T43O5JIZE', merchantName: 'Aegis Sovereign Protocol' },
         paymentDataCallbacks: {
           onPaymentAuthorized: onPaymentAuthorized
         }

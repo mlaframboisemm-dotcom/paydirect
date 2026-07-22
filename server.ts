@@ -10133,8 +10133,8 @@ async function startServer() {
   app.get('/api/sovereign/googlepay/config', (req: any, res: any) => {
     return res.json({
       environment: process.env.GOOGLE_PAY_ENVIRONMENT || 'PRODUCTION',
-      merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || 'BCR2DN4TSOVEREIGN',
-      merchantName: 'Sovereign PayDirect',
+      merchantId: process.env.GOOGLE_PAY_MERCHANT_ID || 'BCR2DN5T43O5JIZE',
+      merchantName: 'Aegis Sovereign Protocol',
       stripePublishableKey: process.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
       gateway: 'stripe',
       gatewayMerchantId: process.env.STRIPE_ACCOUNT_ID || 'acct_1TYDUPI8MQ7TKrX3',
