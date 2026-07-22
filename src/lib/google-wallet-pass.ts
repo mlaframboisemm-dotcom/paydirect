@@ -31,7 +31,7 @@ export interface WalletPassData {
  * Generate a Google Wallet Loyalty Pass JWT for the sovereign ledger
  * This creates an "Add to Google Wallet" link
  */
-export function generateSovereignWalletPassJWT(data: WalletPassData): string {
+export async function generateSovereignWalletPassJWT(data: WalletPassData): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const objectId = `${ISSUER_ID}.sovereign_${data.userId}_${now}`;
 
@@ -180,15 +180,26 @@ export function generateSovereignWalletPassJWT(data: WalletPassData): string {
     }
   };
 
-  // Sign with service account private key or RS256
-  const privateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY ||
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY ||
-    generateFallbackKey();
+  // Load service account private key from file or env
+  let privateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY || '';
+  
+  if (!privateKey) {
+    try {
+      const keyFile = process.env.GOOGLE_WALLET_KEY_FILE || '/home/ubuntu/paydirect/config/google-wallet-service-account.json';
+      const fs = await import('fs');
+      const keyData = JSON.parse(fs.default.readFileSync(keyFile, 'utf8'));
+      privateKey = keyData.private_key;
+      // Update issuer from service account email
+      payload.iss = keyData.client_email;
+    } catch (e) {
+      privateKey = generateFallbackKey();
+    }
+  }
 
   try {
     return jwt.sign(payload, privateKey, { algorithm: 'RS256' });
   } catch (e) {
-    // Fallback: use HS256 with a secret (works for testing, not for production Google Wallet)
+    // Fallback: use HS256 with a secret
     return jwt.sign(payload, 'sovereign-fallback-secret-' + MERCHANT_ID, { algorithm: 'HS256' });
   }
 }

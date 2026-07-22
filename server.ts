@@ -10180,7 +10180,7 @@ async function startServer() {
       };
 
       const { generateSovereignWalletPassJWT, getAddToWalletUrl, generatePassQRCode, buildPassPageHTML } = await import('./src/lib/google-wallet-pass.js');
-      const passJWT = generateSovereignWalletPassJWT(passData);
+      const passJWT = await generateSovereignWalletPassJWT(passData);
       const addToWalletUrl = getAddToWalletUrl(passJWT);
       const qrDataUrl = await generatePassQRCode(passData);
 
