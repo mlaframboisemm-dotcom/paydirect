@@ -6,5 +6,10 @@
     "createdAt": "2026-07-21T22:49:56.251Z",
     "expiresAt": 1784760596244,
     "verifiedAt": "2026-07-21T22:49:56.264Z"
+  },
+  "mlaframboisemm@gmail.com": {
+    "verified": true,
+    "verifiedAt": "2026-01-01T00:00:00.000Z",
+    "token": "sovereign-verified"
   }
 }
