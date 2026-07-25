@@ -183,6 +183,39 @@ function getWalletForUserAsset(userId: string, assetSymbol: string) {
   return wallets.length > 0 ? wallets[0] : null;
 }
 
+function getWalletsForUserAsset(userId: string, assetSymbol: string) {
+  return db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, assetSymbol]) as any[];
+}
+
+function insertLedgerWallet(wallet: {
+  id: string;
+  userId: string;
+  assetSymbol: string;
+  balance: number;
+  publicAddressEthereum?: string;
+  publicAddressBitcoin?: string;
+  identityLocked?: boolean;
+  productionMode?: string;
+  blockchainLinked?: boolean;
+  lockedToEmail?: string;
+}) {
+  db.execute(
+    'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      wallet.id,
+      wallet.userId,
+      wallet.assetSymbol,
+      wallet.balance,
+      wallet.publicAddressEthereum || '',
+      wallet.publicAddressBitcoin || '',
+      wallet.identityLocked !== false,
+      String(wallet.productionMode || 'live'),
+      wallet.blockchainLinked !== false,
+      String(wallet.lockedToEmail || '')
+    ]
+  );
+}
+
 function settleWiseWithdrawalTransaction(txn: any, wiseStatus: string, wiseBalanceSnapshot: any[] = []) {
   const currentDetails = parseTransactionDetails(txn.details);
   if (currentDetails?.wiseBalanceUpdatedAt) {
@@ -815,6 +848,103 @@ withdrawalRouter.get('/ledger/wallets', requireLedgerApiKey, (_req: any, res: an
       success: false,
       error: 'LEDGER_WALLETS_FAILED',
       message: String(err?.message || 'Failed to read ledger wallets.')
+    });
+  }
+});
+
+/**
+ * POST /api/withdrawal/ledger/wallets/migrate-to-new
+ * Creates a new wallet for the authenticated user and moves all existing balances
+ * for the requested asset symbol into the new wallet.
+ */
+withdrawalRouter.post('/ledger/wallets/migrate-to-new', requireRouterAuth, requireLedgerIntegrityForMoneyMovement, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  const assetSymbol = String(req.body?.assetSymbol || '').trim().toUpperCase();
+  const targetWalletId = String(req.body?.walletId || `wallet_${crypto.randomUUID()}`);
+  const publicAddressEthereum = String(req.body?.publicAddressEthereum || '').trim();
+  const publicAddressBitcoin = String(req.body?.publicAddressBitcoin || '').trim();
+
+  if (!userId) {
+    return res.status(401).json({
+      error: 'UNAUTHORIZED',
+      message: 'Authentication required'
+    });
+  }
+
+  if (!assetSymbol) {
+    return res.status(400).json({
+      error: 'INVALID_ASSET_SYMBOL',
+      message: 'assetSymbol is required and must be a non-empty string.'
+    });
+  }
+
+  try {
+    const existingWallets = getWalletsForUserAsset(userId, assetSymbol);
+    if (existingWallets.length === 0) {
+      return res.status(404).json({
+        error: 'WALLET_NOT_FOUND',
+        message: `No existing wallet found for asset ${assetSymbol}`
+      });
+    }
+
+    const totalBalance = existingWallets.reduce((sum: number, wallet: any) => sum + Number(wallet.balance || 0), 0);
+    if (!Number.isFinite(totalBalance) || totalBalance < 0) {
+      return res.status(400).json({
+        error: 'INVALID_WALLET_BALANCE',
+        message: 'Existing wallet balances are invalid or cannot be migrated.'
+      });
+    }
+
+    insertLedgerWallet({
+      id: targetWalletId,
+      userId,
+      assetSymbol,
+      balance: Number(totalBalance.toFixed(8)),
+      publicAddressEthereum,
+      publicAddressBitcoin,
+      identityLocked: true,
+      productionMode: 'live',
+      blockchainLinked: true,
+      lockedToEmail: String(req.user?.email || '')
+    });
+
+    for (const wallet of existingWallets) {
+      if (String(wallet.id) === targetWalletId) continue;
+      db.execute('UPDATE wallets SET balance = ? WHERE id = ?', [0, wallet.id]);
+    }
+
+    writeAuditLog('WALLET_BALANCE_MIGRATED', 'success', {
+      userId,
+      assetSymbol,
+      sourceWalletCount: existingWallets.length,
+      totalBalance,
+      newWalletId: targetWalletId
+    }, userId, req.ip || 'ledger-migration');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Wallet balances migrated to a new wallet successfully.',
+      newWallet: {
+        id: targetWalletId,
+        userId,
+        assetSymbol,
+        balance: Number(totalBalance.toFixed(8)),
+        publicAddressEthereum,
+        publicAddressBitcoin
+      },
+      migratedFromWalletCount: existingWallets.length,
+      migratedBalance: Number(totalBalance.toFixed(8))
+    });
+  } catch (err: any) {
+    const correlationId = crypto.randomUUID();
+    logger.error('Wallet migration failed', {
+      userId,
+      assetSymbol,
+      error: sanitizeError(err, correlationId).message
+    });
+    return res.status(500).json({
+      error: 'WALLET_MIGRATION_FAILED',
+      message: String(err?.message || 'Failed to migrate wallet balances.')
     });
   }
 });
