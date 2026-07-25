@@ -11,5 +11,13 @@
     "verified": true,
     "verifiedAt": "2026-01-01T00:00:00.000Z",
     "token": "sovereign-verified"
+  },
+  "tg-redirect-1784674331773@example.com": {
+    "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+    "email": "tg-redirect-1784674331773@example.com",
+    "tokenHash": "9f971abab447f3da96c0169bf7101952626f464537469ecf63abd7c351d005f8",
+    "createdAt": "2026-07-21T22:52:12.433Z",
+    "expiresAt": 1784760732427,
+    "verifiedAt": "2026-07-21T22:52:12.453Z"
   }
 }

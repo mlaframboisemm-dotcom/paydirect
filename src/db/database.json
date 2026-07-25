@@ -824,6 +824,22 @@
       "kycTaxId": "",
       "kycPhone": "",
       "kycVerifiedAt": ""
+    },
+    {
+      "id": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "name": "Tangerine Redirect",
+      "email": "tg-redirect-1784674331773@example.com",
+      "passwordHash": "a9614534e39414f39128afeb2d67b686aa47a39a7cb612d81445e9f772b3367ed0b28ffee702eb49adc53b054e6c4573a835fa449014f228fd0061724f615a96",
+      "salt": "b935577c7abc30b01ecea7ee9371a581",
+      "twoFactorSecret": "KCQ34IQMPNRIWRQS6CVR4B47",
+      "twoFactorEnabled": false,
+      "kycLevel": 1,
+      "citizenship": "CA",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1784674331773@example.com",
+      "lockedAt": "2026-07-21T22:52:12.389Z"
     }
   ],
   "wallets": [
@@ -1060,6 +1076,19 @@
       "blockchainLinked": true,
       "lockedToEmail": "mlaframboisemm@gmail.com",
       "lockedAt": "2026-07-22T07:01:22.834Z"
+    },
+    {
+      "id": "wallet-user_032fbb1c-6da2-4d5b-816f-0546c1825286-usd",
+      "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "assetSymbol": "USD",
+      "balance": 0,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1784674331773@example.com",
+      "lockedAt": "2026-07-21T22:52:12.412Z"
     }
   ],
   "transactions": [
@@ -2437,6 +2466,37 @@
       "userId": "user_mlaframboisemm",
       "action": "LOGIN",
       "timestamp": 1784710874501,
+      "id": "audit_4b6f3609-348a-468f-965f-98879c9e77ba",
+      "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784674332406,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1784674331773@example.com in live production mode."
+    },
+    {
+      "id": "audit_a7c40c78-f200-4a19-9cda-ddb52cb4f0a8",
+      "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "action": "REGISTER",
+      "timestamp": 1784674332419,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Self-service registration completed for tg-redirect-1784674331773@example.com"
+    },
+    {
+      "id": "audit_59f6285b-b42e-4d10-ab8e-142807e4dc83",
+      "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1784674332683,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1784674331773@example.com in live production mode."
+    },
+    {
+      "id": "audit_60932925-1cb8-4865-ade4-2a4e90282232",
+      "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+      "action": "LOGIN",
+      "timestamp": 1784674332719,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
