@@ -2,12 +2,14 @@ node_modules/
 dist/
 .vite/
 *.log
+build-output.txt
 .env
 .env.*
 !.env.local
 !config/.env.credentials.example
 coverage/
 .DS_Store
+backups/
 
 # Python virtual environments
 venv/
