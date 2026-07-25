@@ -5,6 +5,30 @@ import {
 } from 'lucide-react';
 import { Coin, Holding } from '../types';
 
+function getLocalStorageItem<T>(key: string, defaultValue: T): T {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return defaultValue;
+  }
+  const raw = localStorage.getItem(key);
+  if (!raw) return defaultValue;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function setLocalStorageItem(key: string, value: any): void {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage failures in private mode or low disk space
+  }
+}
+
 interface DeveloperHubProps {
   coins: Coin[];
   holdings: Holding[];
@@ -41,6 +65,14 @@ interface ApiKey {
   status: 'active' | 'inactive';
 }
 
+function getApiUrl(path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  if (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null') {
+    return `${window.location.origin}${normalized}`;
+  }
+  return normalized;
+}
+
 export default function DeveloperHub({
   coins,
   holdings,
@@ -48,6 +80,10 @@ export default function DeveloperHub({
   showToast,
   onRefreshBalances
 }: DeveloperHubProps) {
+  const [wiseBalances, setWiseBalances] = useState<Array<{ currency: string; amount: number; profileId?: number; profileType?: string }>>(() => getLocalStorageItem('cb_wise_balances', []));
+  const [wiseLastFetchedAt, setWiseLastFetchedAt] = useState<string | null>(() => getLocalStorageItem('cb_wise_last_fetched_at', null));
+  const [isFetchingWise, setIsFetchingWise] = useState(false);
+  const [wiseError, setWiseError] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
     const saved = localStorage.getItem('cb_api_keys');
     if (saved) {
@@ -404,6 +440,42 @@ print("Order executed:", order['order_id'])`;
       showToast(`Webhook POST sent successfully to endpoint!`, 'success');
     }, 1500);
   };
+
+  // Fetch live Wise balances from backend
+  const fetchWiseLiveBalances = async (notify = true) => {
+    setIsFetchingWise(true);
+    setWiseError(null);
+    try {
+      const res = await fetch(getApiUrl('/api/wise/balances'), { method: 'GET', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`${res.status} ${res.statusText}: ${body}`);
+      }
+      const json = await res.json();
+      const balances = Array.isArray(json.balances) ? json.balances : Array.isArray(json) ? json : [];
+      const parsedBalances = balances.map((b: any) => ({
+        currency: b.currency || b.amount?.currency || 'USD',
+        amount: Number(b.amount?.value ?? b.amount ?? 0),
+        profileId: b.profileId || undefined,
+        profileType: b.type || 'unknown'
+      }));
+      setWiseBalances(parsedBalances);
+      const now = new Date().toISOString();
+      setWiseLastFetchedAt(now);
+      setLocalStorageItem('cb_wise_balances', parsedBalances);
+      setLocalStorageItem('cb_wise_last_fetched_at', now);
+      if (notify) showToast('Fetched Wise live balances', 'success');
+    } catch (err: any) {
+      setWiseError(String(err?.message || err));
+      if (notify) showToast('Failed to fetch Wise balances', 'error');
+    } finally {
+      setIsFetchingWise(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWiseLiveBalances(false);
+  }, []);
 
   const [hubTab, setHubTab] = useState<'api' | 'cypress' | 'real_coinbase'>('api');
 
@@ -917,6 +989,52 @@ print("Order executed:", order['order_id'])`;
 
           {/* RIGHT COLUMN: Code Playground Console */}
           <div className="lg:col-span-6">
+            {/* Wise Live Balances Card (fetches from backend /api/wise/balances) */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs mb-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
+                  <RefreshCw className="h-4 w-4 text-[#0052FF]" />
+                  <span>Wise Live Balances</span>
+                </h4>
+                <button
+                  onClick={() => fetchWiseLiveBalances()}
+                  disabled={isFetchingWise}
+                  className="py-1.5 px-3 bg-[#0052FF] text-white text-xs rounded-lg font-semibold"
+                >
+                  {isFetchingWise ? 'Fetching...' : 'Fetch Live'}
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-2">Pulls CAD and USD balances from configured Wise profiles.</p>
+              <div className="mt-3 rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
+                <div className="text-[11px] uppercase tracking-wider text-gray-500">App USD Wallet Balance</div>
+                <div className="mt-1 text-2xl font-semibold">${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-[11px] text-gray-500 mt-1">Local ledger USD wallet from the app state.</div>
+              </div>
+              {wiseBalances.length > 0 && (
+                <p className="text-xs text-gray-500 mt-3">Connected Wise balances: {wiseBalances.length} currencies across {Array.from(new Set(wiseBalances.map((b) => b.profileType || 'unknown'))).join(', ')} profiles.</p>
+              )}
+              {wiseLastFetchedAt && (
+                <p className="text-xs text-gray-500 mt-1">Last refreshed at {new Date(wiseLastFetchedAt).toLocaleString()}</p>
+              )}
+
+              <div className="mt-4 space-y-2">
+                {wiseError && <div className="text-xs text-red-600">Error: {wiseError}</div>}
+                {wiseBalances.length === 0 && !wiseError && <div className="text-xs text-gray-500 italic">No balances fetched yet.</div>}
+                {wiseBalances.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {wiseBalances.map((b, i) => (
+                      <div key={i} className="p-3 rounded-xl border border-gray-100 bg-gray-50 text-sm">
+                        <div className="font-bold">{b.currency}</div>
+                        <div className="text-gray-700">{b.amount.toFixed(2)}</div>
+                        {b.profileType && <div className="text-[11px] text-gray-400 mt-1">Profile type: {b.profileType}</div>}
+                        {b.profileId && <div className="text-[11px] text-gray-400 mt-1">Profile: {b.profileId}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             
             <div className="bg-[#1e1e1e] rounded-3xl overflow-hidden shadow-2xl border border-gray-800 flex flex-col justify-between min-h-[500px]">
               

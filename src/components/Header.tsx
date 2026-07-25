@@ -62,6 +62,7 @@ export default function Header({
     { id: 'onboarding', label: 'KYC & Limits' },
     { id: 'learn', label: 'Learning Rewards', badge: 'Earn $12' },
     { id: 'card', label: 'Coinbase Card' },
+    { id: 'api', label: 'Developer Hub' },
     { id: 'hub', label: 'Unified Hub' },
     { id: 'history', label: 'Transactions' }
   ];
