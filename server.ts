@@ -10477,6 +10477,13 @@ async function startServer() {
     try {
       const { fetchWiseLiveBalances, getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const result = await getWiseTotalCashUSD();
+
+      const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [req.user.id]) as any[];
+      const usdWallet = wallets.find((w: any) => String(w.asset_symbol || w.assetSymbol) === 'USD');
+      const wiseBusinessWallet = wallets.find((w: any) => String(w.asset_symbol || w.assetSymbol) === 'WISE_BUSINESS');
+      const appUsdBalance = Number(usdWallet?.balance || 0);
+      const appWiseBusinessBalance = Number(wiseBusinessWallet?.balance || 0);
+
       return res.json({
         success: true,
         source: 'wise_live',
@@ -10485,6 +10492,8 @@ async function startServer() {
         totalUSD: result.totalUSD,
         cadToUsdRate: result.cadRate,
         balances: result.balances,
+        appUsdBalance,
+        appWiseBusinessBalance,
         fetchedAt: new Date().toISOString()
       });
     } catch (e: any) {

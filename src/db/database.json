@@ -798,7 +798,7 @@
       "kycPostalCode": "l1h4s7",
       "kycTaxId": "0512",
       "kycPhone": "9057184275",
-      "kycVerifiedAt": "2026-07-22T09:00:58.374Z"
+      "kycVerifiedAt": "2026-07-25T19:23:33.143Z"
     },
     {
       "id": "user_2cf2c245-c6bd-447c-b3c0-f7bbc5a5a50e",
@@ -839,7 +839,16 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "tg-redirect-1784674331773@example.com",
-      "lockedAt": "2026-07-21T22:52:12.389Z"
+      "lockedAt": "2026-07-21T22:52:12.389Z",
+      "kycFullName": "",
+      "kycAddress": "",
+      "kycCity": "",
+      "kycState": "",
+      "kycProvince": "",
+      "kycPostalCode": "",
+      "kycTaxId": "",
+      "kycPhone": "",
+      "kycVerifiedAt": ""
     }
   ],
   "wallets": [
@@ -1039,6 +1048,19 @@
       "lockedAt": "2026-07-22T07:01:22.834Z"
     },
     {
+      "id": "wallet-user_mlaframboisemm-wise-business",
+      "userId": "user_mlaframboisemm",
+      "assetSymbol": "WISE_BUSINESS",
+      "balance": 0,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "mlaframboisemm@gmail.com",
+      "lockedAt": "2026-07-25T00:00:00.000Z"
+    },
+    {
       "id": "wallet-user_mlaframboisemm-btc",
       "userId": "user_mlaframboisemm",
       "assetSymbol": "BTC",
@@ -1081,7 +1103,7 @@
       "id": "wallet-user_032fbb1c-6da2-4d5b-816f-0546c1825286-usd",
       "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
       "assetSymbol": "USD",
-      "balance": 0,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -1693,6 +1715,35 @@
       "status": "completed",
       "ledgerDebit": "USD",
       "ledgerCredit": "wise_cad"
+    },
+    {
+      "id": "wise_deposit_2257392422",
+      "userId": "user_mlaframboisemm",
+      "type": "WISE_DEPOSIT_RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 0.97,
+      "fiatAmount": 0.97,
+      "timestamp": 1784705000000,
+      "details": "{\"transferReference\":\"Ledger deposit\",\"note\":\"Incoming Wise transfer 2257392422\"}",
+      "hash": "2257392422",
+      "status": "processing",
+      "ledgerDebit": "wise_inbound",
+      "ledgerCredit": "wallet_balance",
+      "wiseTransferId": "2257392422"
+    },
+    {
+      "id": "ledger-deposit-test-1784996391739",
+      "userId": "user_mlaframboisemm",
+      "type": "WISE_DEPOSIT_RECEIVE",
+      "assetSymbol": "USD",
+      "amount": 30,
+      "fiatAmount": 30,
+      "timestamp": 1784996391739,
+      "details": "Test deposit to Wise",
+      "hash": "8089f7c2-a73e-4eb3-a4d2-3612fff52d06",
+      "status": "pending",
+      "ledgerDebit": "ledger-main",
+      "ledgerCredit": "wise-business"
     }
   ],
   "auditLogs": [
@@ -2462,10 +2513,6 @@
       "details": "Account identity locked for mlaframboisemm@gmail.com in live production mode."
     },
     {
-      "id": "audit_9597ecf2-4805-4cc5-a7d2-49919eb9278b",
-      "userId": "user_mlaframboisemm",
-      "action": "LOGIN",
-      "timestamp": 1784710874501,
       "id": "audit_4b6f3609-348a-468f-965f-98879c9e77ba",
       "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
       "action": "IDENTITY_LOCKED",
@@ -2500,6 +2547,15 @@
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_4c8791bb-c09b-4255-8d3a-f00b381ba4c8",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1785007382815,
+      "ipAddress": "127.0.0.1",
+      "status": "failure",
+      "details": "Password verification failed"
     }
   ]
 }

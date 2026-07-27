@@ -6,6 +6,7 @@ import WiseApiEngine, { WiseRecipientPayload } from '../src/lib/wise-api-engine.
 import { db } from '../src/db/ledger.js';
 import { createStructuredLogger } from '../src/lib/structured-logger.js';
 import { sanitizeError } from '../src/lib/error-sanitizer.js';
+import { resolveWiseSettlementAmount } from '../src/lib/wise-settlement.js';
 import {
   getWiseApiToken,
   getWiseClientId,
@@ -216,7 +217,13 @@ function insertLedgerWallet(wallet: {
   );
 }
 
-function settleWiseWithdrawalTransaction(txn: any, wiseStatus: string, wiseBalanceSnapshot: any[] = []) {
+function settleWiseWithdrawalTransaction(
+  txn: any,
+  wiseStatus: string,
+  wiseBalanceSnapshot: any[] = [],
+  wiseAmount?: number | string | null,
+  wiseCurrency?: string | null
+) {
   const currentDetails = parseTransactionDetails(txn.details);
   if (currentDetails?.wiseBalanceUpdatedAt) {
     return currentDetails;
@@ -224,24 +231,53 @@ function settleWiseWithdrawalTransaction(txn: any, wiseStatus: string, wiseBalan
 
   const userId = String(txn.userId || '');
   const assetSymbol = String(txn.assetSymbol || 'USD').trim().toUpperCase();
+  const wiseAccountSymbol = 'WISE_BUSINESS';
   const amount = Number(txn.amount || 0);
+  const { amount: resolvedAmount, currency: resolvedCurrency } = resolveWiseSettlementAmount(txn, wiseAmount, wiseCurrency);
 
   if (!userId) {
     throw new Error('TRANSACTION_USER_MISSING: Transaction user information is missing');
   }
-  if (!Number.isFinite(amount) || amount <= 0) {
+  if (!Number.isFinite(resolvedAmount) || resolvedAmount <= 0) {
     throw new Error('TRANSACTION_AMOUNT_INVALID: Transaction amount is invalid');
   }
 
-  const wallet = getWalletForUserAsset(userId, assetSymbol);
+  const effectiveAssetSymbol = String(resolvedCurrency || assetSymbol).trim().toUpperCase();
+  const wallet = getWalletForUserAsset(userId, effectiveAssetSymbol);
+  const wiseBusinessWallet = getWalletForUserAsset(userId, wiseAccountSymbol);
+
   if (!wallet) {
-    throw new Error(`WALLET_NOT_FOUND: No wallet found for user ${userId} asset ${assetSymbol}`);
+    throw new Error(`WALLET_NOT_FOUND: No wallet found for user ${userId} asset ${effectiveAssetSymbol}`);
+  }
+  if (!wiseBusinessWallet) {
+    throw new Error(`WALLET_NOT_FOUND: No Wise business account wallet found for user ${userId}`);
   }
 
   const previousBalance = Number(wallet.balance || 0);
-  const nextBalance = Number((previousBalance - amount).toFixed(2));
+  const previousWiseBusinessBalance = Number(wiseBusinessWallet.balance || 0);
+  let nextBalance: number;
+  let defaultLedgerDebit: string;
+  let defaultLedgerCredit: string;
+  let auditAction = 'WISE_WITHDRAWAL_SETTLED';
 
-  db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextBalance, userId, assetSymbol]);
+  if (['RECEIVE', 'WISE_DEPOSIT_RECEIVE'].includes(String(txn.type || '').toUpperCase())) {
+    nextBalance = Number((previousBalance + resolvedAmount).toFixed(2));
+    const nextWiseBusinessBalance = Number((previousWiseBusinessBalance + resolvedAmount).toFixed(2));
+    defaultLedgerDebit = String(txn.ledgerDebit || 'wise_inbound');
+    defaultLedgerCredit = String(txn.ledgerCredit || 'wallet_balance');
+    auditAction = 'WISE_DEPOSIT_SETTLED';
+
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextBalance, userId, effectiveAssetSymbol]);
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextWiseBusinessBalance, userId, wiseAccountSymbol]);
+  } else {
+    nextBalance = Number((previousBalance - resolvedAmount).toFixed(2));
+    const nextWiseBusinessBalance = Number((previousWiseBusinessBalance - resolvedAmount).toFixed(2));
+    defaultLedgerDebit = String(txn.ledgerDebit || 'wallet_balance');
+    defaultLedgerCredit = String(txn.ledgerCredit || 'wise_outbound');
+
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextBalance, userId, effectiveAssetSymbol]);
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [nextWiseBusinessBalance, userId, wiseAccountSymbol]);
+  }
 
   const mergedDetails = {
     ...currentDetails,
@@ -250,24 +286,29 @@ function settleWiseWithdrawalTransaction(txn: any, wiseStatus: string, wiseBalan
     wiseClearedAt: new Date().toISOString(),
     wiseBalanceSnapshot,
     wiseBalanceUpdatedAt: new Date().toISOString(),
+    wiseSettledAmount: resolvedAmount,
+    wiseSettledCurrency: resolvedCurrency,
     previousLedgerBalance: previousBalance,
     nextLedgerBalance: nextBalance,
-    ledgerDebit: String(txn.ledgerDebit || 'wallet_balance'),
-    ledgerCredit: String(txn.ledgerCredit || 'wise_outbound')
+    ledgerDebit: defaultLedgerDebit,
+    ledgerCredit: defaultLedgerCredit
   };
 
   db.updateTransaction(txn.id, {
     status: 'completed',
     details: JSON.stringify(mergedDetails),
-    ledgerDebit: String(txn.ledgerDebit || 'wallet_balance'),
-    ledgerCredit: String(txn.ledgerCredit || 'wise_outbound')
+    ledgerDebit: defaultLedgerDebit,
+    ledgerCredit: defaultLedgerCredit,
+    amount: resolvedAmount,
+    assetSymbol: effectiveAssetSymbol
   });
 
-  writeAuditLog('WISE_WITHDRAWAL_SETTLED', 'success', {
+  writeAuditLog(auditAction, 'success', {
     transactionId: txn.id,
     userId,
-    amount,
-    assetSymbol,
+    type: txn.type,
+    amount: resolvedAmount,
+    assetSymbol: effectiveAssetSymbol,
     previousBalance,
     nextBalance,
     wiseStatus,
@@ -348,16 +389,32 @@ function reconcileWiseTransferEvent(payload: WiseWebhookPayload, deliveryId: str
     return { matchedTxId: String(tx.id), reason: 'state_not_mapped' };
   }
 
-  mergeTransactionDetails(String(tx.id), nextStatus, {
-    wiseWebhook: {
-      lastEventType: eventType,
-      lastOccurredAt: String(payload?.data?.occurred_at || payload?.sent_at || new Date().toISOString()),
-      lastDeliveryId: deliveryId || null,
-      transferId,
-      state: rawState || null
-    },
-    ...(nextStatus === 'completed' ? { wiseClearedAt: new Date().toISOString() } : {})
-  });
+  const webhookMeta = {
+    lastEventType: eventType,
+    lastOccurredAt: String(payload?.data?.occurred_at || payload?.sent_at || new Date().toISOString()),
+    lastDeliveryId: deliveryId || null,
+    transferId,
+    state: rawState || null
+  };
+
+  if (nextStatus === 'completed') {
+    try {
+      settleWiseWithdrawalTransaction(tx, rawState, [], payload?.data?.resource?.settled_amount?.value || payload?.data?.resource?.instructed_amount?.value || payload?.data?.amount, payload?.data?.resource?.settled_amount?.currency || payload?.data?.resource?.instructed_amount?.currency || payload?.data?.currency);
+      mergeTransactionDetails(String(tx.id), nextStatus, {
+        wiseWebhook: webhookMeta,
+        wiseClearedAt: new Date().toISOString()
+      });
+    } catch (settleError: any) {
+      mergeTransactionDetails(String(tx.id), nextStatus, {
+        wiseWebhook: webhookMeta,
+        wiseClearedAt: new Date().toISOString()
+      });
+    }
+  } else {
+    mergeTransactionDetails(String(tx.id), nextStatus, {
+      wiseWebhook: webhookMeta
+    });
+  }
 
   return {
     matchedTxId: String(tx.id),
@@ -386,7 +443,7 @@ function reconcileWiseCreditEvent(payload: WiseWebhookPayload, deliveryId: strin
   }
 
   const candidates = (db.execute('SELECT * FROM transactions') as any[])
-    .filter((tx) => String(tx?.type || '') === 'WISE_WITHDRAWAL')
+    .filter((tx) => ['WISE_WITHDRAWAL', 'WISE_DEPOSIT_RECEIVE', 'RECEIVE'].includes(String(tx?.type || '').toUpperCase()))
     .filter((tx) => ['pending', 'processing'].includes(String(tx?.status || '')))
     .filter((tx) => Math.abs(Number(tx?.amount || 0) - amountValue) < 0.000001)
     .filter((tx) => String(tx?.assetSymbol || '').trim().toUpperCase() === currency)
@@ -400,17 +457,21 @@ function reconcileWiseCreditEvent(payload: WiseWebhookPayload, deliveryId: strin
   }
 
   const tx = candidates[0];
-  mergeTransactionDetails(String(tx.id), 'completed', {
-    wiseWebhook: {
-      lastEventType: String(payload?.event_type || ''),
-      lastOccurredAt: String(payload?.data?.occurred_at || payload?.sent_at || new Date().toISOString()),
-      lastDeliveryId: deliveryId || null,
-      reference,
-      creditedAmount: amountValue,
-      creditedCurrency: currency
-    },
-    wiseClearedAt: new Date().toISOString()
-  });
+  try {
+    settleWiseWithdrawalTransaction(tx, 'completed', [], amountValue, currency);
+  } catch (settleError: any) {
+    mergeTransactionDetails(String(tx.id), 'completed', {
+      wiseWebhook: {
+        lastEventType: String(payload?.event_type || ''),
+        lastOccurredAt: String(payload?.data?.occurred_at || payload?.sent_at || new Date().toISOString()),
+        lastDeliveryId: deliveryId || null,
+        reference,
+        creditedAmount: amountValue,
+        creditedCurrency: currency
+      },
+      wiseClearedAt: new Date().toISOString()
+    });
+  }
 
   return {
     matchedTxId: String(tx.id),
@@ -1278,7 +1339,7 @@ withdrawalRouter.get('/wise-status/:transferId', requireRouterAuth, async (req: 
   }
 });
 
-async function reconcileWiseTransaction(txId: string) {
+export async function reconcileWiseTransaction(txId: string) {
   const txn = db.getTransaction(txId);
   if (!txn) {
     throw new Error(`NOT_FOUND: Transaction ${txId} not found`);
@@ -1298,7 +1359,7 @@ async function reconcileWiseTransaction(txId: string) {
 
   if (['outgoing_payment_sent', 'completed', 'settled'].includes(normalizedStatus)) {
     const balanceSnapshot = await wiseApiEngine.getStandardBalances().catch(() => []);
-    const settledDetails = settleWiseWithdrawalTransaction(txn, status.status, balanceSnapshot);
+    const settledDetails = settleWiseWithdrawalTransaction(txn, status.status, balanceSnapshot, status.amount, status.currency);
 
     return {
       transactionId: txId,
@@ -1390,7 +1451,7 @@ withdrawalRouter.post('/wise-reconcile-all', requireRouterAuth, requireLedgerInt
   try {
     const transactions = db.execute('SELECT * FROM transactions') as any[];
     const candidates = transactions.filter((tx) =>
-      String(tx?.type || '') === 'WISE_WITHDRAWAL' &&
+      ['WISE_WITHDRAWAL', 'WISE_DEPOSIT_RECEIVE', 'RECEIVE'].includes(String(tx?.type || '').toUpperCase()) &&
       ['pending', 'processing'].includes(String(tx?.status || '').toLowerCase()) &&
       String(tx?.wiseTransferId || '').trim().length > 0
     );
@@ -1601,7 +1662,7 @@ async function pollWiseTransferStatus(txId: string, wiseTransferId: string) {
           const tx = db.getTransaction(txId);
           const balanceSnapshot = await wiseApiEngine?.getStandardBalances().catch(() => []) || [];
           if (tx) {
-            settleWiseWithdrawalTransaction(tx, status.status, balanceSnapshot);
+            settleWiseWithdrawalTransaction(tx, status.status, balanceSnapshot, status.amount, status.currency);
           } else {
             db.execute(
               `UPDATE transactions SET status = ?, details = ? WHERE id = ?`,

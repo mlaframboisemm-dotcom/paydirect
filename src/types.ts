@@ -27,7 +27,7 @@ export interface Holding {
 
 export interface Transaction {
   id: string;
-  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE';
+  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE' | 'WISE_WITHDRAWAL' | 'WISE_DEPOSIT_RECEIVE';
   assetSymbol: string;
   amount: number;
   fiatAmount: number;

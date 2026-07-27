@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-07-25T17:00:29.745Z",
+  "walletId": "wallet-user_032fbb1c-6da2-4d5b-816f-0546c1825286-usd",
+  "userId": "user_032fbb1c-6da2-4d5b-816f-0546c1825286",
+  "assetSymbol": "USD",
+  "currentBalance": 1791100,
+  "currency": "USD",
+  "recommendedAction": "Payout funds from app USD wallet to Wise business profile balance",
+  "recipientIds": {
+    "defaultRecipientUsd": 1504691893,
+    "defaultRecipientCad": 1504627763,
+    "businessProfileId": 101924589
+  },
+  "safety": {
+    "confirmFlag": "--confirm",
+    "requireEnv": "ALLOW_LIVE_PAYOUT=true",
+    "note": "The execution script `scripts/execute_wise_payout.cjs` will only run when called with both the --confirm flag and ALLOW_LIVE_PAYOUT=true in the environment."
+  },
+  "executeCommandExamples": {
+    "dryRun": "node scripts/execute_wise_payout.cjs --dry-run",
+    "liveRun": "ALLOW_LIVE_PAYOUT=true node scripts/execute_wise_payout.cjs --confirm"
+  }
+}

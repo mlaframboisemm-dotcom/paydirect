@@ -157,6 +157,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [wiseBusinessBalance, setWiseBusinessBalance] = useState<number>(0);
+
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => {
     const saved = localStorage.getItem('cb_quizzes');
     return saved ? JSON.parse(saved) : [];
@@ -325,6 +327,11 @@ export default function App() {
     const scopedUsdBalance = read('cb_usd_balance');
     if (scopedUsdBalance && Number.isFinite(Number(scopedUsdBalance))) {
       setUsdBalance(Number(scopedUsdBalance));
+    }
+
+    const scopedWiseBusiness = read('cb_wise_business_balance');
+    if (scopedWiseBusiness && Number.isFinite(Number(scopedWiseBusiness))) {
+      setWiseBusinessBalance(Number(scopedWiseBusiness));
     }
 
     try {
@@ -530,6 +537,13 @@ export default function App() {
   }, [transactions]);
 
   useEffect(() => {
+    localStorage.setItem('cb_wise_business_balance', wiseBusinessBalance.toString());
+    if (isAuthenticated && userEmail) {
+      localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_wise_business_balance'), wiseBusinessBalance.toString());
+    }
+  }, [wiseBusinessBalance]);
+
+  useEffect(() => {
     localStorage.setItem('cb_quizzes', JSON.stringify(quizzes));
     if (isAuthenticated && userEmail) {
       localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_quizzes'), JSON.stringify(quizzes));
@@ -542,6 +556,29 @@ export default function App() {
       localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_watchlist'), JSON.stringify(watchlist));
     }
   }, [watchlist]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!hasSessionToken()) return;
+
+    const refreshWiseBusinessBalance = async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/wise/balances'), {
+          headers: buildAuthHeaders(),
+          credentials: 'include'
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (typeof json.appWiseBusinessBalance === 'number') {
+          setWiseBusinessBalance(json.appWiseBusinessBalance);
+        }
+      } catch {
+        // ignore failures; we don't want to block app load
+      }
+    };
+
+    refreshWiseBusinessBalance();
+  }, [isAuthenticated, userEmail]);
 
   // Auth token pre-fetching & balance synchronizer
   useEffect(() => {
@@ -935,8 +972,9 @@ export default function App() {
   }, [holdings, coins]);
 
   const liveCashBalance = usdBalance;
+  const liveWiseBusinessBalance = wiseBusinessBalance;
 
-  const netWorth = cryptoTotalValue + liveCashBalance;
+  const netWorth = cryptoTotalValue + liveCashBalance + liveWiseBusinessBalance;
 
   const previousNetWorth = useMemo(() => {
     // Computes previous value based on 24h change ratios for portfolio items
@@ -944,8 +982,8 @@ export default function App() {
       const coin = coins.find((c) => c && c.symbol === hold.symbol);
       const coinPrevPrice = coin ? coin.price / (1 + coin.change24h / 100) : 0;
       return sum + (hold.amount * coinPrevPrice);
-    }, 0) + liveCashBalance;
-  }, [holdings, coins, liveCashBalance]);
+    }, 0) + liveCashBalance + liveWiseBusinessBalance;
+  }, [holdings, coins, liveCashBalance, liveWiseBusinessBalance]);
 
   const netWorthChangeUSD = netWorth - previousNetWorth;
   const netWorthChangePercent = previousNetWorth === 0 ? 0 : (netWorthChangeUSD / previousNetWorth) * 100;
@@ -1335,6 +1373,9 @@ export default function App() {
                     </div>
                     <span className="text-[11px] sm:text-xs text-gray-400 font-medium mt-1 block">
                       Combined Crypto Asset and USD Cash balances
+                    </span>
+                    <span className="text-[11px] sm:text-xs text-gray-400 font-medium mt-1 block">
+                      Wise Business Wallet: ${liveWiseBusinessBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
 

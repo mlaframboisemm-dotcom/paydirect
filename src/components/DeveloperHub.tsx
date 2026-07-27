@@ -82,6 +82,8 @@ export default function DeveloperHub({
 }: DeveloperHubProps) {
   const [wiseBalances, setWiseBalances] = useState<Array<{ currency: string; amount: number; profileId?: number; profileType?: string }>>(() => getLocalStorageItem('cb_wise_balances', []));
   const [wiseLastFetchedAt, setWiseLastFetchedAt] = useState<string | null>(() => getLocalStorageItem('cb_wise_last_fetched_at', null));
+  const [appUsdWalletBalance, setAppUsdWalletBalance] = useState<number>(() => getLocalStorageItem('cb_wise_app_usd_balance', usdBalance));
+  const [appWiseBusinessBalance, setAppWiseBusinessBalance] = useState<number>(() => getLocalStorageItem('cb_wise_business_balance', 0));
   const [isFetchingWise, setIsFetchingWise] = useState(false);
   const [wiseError, setWiseError] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
@@ -462,8 +464,12 @@ print("Order executed:", order['order_id'])`;
       setWiseBalances(parsedBalances);
       const now = new Date().toISOString();
       setWiseLastFetchedAt(now);
+      setAppUsdWalletBalance(Number(json.appUsdBalance ?? json.usdBalance ?? 0));
+      setAppWiseBusinessBalance(Number(json.appWiseBusinessBalance ?? 0));
       setLocalStorageItem('cb_wise_balances', parsedBalances);
       setLocalStorageItem('cb_wise_last_fetched_at', now);
+      setLocalStorageItem('cb_wise_app_usd_balance', Number(json.appUsdBalance ?? json.usdBalance ?? 0));
+      setLocalStorageItem('cb_wise_business_balance', Number(json.appWiseBusinessBalance ?? 0));
       if (notify) showToast('Fetched Wise live balances', 'success');
     } catch (err: any) {
       setWiseError(String(err?.message || err));
@@ -1006,10 +1012,17 @@ print("Order executed:", order['order_id'])`;
               </div>
 
               <p className="text-xs text-gray-500 mt-2">Pulls CAD and USD balances from configured Wise profiles.</p>
-              <div className="mt-3 rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
-                <div className="text-[11px] uppercase tracking-wider text-gray-500">App USD Wallet Balance</div>
-                <div className="mt-1 text-2xl font-semibold">${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                <div className="text-[11px] text-gray-500 mt-1">Local ledger USD wallet from the app state.</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
+                  <div className="text-[11px] uppercase tracking-wider text-gray-500">App USD Wallet Balance</div>
+                  <div className="mt-1 text-2xl font-semibold">${appUsdWalletBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-[11px] text-gray-500 mt-1">Sovereign ledger USD wallet balance from the authenticated user.</div>
+                </div>
+                <div className="rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
+                  <div className="text-[11px] uppercase tracking-wider text-gray-500">App Wise Business Wallet Balance</div>
+                  <div className="mt-1 text-2xl font-semibold">${appWiseBusinessBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-[11px] text-gray-500 mt-1">Internal app ledger balance for the WISE_BUSINESS settlement wallet.</div>
+                </div>
               </div>
               {wiseBalances.length > 0 && (
                 <p className="text-xs text-gray-500 mt-3">Connected Wise balances: {wiseBalances.length} currencies across {Array.from(new Set(wiseBalances.map((b) => b.profileType || 'unknown'))).join(', ')} profiles.</p>

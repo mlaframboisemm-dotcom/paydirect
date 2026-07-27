@@ -62,11 +62,21 @@ export function logSecurityEvent(
  * Log transaction events (trades, withdrawals, deposits, etc.)
  */
 export function logTransactionEvent(
-  type: 'BUY' | 'SELL' | 'CONVERT' | 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER',
-  status: 'INITIATED' | 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED',
-  details: Record<string, any>
+  type: string,
+  statusOrDetails?: string | Record<string, any>,
+  detailsMaybe?: Record<string, any>
 ): void {
   const logger = getLogger();
+  let status = 'INFO';
+  let details: Record<string, any> = {};
+
+  if (typeof statusOrDetails === 'string') {
+    status = statusOrDetails || 'INFO';
+    details = detailsMaybe || {};
+  } else if (typeof statusOrDetails === 'object' && statusOrDetails !== null) {
+    details = statusOrDetails as Record<string, any>;
+  }
+
   logger.info(`[TRANSACTION] ${type} - ${status}`, details);
 }
 
@@ -104,17 +114,18 @@ export function logDatabaseEvent(
  * Log system/infrastructure events
  */
 export function logSystemEvent(
-  event: 'STARTUP' | 'SHUTDOWN' | 'ERROR' | 'WARNING' | 'CONFIG_CHANGE',
-  details: Record<string, any>
+  event: string,
+  details?: Record<string, any>
 ): void {
   const logger = getLogger();
   const level = event === 'ERROR' ? 'ERROR' : event === 'WARNING' ? 'WARN' : 'INFO';
-  
+
+  const payload = details || {};
   if (level === 'ERROR') {
-    logger.error(`[SYSTEM] ${event}`, details);
+    logger.error(`[SYSTEM] ${event}`, payload);
   } else if (level === 'WARN') {
-    logger.warn(`[SYSTEM] ${event}`, details);
+    logger.warn(`[SYSTEM] ${event}`, payload);
   } else {
-    logger.info(`[SYSTEM] ${event}`, details);
+    logger.info(`[SYSTEM] ${event}`, payload);
   }
 }

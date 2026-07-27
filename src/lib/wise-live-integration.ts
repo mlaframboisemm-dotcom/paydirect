@@ -85,44 +85,43 @@ export async function fetchWiseLiveBalances(): Promise<WiseBalance[]> {
   const token = getToken();
   if (!token) throw new Error('WISE_API_TOKEN not configured');
 
-  const personalId = getPersonalProfileId();
-  const businessId = getBusinessProfileId();
+  const profilesResponse = await wiseGet('/v1/profiles');
+  const profiles = Array.isArray(profilesResponse)
+    ? profilesResponse
+    : Array.isArray((profilesResponse as any).profiles)
+      ? (profilesResponse as any).profiles
+      : [];
+
   const results: WiseBalance[] = [];
+  const profileIds = new Set<number>();
 
-  // Fetch personal profile balances
-  try {
-    const personalBals = await wiseGet(`/v4/profiles/${personalId}/balances?types=STANDARD`);
-    if (Array.isArray(personalBals)) {
-      for (const b of personalBals) {
-        results.push({
-          balanceId: b.id,
-          currency: b.amount?.currency || b.currency,
-          amount: Number(b.amount?.value || 0),
-          type: 'personal',
-          profileId: personalId
-        });
-      }
-    }
-  } catch (e: any) {
-    console.warn('[WISE] Failed to fetch personal balances:', e.message);
-  }
+  for (const profile of profiles) {
+    const profileId = Number(profile.id || profile.profileId || 0);
+    if (!profileId || profileIds.has(profileId)) continue;
+    profileIds.add(profileId);
 
-  // Fetch business profile balances
-  try {
-    const businessBals = await wiseGet(`/v4/profiles/${businessId}/balances?types=STANDARD`);
-    if (Array.isArray(businessBals)) {
-      for (const b of businessBals) {
-        results.push({
-          balanceId: b.id,
-          currency: b.amount?.currency || b.currency,
-          amount: Number(b.amount?.value || 0),
-          type: 'business',
-          profileId: businessId
-        });
+    const profileType = String(profile.type || profile.profileType || 'unknown');
+
+    try {
+      let balanceResponse = await wiseGet(`/v4/profiles/${profileId}/balances?types=STANDARD`);
+      if (!Array.isArray(balanceResponse) && Array.isArray((balanceResponse as any).balances)) {
+        balanceResponse = (balanceResponse as any).balances;
       }
+
+      if (Array.isArray(balanceResponse)) {
+        for (const b of balanceResponse) {
+          results.push({
+            balanceId: Number(b.id || 0),
+            currency: String(b.amount?.currency || b.currency || 'UNKNOWN'),
+            amount: Number(b.amount?.value || b.amount || 0),
+            type: profileType,
+            profileId
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[WISE] Failed to fetch balances for profile ${profileId}:`, e.message || e);
     }
-  } catch (e: any) {
-    console.warn('[WISE] Failed to fetch business balances:', e.message);
   }
 
   return results;

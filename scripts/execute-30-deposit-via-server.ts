@@ -1,4 +1,4 @@
-import { db } from './src/db/ledger.js';
+import { db } from '../src/db/ledger.js';
 import fetch from 'node-fetch';
 import crypto from 'crypto';
 

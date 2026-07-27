@@ -1,4 +1,4 @@
-import { db } from './src/db/ledger.js';
+import { db } from '../src/db/ledger.js';
 
 console.log('\n🧹 Cleaning up corrupt transactions...\n');
 
