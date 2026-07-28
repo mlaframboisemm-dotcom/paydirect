@@ -19,5 +19,29 @@
     "createdAt": "2026-07-21T22:52:12.433Z",
     "expiresAt": 1784760732427,
     "verifiedAt": "2026-07-21T22:52:12.453Z"
+  },
+  "test-user-1785151257191@test.local": {
+    "userId": "user_c440bb4d-f3e6-4ea9-ac15-eb9e4b142fa8",
+    "email": "test-user-1785151257191@test.local",
+    "tokenHash": "126a16a289b2ef982eded588ebc4371aca4b14d705d7b1eab17ca98fe0683352",
+    "createdAt": "2026-07-27T11:21:00.318Z",
+    "expiresAt": 1785237660303,
+    "verifiedAt": "2026-07-27T11:21:00.344Z"
+  },
+  "test-user-1785151919814@test.local": {
+    "userId": "user_5d6b7d27-1a80-4f76-ac07-159968b5bb82",
+    "email": "test-user-1785151919814@test.local",
+    "tokenHash": "4fd61012bf959dbd048721009ea70a3e3c0ad4dca091a02b2d1c55d1146ab9d5",
+    "createdAt": "2026-07-27T11:32:02.255Z",
+    "expiresAt": 1785238322203,
+    "verifiedAt": "2026-07-27T11:32:02.274Z"
+  },
+  "copilot-test-1785164557903@example.com": {
+    "userId": "user_8d4c901d-d02a-4152-a802-1bbc64ade403",
+    "email": "copilot-test-1785164557903@example.com",
+    "tokenHash": "7038c24d208b55efd5d3a03690c8ab022fc37819dee8f4dcc282f28dba945302",
+    "createdAt": "2026-07-27T15:02:39.959Z",
+    "expiresAt": 1785250959922,
+    "verifiedAt": "2026-07-27T15:02:40.009Z"
   }
 }

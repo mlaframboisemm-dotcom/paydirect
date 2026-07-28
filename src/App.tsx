@@ -1922,6 +1922,8 @@ export default function App() {
                 usdBalance={liveCashBalance}
                 showToast={showToast}
                 onRefreshBalances={syncCoinbaseBalances}
+                onUpdateUsdBalance={(nextUsdBalance) => setUsdBalance(nextUsdBalance)}
+                onUpdateWiseBusinessBalance={(nextWiseBusinessBalance) => setWiseBusinessBalance(nextWiseBusinessBalance)}
               />
             </ErrorBoundary>
           </div>

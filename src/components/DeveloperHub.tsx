@@ -35,6 +35,8 @@ interface DeveloperHubProps {
   usdBalance: number;
   showToast: (message: string, type: 'success' | 'info' | 'error') => void;
   onRefreshBalances?: () => void;
+  onUpdateUsdBalance?: (nextUsdBalance: number) => void;
+  onUpdateWiseBusinessBalance?: (nextWiseBusinessBalance: number) => void;
 }
 
 interface RuntimeConfigStatus {
@@ -73,18 +75,39 @@ function getApiUrl(path: string): string {
   return normalized;
 }
 
+function buildAuthHeaders(extraHeaders?: Record<string, string>): Record<string, string> {
+  const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+  return {
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(extraHeaders || {})
+  };
+}
+
+function normalizeNumber(value: any, fallback: number): number {
+  if (value === undefined || value === null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 export default function DeveloperHub({
   coins,
   holdings,
   usdBalance,
   showToast,
-  onRefreshBalances
+  onRefreshBalances,
+  onUpdateUsdBalance,
+  onUpdateWiseBusinessBalance
 }: DeveloperHubProps) {
   const [wiseBalances, setWiseBalances] = useState<Array<{ currency: string; amount: number; profileId?: number; profileType?: string }>>(() => getLocalStorageItem('cb_wise_balances', []));
   const [wiseLastFetchedAt, setWiseLastFetchedAt] = useState<string | null>(() => getLocalStorageItem('cb_wise_last_fetched_at', null));
   const [appUsdWalletBalance, setAppUsdWalletBalance] = useState<number>(() => getLocalStorageItem('cb_wise_app_usd_balance', usdBalance));
   const [appWiseBusinessBalance, setAppWiseBusinessBalance] = useState<number>(() => getLocalStorageItem('cb_wise_business_balance', 0));
+  const [wiseCadBalance, setWiseCadBalance] = useState<number>(() => getLocalStorageItem('cb_wise_cad_balance', 0));
+  const [wiseUsdBalance, setWiseUsdBalance] = useState<number>(() => getLocalStorageItem('cb_wise_usd_balance', 0));
+  const [wiseTotalUsd, setWiseTotalUsd] = useState<number>(() => getLocalStorageItem('cb_wise_total_usd', 0));
+  const [reconciliationSnapshot, setReconciliationSnapshot] = useState<any | null>(() => getLocalStorageItem('cb_wise_reconciliation_snapshot', null));
   const [isFetchingWise, setIsFetchingWise] = useState(false);
+  const [isReconcilingWise, setIsReconcilingWise] = useState(false);
   const [wiseError, setWiseError] = useState<string | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
     const saved = localStorage.getItem('cb_api_keys');
@@ -448,7 +471,7 @@ print("Order executed:", order['order_id'])`;
     setIsFetchingWise(true);
     setWiseError(null);
     try {
-      const res = await fetch(getApiUrl('/api/wise/balances'), { method: 'GET', credentials: 'include' });
+      const res = await fetch(getApiUrl('/api/wise/balances'), { method: 'GET', headers: buildAuthHeaders(), credentials: 'include' });
       if (!res.ok) {
         const body = await res.text();
         throw new Error(`${res.status} ${res.statusText}: ${body}`);
@@ -457,19 +480,34 @@ print("Order executed:", order['order_id'])`;
       const balances = Array.isArray(json.balances) ? json.balances : Array.isArray(json) ? json : [];
       const parsedBalances = balances.map((b: any) => ({
         currency: b.currency || b.amount?.currency || 'USD',
-        amount: Number(b.amount?.value ?? b.amount ?? 0),
+        amount: normalizeNumber(b.amount?.value ?? b.amount, 0),
         profileId: b.profileId || undefined,
         profileType: b.type || 'unknown'
       }));
       setWiseBalances(parsedBalances);
       const now = new Date().toISOString();
       setWiseLastFetchedAt(now);
-      setAppUsdWalletBalance(Number(json.appUsdBalance ?? json.usdBalance ?? 0));
-      setAppWiseBusinessBalance(Number(json.appWiseBusinessBalance ?? 0));
+
+      const nextAppUsdBalance = normalizeNumber(json.appUsdBalance ?? json.usdBalance, appUsdWalletBalance);
+      const nextAppWiseBusinessBalance = normalizeNumber(json.appWiseBusinessBalance, appWiseBusinessBalance);
+      const nextWiseCadBalance = normalizeNumber(json.cadBalance, wiseCadBalance);
+      const nextWiseUsdBalance = normalizeNumber(json.usdBalance, wiseUsdBalance);
+      const nextWiseTotalUsd = normalizeNumber(json.totalUSD, wiseTotalUsd);
+
+      setAppUsdWalletBalance(nextAppUsdBalance);
+      setAppWiseBusinessBalance(nextAppWiseBusinessBalance);
+      setWiseCadBalance(nextWiseCadBalance);
+      setWiseUsdBalance(nextWiseUsdBalance);
+      setWiseTotalUsd(nextWiseTotalUsd);
+      setReconciliationSnapshot(json.reconciliationSnapshot || reconciliationSnapshot);
       setLocalStorageItem('cb_wise_balances', parsedBalances);
       setLocalStorageItem('cb_wise_last_fetched_at', now);
-      setLocalStorageItem('cb_wise_app_usd_balance', Number(json.appUsdBalance ?? json.usdBalance ?? 0));
-      setLocalStorageItem('cb_wise_business_balance', Number(json.appWiseBusinessBalance ?? 0));
+      setLocalStorageItem('cb_wise_app_usd_balance', nextAppUsdBalance);
+      setLocalStorageItem('cb_wise_business_balance', nextAppWiseBusinessBalance);
+      setLocalStorageItem('cb_wise_cad_balance', nextWiseCadBalance);
+      setLocalStorageItem('cb_wise_usd_balance', nextWiseUsdBalance);
+      setLocalStorageItem('cb_wise_total_usd', nextWiseTotalUsd);
+      setLocalStorageItem('cb_wise_reconciliation_snapshot', json.reconciliationSnapshot || reconciliationSnapshot);
       if (notify) showToast('Fetched Wise live balances', 'success');
     } catch (err: any) {
       setWiseError(String(err?.message || err));
@@ -479,9 +517,62 @@ print("Order executed:", order['order_id'])`;
     }
   };
 
+  const reconcileWiseBalances = async () => {
+    if (isReconcilingWise) return;
+    setWiseError(null);
+    setIsReconcilingWise(true);
+
+    try {
+      const res = await fetch(getApiUrl('/api/wise/reconcile'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`${res.status} ${res.statusText}: ${body}`);
+      }
+      const json = await res.json();
+      const nextUsdBalance = normalizeNumber(json.reconciledAppUSDBalance ?? json.appUsdBalance, appUsdWalletBalance);
+      const nextWiseBusinessBalance = normalizeNumber(json.appWiseBusinessBalance, appWiseBusinessBalance);
+      const nextWiseCadBalance = normalizeNumber(json.cadBalance, wiseCadBalance);
+      const nextWiseUsdBalance = normalizeNumber(json.usdBalance, wiseUsdBalance);
+      const nextWiseTotalUsd = normalizeNumber(json.wiseTotalUSD ?? json.totalUSD, wiseTotalUsd);
+
+      setAppUsdWalletBalance(nextUsdBalance);
+      setAppWiseBusinessBalance(nextWiseBusinessBalance);
+      setWiseCadBalance(nextWiseCadBalance);
+      setWiseUsdBalance(nextWiseUsdBalance);
+      setWiseTotalUsd(nextWiseTotalUsd);
+      setReconciliationSnapshot(json.reconciliationSnapshot || reconciliationSnapshot);
+
+      if (onUpdateUsdBalance) {
+        onUpdateUsdBalance(nextUsdBalance);
+      }
+      if (onUpdateWiseBusinessBalance) {
+        onUpdateWiseBusinessBalance(nextWiseBusinessBalance);
+      }
+
+      await fetchWiseLiveBalances(false);
+      showToast('Wise reconciliation succeeded', 'success');
+    } catch (err: any) {
+      setWiseError(String(err?.message || err));
+      showToast('Wise reconciliation failed', 'error');
+    } finally {
+      setIsReconcilingWise(false);
+    }
+  };
+
   useEffect(() => {
     fetchWiseLiveBalances(false);
   }, []);
+
+  const maskAccountNumber = (value?: string) => {
+    const raw = String(value || '').trim();
+    if (!raw) return 'Not configured';
+    if (raw.length <= 4) return '••••';
+    return `•••• ${raw.slice(-4)}`;
+  };
 
   const [hubTab, setHubTab] = useState<'api' | 'cypress' | 'real_coinbase'>('api');
 
@@ -1002,13 +1093,22 @@ print("Order executed:", order['order_id'])`;
                   <RefreshCw className="h-4 w-4 text-[#0052FF]" />
                   <span>Wise Live Balances</span>
                 </h4>
-                <button
-                  onClick={() => fetchWiseLiveBalances()}
-                  disabled={isFetchingWise}
-                  className="py-1.5 px-3 bg-[#0052FF] text-white text-xs rounded-lg font-semibold"
-                >
-                  {isFetchingWise ? 'Fetching...' : 'Fetch Live'}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fetchWiseLiveBalances()}
+                    disabled={isFetchingWise || isReconcilingWise}
+                    className="py-1.5 px-3 bg-[#0052FF] text-white text-xs rounded-lg font-semibold"
+                  >
+                    {isFetchingWise ? 'Fetching...' : 'Fetch Live'}
+                  </button>
+                  <button
+                    onClick={() => reconcileWiseBalances()}
+                    disabled={isReconcilingWise || isFetchingWise}
+                    className="py-1.5 px-3 bg-emerald-600 text-white text-xs rounded-lg font-semibold"
+                  >
+                    {isReconcilingWise ? 'Reconciling...' : 'Reconcile'}
+                  </button>
+                </div>
               </div>
 
               <p className="text-xs text-gray-500 mt-2">Pulls CAD and USD balances from configured Wise profiles.</p>
@@ -1023,12 +1123,53 @@ print("Order executed:", order['order_id'])`;
                   <div className="mt-1 text-2xl font-semibold">${appWiseBusinessBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                   <div className="text-[11px] text-gray-500 mt-1">Internal app ledger balance for the WISE_BUSINESS settlement wallet.</div>
                 </div>
+                <div className="rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
+                  <div className="text-[11px] uppercase tracking-wider text-gray-500">Live Wise Total USD</div>
+                  <div className="mt-1 text-2xl font-semibold">${wiseTotalUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div className="text-[11px] text-gray-500 mt-1">Wise balances: USD ${wiseUsdBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + CAD ${wiseCadBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} converted to USD.</div>
+                </div>
               </div>
               {wiseBalances.length > 0 && (
                 <p className="text-xs text-gray-500 mt-3">Connected Wise balances: {wiseBalances.length} currencies across {Array.from(new Set(wiseBalances.map((b) => b.profileType || 'unknown'))).join(', ')} profiles.</p>
               )}
               {wiseLastFetchedAt && (
                 <p className="text-xs text-gray-500 mt-1">Last refreshed at {new Date(wiseLastFetchedAt).toLocaleString()}</p>
+              )}
+
+              {reconciliationSnapshot && (
+                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.2em] font-bold text-emerald-700">Sovereign Wise Reconciliation</div>
+                      <div className="text-sm font-semibold text-gray-900">{reconciliationSnapshot.status}</div>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1">Proof verified</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-700">
+                    <div className="rounded-xl bg-white/70 p-3 border border-emerald-100">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Account holder</div>
+                      <div className="mt-1 font-semibold text-gray-900">{reconciliationSnapshot.accountHolder}</div>
+                    </div>
+                    <div className="rounded-xl bg-white/70 p-3 border border-emerald-100">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Account number</div>
+                      <div className="mt-1 font-semibold text-gray-900">{maskAccountNumber(reconciliationSnapshot.accountNumber)}</div>
+                    </div>
+                    <div className="rounded-xl bg-white/70 p-3 border border-emerald-100">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Routing / SWIFT</div>
+                      <div className="mt-1 font-semibold text-gray-900">{reconciliationSnapshot.routingNumber} · {reconciliationSnapshot.swiftBic}</div>
+                    </div>
+                    <div className="rounded-xl bg-white/70 p-3 border border-emerald-100">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Wallet balance</div>
+                      <div className="mt-1 font-semibold text-gray-900">${Number(reconciliationSnapshot.walletBalanceUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-900 p-3 text-[11px] font-mono text-emerald-300 break-all">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-gray-400">Proof hash</div>
+                    <div className="mt-1">{reconciliationSnapshot.proofHash}</div>
+                    <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-gray-400">Merkle root</div>
+                    <div className="mt-1">{reconciliationSnapshot.merkleRoot}</div>
+                  </div>
+                </div>
               )}
 
               <div className="mt-4 space-y-2">
