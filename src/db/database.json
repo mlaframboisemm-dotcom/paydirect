@@ -914,7 +914,32 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "copilot-test-1785164557903@example.com",
-      "lockedAt": "2026-07-27T15:02:39.561Z"
+      "lockedAt": "2026-07-27T15:02:39.561Z",
+      "kycFullName": "",
+      "kycAddress": "",
+      "kycCity": "",
+      "kycState": "",
+      "kycProvince": "",
+      "kycPostalCode": "",
+      "kycTaxId": "",
+      "kycPhone": "",
+      "kycVerifiedAt": ""
+    },
+    {
+      "id": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "name": "Tangerine Redirect",
+      "email": "tg-redirect-1785268109010@example.com",
+      "passwordHash": "7c02f6bdbc3dd6a018e738d8f7fe2cb2624a5811619c32e80bea8599a8d21e233701a90c2e96f758775e722990723e6bd2d5ad38a77a3cd80da74291df5eb8fe",
+      "salt": "f53a709e728fa7760d2fe255e3f8b168",
+      "twoFactorSecret": "WF4C7AE3ABLQMGTXJE57YLSA",
+      "twoFactorEnabled": false,
+      "kycLevel": 1,
+      "citizenship": "CA",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1785268109010@example.com",
+      "lockedAt": "2026-07-28T19:48:29.675Z"
     }
   ],
   "wallets": [
@@ -1216,6 +1241,19 @@
       "blockchainLinked": true,
       "lockedToEmail": "copilot-test-1785164557903@example.com",
       "lockedAt": "2026-07-27T15:02:39.824Z"
+    },
+    {
+      "id": "wallet-user_6f515afc-748e-410c-8496-452c91e4f1c0-usd",
+      "userId": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "assetSymbol": "USD",
+      "balance": 0,
+      "publicAddressEthereum": "",
+      "publicAddressBitcoin": "",
+      "identityLocked": true,
+      "productionMode": "live",
+      "blockchainLinked": true,
+      "lockedToEmail": "tg-redirect-1785268109010@example.com",
+      "lockedAt": "2026-07-28T19:48:29.734Z"
     }
   ],
   "transactions": [
@@ -3691,6 +3729,42 @@
       "userId": "user_8d4c901d-d02a-4152-a802-1bbc64ade403",
       "action": "LOGIN",
       "timestamp": 1785164560715,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_6f978c43-cacc-4e65-a983-5b17c335f15a",
+      "userId": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1785268109706,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1785268109010@example.com in live production mode."
+    },
+    {
+      "id": "audit_4944d885-22a7-434b-9371-9a610d07b49b",
+      "userId": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "action": "REGISTER",
+      "timestamp": 1785268109767,
+      "ipAddress": "127.0.0.1",
+      "status": "success",
+      "details": "Self-service registration completed for tg-redirect-1785268109010@example.com"
+    },
+    {
+      "id": "audit_9ab66086-e739-41ba-b8a2-e71a6218849a",
+      "userId": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "action": "IDENTITY_LOCKED",
+      "timestamp": 1785268110252,
+      "ipAddress": "system",
+      "status": "success",
+      "details": "Account identity locked for tg-redirect-1785268109010@example.com in live production mode."
+    },
+    {
+      "id": "audit_54d8f7dc-ea44-4f63-88d5-5ebb83562abc",
+      "userId": "user_6f515afc-748e-410c-8496-452c91e4f1c0",
+      "action": "LOGIN",
+      "timestamp": 1785268110273,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"

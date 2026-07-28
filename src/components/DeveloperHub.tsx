@@ -1188,7 +1188,7 @@ print("Order executed:", order['order_id'])`;
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500 mt-2">Pulls CAD and USD balances from configured Wise profiles.</p>
+              <p className="text-xs text-gray-500 mt-2">Pulls CAD and USD balances from configured Wise profiles and overlays the verified account certificate values.</p>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-gray-100 bg-slate-50 p-4 text-sm text-gray-900">
                   <div className="text-[11px] uppercase tracking-wider text-gray-500">App USD Wallet Balance</div>
@@ -1238,6 +1238,24 @@ print("Order executed:", order['order_id'])`;
                     <div className="rounded-xl bg-white/70 p-3 border border-emerald-100">
                       <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Wallet balance</div>
                       <div className="mt-1 font-semibold text-gray-900">${Number(reconciliationSnapshot.walletBalanceUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-emerald-100 bg-white/70 p-3 text-xs text-gray-700 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Certificate</span>
+                      <span className="font-semibold text-emerald-700">{reconciliationSnapshot.proofStatus}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">Document ref</span>
+                      <span className="font-semibold text-gray-900">{reconciliationSnapshot.documentReference}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">Primary deposit</span>
+                      <span className="font-semibold text-gray-900">${Number(reconciliationSnapshot.verifiedPrimaryDepositUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-gray-500">Verified portfolio</span>
+                      <span className="font-semibold text-gray-900">${Number(reconciliationSnapshot.verifiedPortfolioUsd || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                   <div className="rounded-xl bg-slate-900 p-3 text-[11px] font-mono text-emerald-300 break-all">

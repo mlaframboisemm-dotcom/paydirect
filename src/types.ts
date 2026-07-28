@@ -106,3 +106,43 @@ export interface Quiz {
   questions: QuizQuestion[];
   completed: boolean;
 }
+
+export interface LedgerAccount {
+  id: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  balance: number;
+  description?: string;
+}
+
+export interface ExternalTransaction {
+  id: string;
+  imported: boolean;
+  amount: number;
+  currency: string;
+  description?: string;
+  timestamp?: number;
+  source?: 'stripe' | 'wise' | 'plaid' | 'coinbase55' | 'manual';
+  date?: string;
+  category?: string;
+  raw?: any;
+}
+
+export interface LedgerTransaction {
+  id: string;
+  status?: string;
+  amount?: number;
+  currency?: string;
+  description?: string;
+  timestamp?: number;
+  source?: 'stripe' | 'wise' | 'plaid' | 'coinbase55' | 'manual';
+  date?: string;
+  entries?: Array<{ id?: string; accountId: string; amount: number; category?: string }>;
+}
+
+export interface IntegrationsState {
+  stripe: { apiKeySet: boolean; connected?: boolean };
+  plaid: { apiKeySet: boolean; connected?: boolean };
+  wise: { apiKeySet: boolean; connected?: boolean };
+  coinbase55?: { connected?: boolean; error?: string };
+}
