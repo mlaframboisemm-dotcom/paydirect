@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { MailerSend, EmailParams, Sender, Recipient } from 'mailersend';
 import { withdrawalRouter, initializeWiseEngine } from './api/withdrawal.js';
-import { createEnforcer, enforceExternalProofRequirement, isFinancialOperationVerified, getCriticalOperationsEnforcementState } from './src/lib/critical-operations-enforcer.js';
+import { createEnforcer, enforceExternalProofRequirement, isFinancialOperationVerified, getCriticalOperationsEnforcementState, getFinancialOperationVerificationSummary } from './src/lib/critical-operations-enforcer.js';
 import { generateVerificationReport, validateReport } from './src/lib/truth-based-reporter.js';
 import { LedgerMutex } from './src/lib/ledger-mutex.js';
 import { db } from './src/db/ledger.js';
@@ -10540,13 +10540,12 @@ async function startServer() {
   // Deducts from app USD wallet, creates real Wise transfer to Marcel's Wise balance
   app.post('/api/wise/payout', requireAuth, async (req: any, res: any) => {
     try {
-      const { executeWisePayout, getWiseExchangeRate } = await import('./src/lib/wise-live-integration.js');
+      const { executeWisePayout } = await import('./src/lib/wise-live-integration.js');
       const { amount, sourceCurrency = 'USD', targetCurrency = 'CAD', reference } = req.body;
       const amt = Number(amount);
       if (!amt || amt <= 0) return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'amount must be positive.' });
       const userId = req.user.id;
 
-      // Deduct from app USD wallet first
       const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
       const currentUsdBal = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
       const amtUsd = sourceCurrency === 'CAD' ? amt / 1.40895 : amt;
@@ -10554,12 +10553,10 @@ async function startServer() {
         return res.status(400).json({ error: 'INSUFFICIENT_BALANCE', message: `Insufficient USD. Have: $${currentUsdBal.toFixed(2)}, Need: $${amtUsd.toFixed(2)}` });
       }
 
-      // Determine recipient ID
       const recipientId = targetCurrency === 'USD'
         ? Number(process.env.WISE_RECIPIENT_USD_ID || 1504691893)
         : Number(process.env.WISE_RECIPIENT_CAD_ID || 1504627763);
 
-      // Execute real Wise transfer
       const result = await executeWisePayout({
         sourceCurrency,
         targetCurrency,
@@ -10568,22 +10565,30 @@ async function startServer() {
         reference: reference || `Sovereign PayDirect payout ${new Date().toISOString()}`
       });
 
-      if (result.success) {
-        // Deduct from app wallet
+      const enforcer = createEnforcer('payment');
+      const verificationResult = await enforcer.processPaymentWithVerification(
+        String(amtUsd),
+        sourceCurrency,
+        String(recipientId),
+        'wise',
+        String(result.transferId || result.quoteId || `wise_${Date.now()}`)
+      );
+      const verificationSummary = getFinancialOperationVerificationSummary(verificationResult);
+
+      if (result.success && verificationSummary.isVerified) {
         const newBal = currentUsdBal - amtUsd;
         if (usdWallets.length > 0) {
           db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newBal, userId, 'USD']);
         }
-        // Record transaction
         const txId = `wise_payout_${crypto.randomUUID()}`;
         db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [txId, userId, 'WITHDRAWAL', 'USD', amtUsd, amtUsd, Date.now(),
            `Wise Payout: ${sourceCurrency} ${amt} → ${targetCurrency} ${result.targetAmount?.toFixed(2)} (Transfer #${result.transferId})`,
            String(result.transferId || txId), 'completed', 'USD', `wise_${targetCurrency.toLowerCase()}`]);
         await recordLedgerEntry({ type: 'transfer', status: 'executed',
-          payload: { action: 'wise.payout', userId, amount: amtUsd, sourceCurrency, targetCurrency, wiseTransferId: result.transferId },
+          payload: { action: 'wise.payout', userId, amount: amtUsd, sourceCurrency, targetCurrency, wiseTransferId: result.transferId, verification: verificationSummary },
           result: { success: true, transferId: result.transferId } });
-        logTransactionEvent('WISE_PAYOUT', { userId, amount: amtUsd, sourceCurrency, targetCurrency, transferId: result.transferId });
+        logTransactionEvent('WISE_PAYOUT', { userId, amount: amtUsd, sourceCurrency, targetCurrency, transferId: result.transferId, verification: verificationSummary });
         return res.json({
           success: true,
           message: `Wise transfer created: ${sourceCurrency} ${amt} → ${targetCurrency} ${result.targetAmount?.toFixed(2)}`,
@@ -10598,13 +10603,56 @@ async function startServer() {
           rate: result.rate,
           wiseUrl: result.wiseUrl,
           appWalletDeducted: amtUsd,
-          newAppUsdBalance: newBal
+          newAppUsdBalance: newBal,
+          verification: verificationSummary
         });
-      } else {
-        return res.status(502).json({ error: 'WISE_TRANSFER_FAILED', message: result.error });
       }
+
+      return res.status(202).json({
+        success: false,
+        error: 'WISE_TRANSFER_PENDING_VERIFICATION',
+        message: verificationSummary.message,
+        verification: verificationSummary,
+        transferId: result.transferId,
+        quoteId: result.quoteId
+      });
     } catch (e: any) {
       return res.status(500).json({ error: 'WISE_PAYOUT_ERROR', message: e.message });
+    }
+  });
+
+  // POST /api/sovereign/payout — Trigger a payout via the sovereign pipeline and return verification state
+  app.post('/api/sovereign/payout', requireAuth, async (req: any, res: any) => {
+    try {
+      const { executeSovereignPayoutPipeline } = await import('./src/lib/sovereign-payout-pipeline.js');
+      const { symbol = 'BTC', amount, targetCurrency = 'CAD', splitWise = true, wiseAmount } = req.body || {};
+      const amountNum = Number(amount);
+      if (!Number.isFinite(amountNum) || amountNum <= 0) {
+        return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'amount must be a positive number.' });
+      }
+
+      const result = await executeSovereignPayoutPipeline({
+        symbol: String(symbol).toUpperCase(),
+        amount: amountNum,
+        targetCurrency: String(targetCurrency).toUpperCase(),
+        splitWise: Boolean(splitWise),
+        wiseAmount: wiseAmount == null ? undefined : Number(wiseAmount)
+      });
+
+      const verificationSummary = {
+        isVerified: Boolean(result.success && result.steps?.wise_payout?.success),
+        status: result.success ? 'pending' : 'failed',
+        message: result.success ? 'Sovereign payout workflow started. External verification will be recorded once the provider confirms the transfer.' : (result.error || 'Payout workflow failed to start.'),
+      };
+
+      return res.json({
+        success: result.success,
+        pipeline: result,
+        verification: verificationSummary,
+        message: result.success ? 'Sovereign payout workflow started.' : 'Sovereign payout workflow failed.'
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'SOVEREIGN_PAYOUT_ERROR', message: e.message });
     }
   });
 

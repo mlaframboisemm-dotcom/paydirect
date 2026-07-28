@@ -108,7 +108,15 @@ export default function DeveloperHub({
   const [reconciliationSnapshot, setReconciliationSnapshot] = useState<any | null>(() => getLocalStorageItem('cb_wise_reconciliation_snapshot', null));
   const [isFetchingWise, setIsFetchingWise] = useState(false);
   const [isReconcilingWise, setIsReconcilingWise] = useState(false);
+  const [isSubmittingPayout, setIsSubmittingPayout] = useState(false);
   const [wiseError, setWiseError] = useState<string | null>(null);
+  const [payoutAmount, setPayoutAmount] = useState('100');
+  const [payoutSymbol, setPayoutSymbol] = useState('BTC');
+  const [payoutTargetCurrency, setPayoutTargetCurrency] = useState('CAD');
+  const [payoutSplitWise, setPayoutSplitWise] = useState(true);
+  const [payoutMessage, setPayoutMessage] = useState<string | null>(null);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [payoutStatus, setPayoutStatus] = useState<'idle' | 'submitted' | 'verified' | 'pending' | 'failed'>('idle');
   const [apiKeys, setApiKeys] = useState<ApiKey[]>(() => {
     const saved = localStorage.getItem('cb_api_keys');
     if (saved) {
@@ -560,6 +568,75 @@ print("Order executed:", order['order_id'])`;
       showToast('Wise reconciliation failed', 'error');
     } finally {
       setIsReconcilingWise(false);
+    }
+  };
+
+  const submitSovereignPayout = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setPayoutError(null);
+    setPayoutMessage(null);
+    setIsSubmittingPayout(true);
+
+    try {
+      const amount = Number(payoutAmount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('Enter a valid positive payout amount.');
+      }
+
+      const res = await fetch(getApiUrl('/api/sovereign/payout'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        body: JSON.stringify({
+          symbol: payoutSymbol.trim().toUpperCase() || 'BTC',
+          amount,
+          targetCurrency: payoutTargetCurrency.toUpperCase(),
+          splitWise: payoutSplitWise,
+        })
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(json?.message || json?.error || 'Sovereign payout request failed.');
+      }
+
+      setPayoutMessage(json?.message || 'Sovereign payout workflow started.');
+      setPayoutStatus(json?.verification?.isVerified ? 'verified' : (json?.verification?.status === 'failed' ? 'failed' : 'submitted'));
+      if (json?.verification?.isVerified) {
+        showToast('Sovereign payout verified and recorded', 'success');
+      } else {
+        showToast('Sovereign payout submitted; external verification is pending', 'info');
+      }
+
+      try {
+        const persisted = {
+          status: json?.verification?.isVerified ? 'verified' : (json?.verification?.status === 'failed' ? 'failed' : 'pending'),
+          message: json?.message || 'Sovereign payout workflow started.',
+          timestamp: new Date().toISOString(),
+          amount: payoutAmount,
+          symbol: payoutSymbol.trim().toUpperCase() || 'BTC',
+          targetCurrency: payoutTargetCurrency.toUpperCase(),
+        };
+        localStorage.setItem('cb_last_sovereign_payout', JSON.stringify(persisted));
+      } catch {
+        // ignore storage failures
+      }
+
+      if (onUpdateUsdBalance) {
+        onUpdateUsdBalance(Math.max(0, appUsdWalletBalance - Number(payoutAmount)));
+      }
+      if (onUpdateWiseBusinessBalance) {
+        onUpdateWiseBusinessBalance(Math.max(0, appWiseBusinessBalance));
+      }
+
+      await fetchWiseLiveBalances(false);
+    } catch (err: any) {
+      const message = String(err?.message || err || 'Sovereign payout request failed.');
+      setPayoutError(message);
+      setPayoutStatus('failed');
+      showToast(message, 'error');
+    } finally {
+      setIsSubmittingPayout(false);
     }
   };
 
@@ -1188,6 +1265,53 @@ print("Order executed:", order['order_id'])`;
                   </div>
                 )}
               </div>
+
+              <form onSubmit={(e) => submitSovereignPayout(e)} className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.2em] font-semibold text-slate-500">Sovereign payout</div>
+                    <div className="text-sm font-semibold text-slate-900">Trigger a live payout workflow</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase ${payoutStatus === 'verified' ? 'bg-emerald-100 text-emerald-700' : payoutStatus === 'failed' ? 'bg-red-100 text-red-700' : payoutStatus === 'submitted' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {payoutStatus === 'verified' ? 'Verified' : payoutStatus === 'failed' ? 'Failed' : payoutStatus === 'submitted' ? 'Submitted' : 'Idle'}
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingPayout || isFetchingWise || isReconcilingWise}
+                      className="rounded-lg bg-[#0052FF] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {isSubmittingPayout ? 'Submitting...' : 'Run payout'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <label className="text-xs text-slate-600">
+                    <span className="mb-1 block">Amount</span>
+                    <input type="number" min="0.01" step="0.01" value={payoutAmount} onChange={(e) => setPayoutAmount(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900" />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    <span className="mb-1 block">Asset</span>
+                    <input value={payoutSymbol} onChange={(e) => setPayoutSymbol(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900" />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    <span className="mb-1 block">Target currency</span>
+                    <select value={payoutTargetCurrency} onChange={(e) => setPayoutTargetCurrency(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900">
+                      <option value="CAD">CAD</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={payoutSplitWise} onChange={(e) => setPayoutSplitWise(e.target.checked)} />
+                  <span>Split funds to Wise as part of the sovereign flow</span>
+                </label>
+
+                {payoutMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{payoutMessage}</div>}
+                {payoutError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{payoutError}</div>}
+              </form>
             </div>
             
             <div className="bg-[#1e1e1e] rounded-3xl overflow-hidden shadow-2xl border border-gray-800 flex flex-col justify-between min-h-[500px]">

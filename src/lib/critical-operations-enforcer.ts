@@ -430,3 +430,40 @@ export function enforceExternalProofRequirement(result: TestResult): void {
 export function isFinancialOperationVerified(result: TestResult): boolean {
   return result.internalResult.success === true && result.externalProof?.status === 'verified';
 }
+
+export function getFinancialOperationVerificationSummary(result: TestResult): {
+  isVerified: boolean;
+  status: 'verified' | 'pending' | 'failed' | 'unavailable';
+  message: string;
+} {
+  if (!result.internalResult.success) {
+    return {
+      isVerified: false,
+      status: 'failed',
+      message: result.internalResult.error || 'Internal validation failed.',
+    };
+  }
+
+  const status = result.externalProof?.status || 'pending';
+  if (status === 'verified') {
+    return {
+      isVerified: true,
+      status: 'verified',
+      message: 'Verified by external confirmation.',
+    };
+  }
+
+  if (status === 'failed' || status === 'unavailable') {
+    return {
+      isVerified: false,
+      status,
+      message: 'External verification failed or is unavailable.',
+    };
+  }
+
+  return {
+    isVerified: false,
+    status: 'pending',
+    message: 'Awaiting external confirmation before marking the payout as complete.',
+  };
+}
