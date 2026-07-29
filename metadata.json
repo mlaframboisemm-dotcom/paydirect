@@ -1,6 +1,6 @@
 {
-  "name": "Sovereigns Banking Hub",
-  "description": "Sovereigns Banking Hub with advanced security, financial ledger, and cryptocurrency wallet simulation.",
+  "name": "Unified Finance Hub",
+  "description": "Connects, aggregates, and synchronizes accounts across Stripe, Wise, Plaid, and a personal accounting ledger.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

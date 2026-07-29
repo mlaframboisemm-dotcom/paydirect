@@ -10,31 +10,27 @@
       "DOM.Iterable"
     ],
     "skipLibCheck": true,
-    "skipDefaultLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "react",
     "paths": {
       "@/*": [
         "./*"
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "types": ["react", "react-dom", "node"]
+    "noEmit": true
   },
   "include": [
     "src/**/*",
-    "scripts/**/*",
-    "server.ts",
-    "*.ts",
-    "src/**/*.d.ts"
+    "server.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "downloaded_hub",
+    "sovereigns",
+    "sovereigns-banking-hub"
   ]
 }

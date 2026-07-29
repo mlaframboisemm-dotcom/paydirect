@@ -25,6 +25,10 @@ export interface WalletPassData {
   totalPortfolioUsd: number;
   walletAddress: string;
   topHoldings: Array<{ symbol: string; amount: number }>;
+  wiseLiveSynced?: boolean;
+  wiseCADBalance?: number;
+  wiseUSDBalance?: number;
+  wiseTotalUSD?: number;
 }
 
 /**

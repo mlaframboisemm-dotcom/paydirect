@@ -47,7 +47,7 @@ export interface DBWallet {
 export interface DBTransaction {
   id: string;
   userId: string;
-  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE' | 'WISE_WITHDRAWAL' | 'WISE_DEPOSIT_RECEIVE';
+  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE' | 'WISE_WITHDRAWAL';
   assetSymbol: string;
   amount: number;
   fiatAmount: number;
@@ -430,24 +430,6 @@ class RelationalLedgerDatabase {
         assetSymbol: 'ETH',
         balance: 116998.23,
         publicAddressEthereum: '0xabcdef1234567890abcdef1234567890abcdef12',
-        publicAddressBitcoin: '',
-        identityLocked: true,
-        productionMode: 'live',
-        blockchainLinked: true,
-        lockedToEmail: targetEmail,
-        lockedAt: new Date().toISOString()
-      });
-    }
-
-    // Ensure a dedicated Wise business settlement wallet exists for reconciliation
-    let wiseBusinessWallet = this.state.wallets.find(w => w.userId === userId && w.assetSymbol === 'WISE_BUSINESS');
-    if (!wiseBusinessWallet) {
-      this.state.wallets.push({
-        id: `wallet-${userId}-wise-business`,
-        userId,
-        assetSymbol: 'WISE_BUSINESS',
-        balance: 1791100,
-        publicAddressEthereum: '',
         publicAddressBitcoin: '',
         identityLocked: true,
         productionMode: 'live',

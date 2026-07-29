@@ -4,17 +4,7 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
-  const baseUrl = String(process.env.VITE_BASE_URL || process.env.BASE_URL || '/').trim();
   return {
-    base: baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`,
-    root: path.resolve(__dirname, 'src'),
-    envDir: path.resolve(__dirname, '.'),
-    publicDir: path.resolve(__dirname, 'public'),
-    build: {
-      outDir: path.resolve(__dirname, 'dist'),
-      emptyOutDir: true,
-      sourcemap: true,
-    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

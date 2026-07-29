@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Bell, Menu, Compass, ArrowUpRight, ArrowDownLeft, X, Wallet, ShieldCheck, User, LogOut, Award, CreditCard, ChevronDown, Globe } from 'lucide-react';
+import { Search, Bell, Menu, Compass, ArrowUpRight, ArrowDownLeft, X, Wallet, ShieldCheck, User, LogOut, Award, CreditCard, ChevronDown } from 'lucide-react';
 import { Coin } from '../types';
 
 interface HeaderProps {
@@ -59,11 +59,12 @@ export default function Header({
   const navItems = [
     { id: 'dashboard', label: 'Assets' },
     { id: 'trade', label: 'Trade' },
+    { id: 'sovereign', label: 'Sovereign Hub' },
+    { id: 'wise-card', label: 'Wise Card', badge: 'API' },
+    { id: 'google-pay', label: 'Google Pay & Pass', badge: 'Tap' },
     { id: 'onboarding', label: 'KYC & Limits' },
     { id: 'learn', label: 'Learning Rewards', badge: 'Earn $12' },
     { id: 'card', label: 'Coinbase Card' },
-    { id: 'api', label: 'Developer Hub' },
-    { id: 'hub', label: 'Unified Hub' },
     { id: 'history', label: 'Transactions' }
   ];
 
@@ -433,6 +434,16 @@ export default function Header({
                     </button>
                     <button
                       onClick={() => {
+                        setCurrentTab('sovereign');
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
+                    >
+                      <ShieldCheck className="h-4 w-4 text-amber-500" />
+                      <span className="font-bold text-gray-900">Sovereign Banking Hub</span>
+                    </button>
+                    <button
+                      onClick={() => {
                         setCurrentTab('address');
                         setShowProfileMenu(false);
                       }}
@@ -450,16 +461,6 @@ export default function Header({
                     >
                       <Compass className="h-4 w-4 text-emerald-500" />
                       <span>Developer Hub</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCurrentTab('hub');
-                        setShowProfileMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer text-left font-medium"
-                    >
-                      <Globe className="h-4 w-4 text-blue-500" />
-                      <span>Unified Finance Hub</span>
                     </button>
                     <button
                       onClick={() => {

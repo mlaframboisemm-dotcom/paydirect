@@ -881,7 +881,7 @@ export default function TransactionList({
                   </p>
                   {status?.coinbase55?.error && (
                     <div className="bg-white border border-red-100 p-3 rounded-lg text-left font-mono text-[10px] text-red-700 mt-3 overflow-x-auto break-all">
-                      <strong>Handshake Error:</strong> {status.coinbase55.error}
+                      <strong>Handshake Error:</strong> {status?.coinbase55?.error}
                     </div>
                   )}
                 </div>

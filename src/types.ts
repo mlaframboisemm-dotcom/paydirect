@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 export interface Coin {
   id: string;
   name: string;
@@ -27,7 +26,7 @@ export interface Holding {
 
 export interface Transaction {
   id: string;
-  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE' | 'WISE_WITHDRAWAL' | 'WISE_DEPOSIT_RECEIVE';
+  type: 'BUY' | 'SELL' | 'CONVERT' | 'EARN' | 'SEND' | 'RECEIVE';
   assetSymbol: string;
   amount: number;
   fiatAmount: number;
@@ -110,39 +109,71 @@ export interface Quiz {
 export interface LedgerAccount {
   id: string;
   name: string;
-  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
+  type: string;
   balance: number;
-  description?: string;
+  currency: string;
+  description: string;
 }
 
-export interface ExternalTransaction {
+export interface LedgerEntry {
   id: string;
-  imported: boolean;
+  date: string;
+  description: string;
   amount: number;
-  currency: string;
-  description?: string;
-  timestamp?: number;
-  source?: 'stripe' | 'wise' | 'plaid' | 'coinbase55' | 'manual';
-  date?: string;
-  category?: string;
-  raw?: any;
+  accountId: string;
+  category: string;
+  source: string;
+  sourceId: string;
+  cleared: boolean;
 }
 
 export interface LedgerTransaction {
   id: string;
-  status?: string;
-  amount?: number;
-  currency?: string;
-  description?: string;
-  timestamp?: number;
-  source?: 'stripe' | 'wise' | 'plaid' | 'coinbase55' | 'manual';
-  date?: string;
-  entries?: Array<{ id?: string; accountId: string; amount: number; category?: string }>;
+  date: string;
+  description: string;
+  source: string;
+  sourceId: string;
+  entries: LedgerEntry[];
+}
+
+export interface ExternalTransaction {
+  id: string;
+  source: string;
+  date: string;
+  description: string;
+  amount: number;
+  currency: string;
+  category: string;
+  raw?: any;
+  imported: boolean;
+  ledgerTransactionId?: string;
 }
 
 export interface IntegrationsState {
-  stripe: { apiKeySet: boolean; connected?: boolean };
-  plaid: { apiKeySet: boolean; connected?: boolean };
-  wise: { apiKeySet: boolean; connected?: boolean };
-  coinbase55?: { connected?: boolean; error?: string };
+  stripe: {
+    apiKeySet: boolean;
+    connected: boolean;
+    mode?: string;
+    lastSyncedAt?: string;
+  };
+  plaid: {
+    apiKeySet: boolean;
+    connected: boolean;
+    mode?: string;
+    lastSyncedAt?: string;
+  };
+  wise: {
+    apiKeySet: boolean;
+    connected: boolean;
+    mode?: string;
+    lastSyncedAt?: string;
+  };
+  coinbase55?: {
+    apiKeySet: boolean;
+    connected: boolean;
+    mode?: string;
+    lastSyncedAt?: string;
+    error?: string | null;
+  };
 }
+

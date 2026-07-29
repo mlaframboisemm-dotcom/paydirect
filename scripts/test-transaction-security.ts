@@ -1,11 +1,8 @@
-/// <reference types="node" />
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
 import net from 'net';
 import crypto from 'crypto';
-import process from 'process';
-import { Buffer } from 'buffer';
 
 const repoRoot = process.cwd();
 const dbPath = path.join(repoRoot, 'src', 'db', 'database.json');
@@ -67,15 +64,10 @@ async function waitForServerReady(proc: ReturnType<typeof spawn>): Promise<void>
       }
     };
 
-    if (!proc.stdout || !proc.stderr) {
-      reject(new Error('Process streams are unavailable.'));
-      return;
-    }
-
     proc.stdout.on('data', handleData);
     proc.stderr.on('data', handleData);
 
-    proc.on('exit', (code: number | null) => {
+    proc.on('exit', (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);

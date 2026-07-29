@@ -63,21 +63,15 @@ export function logSecurityEvent(
  */
 export function logTransactionEvent(
   type: string,
-  statusOrDetails?: string | Record<string, any>,
-  detailsMaybe?: Record<string, any>
+  statusOrDetails: any,
+  details?: Record<string, any>
 ): void {
   const logger = getLogger();
-  let status = 'INFO';
-  let details: Record<string, any> = {};
-
-  if (typeof statusOrDetails === 'string') {
-    status = statusOrDetails || 'INFO';
-    details = detailsMaybe || {};
-  } else if (typeof statusOrDetails === 'object' && statusOrDetails !== null) {
-    details = statusOrDetails as Record<string, any>;
+  if (typeof statusOrDetails === 'object' && !details) {
+    logger.info(`[TRANSACTION] ${type}`, statusOrDetails);
+  } else {
+    logger.info(`[TRANSACTION] ${type} - ${statusOrDetails}`, details || {});
   }
-
-  logger.info(`[TRANSACTION] ${type} - ${status}`, details);
 }
 
 /**
@@ -85,16 +79,16 @@ export function logTransactionEvent(
  */
 export function logProviderEvent(
   provider: string,
-  event: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'TIMEOUT' | 'RATE_LIMITED',
-  details: Record<string, any>
+  event: string,
+  details?: Record<string, any>
 ): void {
   const logger = getLogger();
   const level = event === 'ERROR' || event === 'TIMEOUT' ? 'ERROR' : 'WARN';
   
   if (level === 'ERROR') {
-    logger.error(`[PROVIDER] ${provider} - ${event}`, details);
+    logger.error(`[PROVIDER] ${provider} - ${event}`, details || {});
   } else {
-    logger.warn(`[PROVIDER] ${provider} - ${event}`, details);
+    logger.warn(`[PROVIDER] ${provider} - ${event}`, details || {});
   }
 }
 
@@ -102,12 +96,12 @@ export function logProviderEvent(
  * Log database operations
  */
 export function logDatabaseEvent(
-  operation: 'READ' | 'WRITE' | 'DELETE' | 'UPDATE' | 'QUERY',
+  operation: string,
   table: string,
-  details: Record<string, any>
+  details?: Record<string, any>
 ): void {
   const logger = getLogger();
-  logger.debug(`[DATABASE] ${operation} on ${table}`, details);
+  logger.debug(`[DATABASE] ${operation} on ${table}`, details || {});
 }
 
 /**
@@ -119,13 +113,12 @@ export function logSystemEvent(
 ): void {
   const logger = getLogger();
   const level = event === 'ERROR' ? 'ERROR' : event === 'WARNING' ? 'WARN' : 'INFO';
-
-  const payload = details || {};
+  
   if (level === 'ERROR') {
-    logger.error(`[SYSTEM] ${event}`, payload);
+    logger.error(`[SYSTEM] ${event}`, details || {});
   } else if (level === 'WARN') {
-    logger.warn(`[SYSTEM] ${event}`, payload);
+    logger.warn(`[SYSTEM] ${event}`, details || {});
   } else {
-    logger.info(`[SYSTEM] ${event}`, payload);
+    logger.info(`[SYSTEM] ${event}`, details || {});
   }
 }

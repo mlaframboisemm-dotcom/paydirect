@@ -193,18 +193,16 @@ export async function fetchLiveExchangeRates(): Promise<Record<string, number>> 
   try {
     const res = await fetch('/api/prices');
     if (!res.ok) {
-      if (isProd) {
-        throw new Error(`Price API unavailable: ${res.status}`);
+      if ((import.meta as any).env?.DEV) {
+        console.warn('Price API returned non-ok status:', res.status);
       }
-      console.warn('Price API returned non-ok status:', res.status);
       return fallbacks;
     }
     const contentType = res.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
-      if (isProd) {
-        throw new Error('Price API returned non-JSON content');
+      if ((import.meta as any).env?.DEV) {
+        console.warn('Price API returned non-JSON content-type:', contentType);
       }
-      console.warn('Price API returned non-JSON content-type:', contentType);
       return fallbacks;
     }
     const data = await res.json();
@@ -228,10 +226,9 @@ export async function fetchLiveExchangeRates(): Promise<Record<string, number>> 
       USDCAD: data.USDCAD?.USD || 1.3650
     };
   } catch (error) {
-    if (isProd) {
-      throw error;
+    if ((import.meta as any).env?.DEV) {
+      console.warn('Unable to retrieve live exchange rates, defaulting to internal reference pricing:', error);
     }
-    console.warn('Unable to retrieve live exchange rates, defaulting to internal reference pricing:', error);
     return fallbacks;
   }
 }

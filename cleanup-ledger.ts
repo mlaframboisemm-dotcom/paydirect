@@ -4,7 +4,7 @@ console.log('\n🧹 Cleaning up corrupt transactions...\n');
 
 try {
   // Get all transactions
-  const allTxs = (db as any).getAllTransactions?.() ?? [];
+  const allTxs = db.getAllTransactions();
   console.log(`Total transactions: ${allTxs.length}`);
 
   // Find corrupt ones (ledger-deposit-* transactions)
@@ -25,7 +25,7 @@ try {
 
   // Verify integrity
   console.log('Checking integrity after cleanup...');
-  const integrity = (db as any).checkLedgerIntegrity?.() ?? { errors: [], warnings: [] };
+  const integrity = db.checkLedgerIntegrity();
   console.log(`  Errors: ${integrity.errors.length}`);
   console.log(`  Warnings: ${integrity.warnings.length}`);
   

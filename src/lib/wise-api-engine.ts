@@ -51,7 +51,7 @@ export interface WiseRecipientPayload {
 
 export interface WiseTransferStatus {
   id: string;
-  status: 'incoming_payment_waiting' | 'processing' | 'outgoing_payment_sent' | 'completed' | 'settled' | 'cancelled' | 'rejected';
+  status: 'incoming_payment_waiting' | 'processing' | 'outgoing_payment_sent' | 'cancelled' | 'rejected';
   amount: number;
   currency: string;
   createdAt: string;
@@ -808,24 +808,6 @@ export class WiseApiEngine {
    * @param transferId - Wise transfer ID to check
    * @returns Current transfer status
    */
-  async getStandardBalances(): Promise<any[]> {
-    logger.debug('Fetching standard Wise balances');
-    const profileId = await this.getProfileId();
-    const response = await this.wiseFetch(`/v4/profiles/${profileId}/balances?types=STANDARD`, {
-      method: 'GET',
-      headers: this.baseHeaders
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      logger.error('Wise standard balance fetch failed', { status: response.status, error });
-      throw new Error(`Wise balance fetch failed: ${response.status}`);
-    }
-
-    const balanceData = await response.json();
-    return Array.isArray(balanceData) ? balanceData : [];
-  }
-
   async checkTransferStatus(transferId: string): Promise<WiseTransferStatus> {
     logger.debug('Checking transfer status', { transferId });
 
@@ -878,6 +860,40 @@ export class WiseApiEngine {
     refreshInFlight: boolean;
   } {
     return this.authProvider.getHealthSnapshot();
+  }
+
+  /**
+   * Fetches real live Wise account balances for profile
+   */
+  async getProfileBalances(customProfileId?: string): Promise<any[]> {
+    try {
+      const profileId = customProfileId || await this.getProfileId();
+      const response = await this.wiseFetch(`/v4/profiles/${profileId}/balances?types=STANDARD`, {
+        method: 'GET',
+        headers: this.baseHeaders
+      });
+
+      if (!response.ok) {
+        // Fall back to v1 borderless-accounts
+        const altRes = await this.wiseFetch(`/v1/borderless-accounts?profileId=${profileId}`, {
+          method: 'GET',
+          headers: this.baseHeaders
+        });
+        if (altRes.ok) {
+          const accounts = await altRes.json();
+          if (Array.isArray(accounts) && accounts.length > 0 && accounts[0].balances) {
+            return accounts[0].balances;
+          }
+        }
+        return [];
+      }
+
+      const balances = await response.json();
+      return Array.isArray(balances) ? balances : [];
+    } catch (err: any) {
+      logger.warn('Could not fetch live Wise balances directly from Wise API endpoint', { error: err.message });
+      return [];
+    }
   }
 }
 
