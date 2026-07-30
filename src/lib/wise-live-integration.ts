@@ -339,3 +339,12 @@ export async function getWiseTotalCashUSD(): Promise<{
     businessName: 'sovereigns'
   };
 }
+
+export function parseWiseBalanceAmount(obj: any): number {
+  if (obj === null || obj === undefined) return 0;
+  if (typeof obj.value === 'number') return obj.value;
+  if (typeof obj.amount === 'number') return obj.amount;
+  if (obj.amount && typeof obj.amount.value === 'number') return obj.amount.value;
+  if (obj.cashAmount && typeof obj.cashAmount.value === 'number') return obj.cashAmount.value;
+  return 0;
+}

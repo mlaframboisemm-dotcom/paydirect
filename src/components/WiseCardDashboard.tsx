@@ -170,15 +170,20 @@ export default function WiseCardDashboard({
 
   // Fetch Wise Card Details
   const fetchCardDetails = async () => {
+    const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
     try {
       setIsRefreshing(true);
-      const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
       const res = await fetch('/api/withdrawal/wise/card/details', {
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         }
       });
+      if (res.status === 401) return;
       const data = await res.json();
       if (data.success && data.card) {
         setCard(data.card);
@@ -192,7 +197,9 @@ export default function WiseCardDashboard({
         });
       }
     } catch (err) {
-      console.error('Failed to fetch Wise card details:', err);
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch Wise card details:', err);
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -201,23 +208,27 @@ export default function WiseCardDashboard({
 
   // Fetch Transactions
   const fetchTransactions = async (query = '', cat = 'ALL') => {
+    const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+    if (!token) return;
     try {
-      const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
       const url = new URL('/api/withdrawal/wise/card/transactions', window.location.origin);
       if (query) url.searchParams.set('q', query);
       if (cat && cat !== 'ALL') url.searchParams.set('category', cat);
 
       const res = await fetch(url.toString(), {
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${token}`
         }
       });
+      if (res.status === 401) return;
       const data = await res.json();
       if (data.success && Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
       }
     } catch (err) {
-      console.error('Failed to fetch Wise card transactions:', err);
+      if (import.meta.env.DEV) {
+        console.error('Failed to fetch Wise card transactions:', err);
+      }
     }
   };
 

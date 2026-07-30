@@ -1903,8 +1903,7 @@ function getMarshallAddress(): string {
 
 // Mount withdrawal routing gateway
 // TEMPORARILY DISABLED FOR LIVE TRANSACTION TESTING
-// app.use('/api/withdrawal', requireAuth, requireMfa, withdrawalRouter);
-app.use('/api/withdrawal', withdrawalRouter); // Test mode: auth disabled
+app.use('/api/withdrawal', requireAuth, requireMfa, withdrawalRouter);
 
 /**
  * Health check endpoint.
@@ -2956,6 +2955,195 @@ app.post('/api/wallet/settle-broadcast', requireAuth, requireMfa, async (req: an
 });
 
 /**
+ * Authenticated user ledger broadcast.
+ * Anchors the authenticated user’s cleared ledger wallet balances on-chain.
+ */
+app.post('/api/wallet/user-settle-broadcast', requireAuth, requireMfa, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Authentication required.' });
+  }
+
+  const privKey = process.env.MARSHALL_WALLET_PRIVATE_KEY;
+  if (!privKey) {
+    return res.status(503).json({ error: 'BROADCAST_NOT_CONFIGURED', message: 'On-chain broadcast key is not configured.' });
+  }
+
+  try {
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+    if (!Array.isArray(wallets) || wallets.length === 0) {
+      return res.status(404).json({ error: 'WALLET_BALANCES_NOT_FOUND', message: 'No ledger wallet balances were found for the authenticated user.' });
+    }
+
+    const sortedBalances = wallets
+      .map((wallet) => ({
+        assetSymbol: String(wallet.assetSymbol || 'UNKNOWN').toUpperCase(),
+        balance: Number(wallet.balance || 0)
+      }))
+      .sort((a, b) => a.assetSymbol.localeCompare(b.assetSymbol));
+
+    const totalValue = sortedBalances.reduce((sum, wallet) => sum + wallet.balance, 0);
+    const statePayload = {
+      userId,
+      timestamp: new Date().toISOString(),
+      wallets: sortedBalances
+    };
+    const stateString = JSON.stringify(statePayload);
+    const stateHash = crypto.createHash('sha256').update(stateString).digest('hex');
+
+    const providerUrl = String(process.env.ETHEREUM_RPC_URL || 'https://ethereum-rpc.publicnode.com').trim();
+    const provider = new ethers.JsonRpcProvider(providerUrl, 1, { staticNetwork: true });
+    const wallet = new ethers.Wallet(privKey, provider);
+    const payloadStr = `SOVEREIGN-USER-SETTLE:${userId}:${stateHash}`;
+    const dataHex = ethers.hexlify(ethers.toUtf8Bytes(payloadStr));
+
+    const tx = await wallet.sendTransaction({
+      to: wallet.address,
+      value: 0n,
+      data: dataHex
+    });
+
+    const enforcer = createEnforcer('blockchain');
+    const verificationResult = await enforcer.executeBlockchainTransfer(
+      'ethereum',
+      tx.hash,
+      '0',
+      wallet.address,
+      userId
+    );
+
+    await recordLedgerEntry({
+      type: 'transfer',
+      status: isFinancialOperationVerified(verificationResult) ? 'completed' : 'pending',
+      payload: {
+        action: 'user_settlement.broadcast',
+        userId,
+        wallets: sortedBalances,
+        totalValue,
+        stateHash,
+        txHash: tx.hash
+      },
+      result: {
+        verification: verificationResult.externalProof,
+        broadcastAt: new Date().toISOString()
+      }
+    });
+
+    return res.status(isFinancialOperationVerified(verificationResult) ? 200 : 202).json({
+      success: true,
+      userId,
+      txHash: tx.hash,
+      totalValue,
+      wallets: sortedBalances,
+      stateHash,
+      isRealBroadcast: true,
+      verification: verificationResult.externalProof,
+      message: isFinancialOperationVerified(verificationResult)
+        ? 'User ledger broadcast verified on-chain.'
+        : 'User ledger broadcast sent and pending verification.',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('User ledger broadcast failed:', error);
+    return res.status(500).json({ error: 'USER_LEDGER_BROADCAST_FAILED', message: String(error?.message || 'Failed to broadcast user ledger state.') });
+  }
+});
+
+app.post('/api/wallet/migrate-to-new', requireAuth, requireMfa, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  const assetSymbol = req.body?.assetSymbol ? String(req.body.assetSymbol).trim().toUpperCase() : '';
+
+  if (!userId) {
+    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Authentication required.' });
+  }
+
+  if (!assetSymbol) {
+    return res.status(400).json({ error: 'MISSING_ASSET_SYMBOL', message: 'assetSymbol is required to migrate wallet balances.' });
+  }
+
+  try {
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, assetSymbol]) as any[];
+    if (!wallets || wallets.length === 0) {
+      return res.status(404).json({ error: 'WALLETS_NOT_FOUND', message: `No wallets found for asset ${assetSymbol}.` });
+    }
+
+    const totalBalance = wallets.reduce((sum, wallet) => sum + Number(wallet.balance || 0), 0);
+    if (!Number.isFinite(totalBalance) || totalBalance <= 0) {
+      return res.status(400).json({ error: 'NO_BALANCE_TO_MIGRATE', message: 'There is no positive balance to migrate.' });
+    }
+
+    const existingWalletIds = wallets.map((wallet) => String(wallet.id || wallet.wallet_id || '')).filter(Boolean);
+    const firstWallet = wallets[0];
+    const newWalletId = `wallet-${userId}-${assetSymbol.toLowerCase()}-${crypto.randomUUID()}`;
+    const publicAddressEthereum = String(firstWallet.public_address_ethereum || firstWallet.publicAddressEthereum || `0x${crypto.randomBytes(20).toString('hex')}`);
+    const publicAddressBitcoin = String(firstWallet.public_address_bitcoin || firstWallet.publicAddressBitcoin || `bc1${crypto.randomBytes(20).toString('hex')}`);
+    const productionMode = String(firstWallet.productionMode || firstWallet.production_mode || 'live');
+
+    db.execute(
+      'INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        newWalletId,
+        userId,
+        assetSymbol,
+        Number(totalBalance.toFixed(2)),
+        publicAddressEthereum,
+        publicAddressBitcoin,
+        1,
+        productionMode,
+        1,
+        String(req.user?.email || '').toLowerCase()
+      ]
+    );
+
+    db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [0, userId, assetSymbol]);
+
+    await recordLedgerEntry({
+      type: 'transfer',
+      status: 'completed',
+      payload: {
+        action: 'wallet.migration',
+        userId,
+        assetSymbol,
+        fromWalletIds: existingWalletIds,
+        toWalletId: newWalletId,
+        amount: Number(totalBalance.toFixed(2))
+      },
+      result: {
+        migratedAt: new Date().toISOString(),
+        newWalletId,
+        walletCount: existingWalletIds.length
+      }
+    });
+
+    db.execute(
+      'INSERT INTO audit_logs (id, user_id, action, timestamp, ip_address, status, details) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        `audit_${crypto.randomUUID()}`,
+        userId,
+        'WALLET_MIGRATION',
+        Date.now(),
+        String(req.ip || req.socket.remoteAddress || ''),
+        'success',
+        `Migrated ${assetSymbol} balance $${Number(totalBalance.toFixed(2)).toFixed(2)} to new wallet ${newWalletId}`
+      ]
+    );
+
+    return res.json({
+      success: true,
+      newWalletId,
+      assetSymbol,
+      migratedBalance: Number(totalBalance.toFixed(2)),
+      fromWalletIds: existingWalletIds,
+      message: 'Wallet balances migrated to a new ledger wallet.'
+    });
+  } catch (error: any) {
+    console.error('Wallet migration failed:', error);
+    return res.status(500).json({ error: 'WALLET_MIGRATION_FAILED', message: String(error?.message || 'Failed to migrate wallet balances.') });
+  }
+});
+
+
+/**
  * Proxy to fetch live cryptocurrency rates from a secure public feed (Binance Public API).
  * Fallback to robust reference rates if there are external API or network interruptions.
  */
@@ -3503,7 +3691,7 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
         results.coinbase = { success: false, live: true, error: err.message };
       }
     } else {
-      return res.status(400).json({ error: 'Coinbase API credentials (COINBASE_API_KEY_ID & COINBASE_API_SECRET_RAW) are not configured.' });
+      return res.status(503).json({ error: 'Coinbase API credentials (COINBASE_API_KEY_ID & COINBASE_API_SECRET_RAW) are not configured.' });
     }
   }
 
@@ -3523,7 +3711,7 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
         results.kraken = { success: false, live: true, error: err.message };
       }
     } else {
-      return res.status(400).json({ error: 'Kraken API credentials (KRAKEN_API_KEY & KRAKEN_API_SECRET) are not configured.' });
+      return res.status(503).json({ error: 'Kraken API credentials (KRAKEN_API_KEY & KRAKEN_API_SECRET) are not configured.' });
     }
   }
 
@@ -3548,7 +3736,7 @@ app.post('/api/exchanges/trade', requireAuth, tradeRateLimiter, requireMfa, requ
         results.routing = { success: false, live: true, error: err.message };
       }
     } else {
-      return res.status(400).json({ error: 'No exchange credentials configured for dynamic routing.' });
+      return res.status(503).json({ error: 'No exchange credentials configured for dynamic routing.' });
     }
   }
 
@@ -6532,7 +6720,7 @@ app.post('/api/auth/exchange-code', async (req: any, res: any) => {
 
 if (ENABLE_DEV_TEST_TOKEN) {
   app.post('/api/auth/test-token', (req, res) => {
-    const { token } = issueSessionForUser({ id: 'user_1783268445451', email: 'admin@sovereigns.ca', name: 'Test User' }, true);
+    const { token } = issueSessionForUser({ id: 'user_mlaframboisemm', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' }, true);
     return res.json({ success: true, token });
   });
 }

@@ -1115,7 +1115,9 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.warn('Failed to load user profile from Firestore:', err);
+        if (import.meta.env.DEV) {
+          console.warn('Failed to load user profile from Firestore:', err);
+        }
       }
     };
 
@@ -1138,7 +1140,9 @@ export default function App() {
           lastUpdated: new Date().toISOString()
         }, { merge: true });
       } catch (err) {
-        console.warn('Failed to save user profile to Firestore:', err);
+        if (import.meta.env.DEV) {
+          console.warn('Failed to save user profile to Firestore:', err);
+        }
       }
     };
 
