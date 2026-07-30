@@ -197,7 +197,7 @@ export default function WiseCardDashboard({
         });
       }
     } catch (err) {
-      if (import.meta.env.DEV) {
+      if ((import.meta as any).env?.DEV) {
         console.error('Failed to fetch Wise card details:', err);
       }
     } finally {
@@ -226,7 +226,7 @@ export default function WiseCardDashboard({
         setTransactions(data.transactions);
       }
     } catch (err) {
-      if (import.meta.env.DEV) {
+      if ((import.meta as any).env?.DEV) {
         console.error('Failed to fetch Wise card transactions:', err);
       }
     }
