@@ -13,6 +13,36 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
+const configuredApiBase = String(
+  (import.meta as any).env?.VITE_API_BASE ||
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  ''
+).trim();
+
+function buildApiUrl(path: string): string {
+  const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
+  const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
+  if (typeof window !== 'undefined') {
+    const isCapacitor = window.location.origin === 'http://localhost' || 
+                        window.location.origin === 'capacitor://localhost' || 
+                        window.location.protocol.startsWith('capacitor') ||
+                        !!(window as any).Capacitor;
+    if (isCapacitor) {
+      return `https://www.pay.sovereigns.ca${normalized}`;
+    }
+    if (window.location.protocol === 'file:') {
+      return `http://localhost:3000${normalized}`;
+    }
+    if (window.location?.origin && window.location.origin !== 'null') {
+      return `${window.location.origin}${normalized}`;
+    }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
+  }
+  return normalized;
+}
+
 interface GooglePayButtonProps {
   amount: number;           // Amount in CAD
   currency?: string;        // Default: CAD
@@ -118,7 +148,7 @@ export function GooglePayButton({
     try {
       setIsProcessing(true);
       // Send payment token to sovereign ledger endpoint
-      const response = await fetch('/api/sovereign/googlepay/process', {
+      const response = await fetch(buildApiUrl('/api/sovereign/googlepay/process'), {
         method: 'POST',
         headers: getAuthHeaders(),
         credentials: 'include',
@@ -178,7 +208,7 @@ export function GooglePayButton({
       // Fallback: If Google Pay UI is blocked by browser/OR_BIBED_11 or canceled, process directly via Sovereign PayDirect ledger
       if (err.statusCode !== 'CANCELED') {
         try {
-          const fallbackRes = await fetch('/api/sovereign/googlepay/process', {
+          const fallbackRes = await fetch(buildApiUrl('/api/sovereign/googlepay/process'), {
             method: 'POST',
             headers: getAuthHeaders(),
             credentials: 'include',

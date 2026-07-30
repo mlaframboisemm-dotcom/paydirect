@@ -5,6 +5,36 @@ import { GooglePayButton } from './GooglePayButton';
 import { auth } from '../lib/firebase';
 import { useWiseGooglePassSync } from '../lib/wise-google-pass-sync-service';
 
+const configuredApiBase = String(
+  (import.meta as any).env?.VITE_API_BASE ||
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  ''
+).trim();
+
+function buildApiUrl(path: string): string {
+  const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
+  const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
+  if (typeof window !== 'undefined') {
+    const isCapacitor = window.location.origin === 'http://localhost' || 
+                        window.location.origin === 'capacitor://localhost' || 
+                        window.location.protocol.startsWith('capacitor') ||
+                        !!(window as any).Capacitor;
+    if (isCapacitor) {
+      return `https://www.pay.sovereigns.ca${normalized}`;
+    }
+    if (window.location.protocol === 'file:') {
+      return `http://localhost:3000${normalized}`;
+    }
+    if (window.location?.origin && window.location.origin !== 'null') {
+      return `${window.location.origin}${normalized}`;
+    }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
+  }
+  return normalized;
+}
+
 export async function getFirebaseAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -78,7 +108,7 @@ export function useWiseWallets() {
     try {
       setIsLoadingWallets(true);
       const authHeaders = await getFirebaseAuthHeaders();
-      const res = await fetch('/api/wise/balances', { headers: authHeaders, credentials: 'include' });
+      const res = await fetch(buildApiUrl('/api/wise/balances'), { headers: authHeaders, credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -169,7 +199,7 @@ export function useWiseLedgerEnforcer() {
     setIsReconciling(true);
     try {
       const authHeaders = await getFirebaseAuthHeaders();
-      const res = await fetch('/api/wise/balances', { headers: authHeaders, credentials: 'include' });
+      const res = await fetch(buildApiUrl('/api/wise/balances'), { headers: authHeaders, credentials: 'include' });
       let liveUsd = ledgerStatus.reconciledUsdBalance;
       
       if (res.ok) {
@@ -500,7 +530,7 @@ export default function GooglePayAndPassHub({
       const authHeaders = await getFirebaseAuthHeaders();
 
       // Step 2: Immediate Wise API withdrawal / payout transaction
-      const res = await fetch('/api/sovereign/wallet-pass/scan', {
+      const res = await fetch(buildApiUrl('/api/sovereign/wallet-pass/scan'), {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -530,7 +560,7 @@ export default function GooglePayAndPassHub({
 
       // Fallback to direct /api/wise/payout if needed
       if (!res.ok) {
-        const payoutRes = await fetch('/api/wise/payout', {
+        const payoutRes = await fetch(buildApiUrl('/api/wise/payout'), {
           method: 'POST',
           headers: {
             ...authHeaders,
@@ -718,7 +748,7 @@ export default function GooglePayAndPassHub({
   const handleSyncWise = async () => {
     setIsSyncingWise(true);
     try {
-      const res = await fetch('/api/wise/reconcile', {
+      const res = await fetch(buildApiUrl('/api/wise/reconcile'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
@@ -741,7 +771,7 @@ export default function GooglePayAndPassHub({
   const fetchWalletPass = async () => {
     setIsLoadingPass(true);
     try {
-      const res = await fetch('/api/sovereign/wallet-pass', {
+      const res = await fetch(buildApiUrl('/api/sovereign/wallet-pass'), {
         credentials: 'include'
       });
       if (res.ok) {
@@ -750,14 +780,14 @@ export default function GooglePayAndPassHub({
         if (data.qrDataUrl) {
           setQrCodeUrl(data.qrDataUrl);
         } else {
-          setQrCodeUrl('/api/sovereign/wallet-pass/qr');
+          setQrCodeUrl(buildApiUrl('/api/sovereign/wallet-pass/qr'));
         }
       } else {
-        setQrCodeUrl('/api/sovereign/wallet-pass/qr');
+        setQrCodeUrl(buildApiUrl('/api/sovereign/wallet-pass/qr'));
       }
     } catch (e) {
       console.warn('Failed to load Google Wallet Pass:', e);
-      setQrCodeUrl('/api/sovereign/wallet-pass/qr');
+      setQrCodeUrl(buildApiUrl('/api/sovereign/wallet-pass/qr'));
     } finally {
       setIsLoadingPass(false);
     }
@@ -1406,6 +1436,28 @@ export default function GooglePayAndPassHub({
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Google Wallet Integration Button */}
+              {passData?.addToWalletUrl && (
+                <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="text-xs">
+                    <span className="font-bold text-slate-900 block">Link to Google Wallet</span>
+                    <span className="text-slate-500 text-[11px]">Save this digital pass directly to your device Google Wallet.</span>
+                  </div>
+                  <a
+                    href={passData.addToWalletUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center shrink-0 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <img 
+                      src="https://upload.wikimedia.org/wikipedia/commons/e/e1/Google_Wallet_badge.svg" 
+                      alt="Add to Google Wallet" 
+                      className="h-10 rounded-lg shadow-sm" 
+                    />
+                  </a>
+                </div>
+              )}
 
               {/* PWA & Download Options */}
               <div className="bg-white rounded-3xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">

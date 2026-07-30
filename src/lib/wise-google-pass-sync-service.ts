@@ -1,5 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 
+const configuredApiBase = String(
+  (import.meta as any).env?.VITE_API_BASE ||
+  (import.meta as any).env?.VITE_API_BASE_URL ||
+  ''
+).trim();
+
+function buildApiUrl(path: string): string {
+  const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
+  const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
+  if (typeof window !== 'undefined') {
+    const isCapacitor = window.location.origin === 'http://localhost' || 
+                        window.location.origin === 'capacitor://localhost' || 
+                        window.location.protocol.startsWith('capacitor') ||
+                        !!(window as any).Capacitor;
+    if (isCapacitor) {
+      return `https://www.pay.sovereigns.ca${normalized}`;
+    }
+    if (window.location.protocol === 'file:') {
+      return `http://localhost:3000${normalized}`;
+    }
+    if (window.location?.origin && window.location.origin !== 'null') {
+      return `${window.location.origin}${normalized}`;
+    }
+  }
+  if (configuredApiBase) {
+    return new URL(normalized, configuredApiBase).toString();
+  }
+  return normalized;
+}
+
 /**
  * Wise Card & Google Pay Pass Synchronization Service Layer
  * 
@@ -110,7 +140,7 @@ export class WiseGooglePassSyncService {
       headers['Authorization'] = `Bearer ${sessionToken}`;
     }
 
-    const response = await fetch('/api/sovereign/sync-pass-hub', {
+    const response = await fetch(buildApiUrl('/api/sovereign/sync-pass-hub'), {
       method: 'POST',
       headers,
       credentials: 'include'
