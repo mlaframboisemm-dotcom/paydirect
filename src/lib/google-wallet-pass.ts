@@ -29,6 +29,7 @@ export interface WalletPassData {
   wiseCADBalance?: number;
   wiseUSDBalance?: number;
   wiseTotalUSD?: number;
+  lastSyncedAt?: string;
 }
 
 /**
@@ -45,6 +46,12 @@ export async function generateSovereignWalletPassJWT(data: WalletPassData): Prom
     .map(h => `${h.symbol}: ${Number(h.amount).toLocaleString('en-CA', { maximumFractionDigits: 4 })}`)
     .join(' | ');
 
+  // Use wiseTotalUSD if available (live Wise balance), fall back to usdBalance
+  const displayUsd = data.wiseTotalUSD ?? data.wiseUSDBalance ?? data.usdBalance;
+  const displayCad = data.wiseCADBalance ?? 0;
+  const syncedAt = data.lastSyncedAt || new Date().toISOString();
+  const syncLabel = data.wiseLiveSynced ? `Live — synced ${new Date(syncedAt).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}` : 'Offline balance';
+
   // Build the loyalty pass object
   const loyaltyObject = {
     id: objectId,
@@ -55,7 +62,7 @@ export async function generateSovereignWalletPassJWT(data: WalletPassData): Prom
     loyaltyPoints: {
       balance: {
         money: {
-          micros: Math.round(data.usdBalance * 1_000_000),
+          micros: Math.round(displayUsd * 1_000_000),
           currencyCode: 'USD'
         }
       },
@@ -68,9 +75,24 @@ export async function generateSovereignWalletPassJWT(data: WalletPassData): Prom
         body: `$${data.totalPortfolioUsd.toLocaleString('en-CA', { maximumFractionDigits: 2 })} USD`
       },
       {
+        id: 'wise_usd',
+        header: 'Wise USD Balance',
+        body: `$${displayUsd.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+      },
+      {
+        id: 'wise_cad',
+        header: 'Wise CAD Balance',
+        body: `CA$${displayCad.toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      },
+      {
         id: 'top_holdings',
         header: 'Top Holdings',
-        body: holdingsText || 'Loading...'
+        body: holdingsText || 'No holdings'
+      },
+      {
+        id: 'sync_status',
+        header: 'Wise Live Sync',
+        body: syncLabel
       },
       {
         id: 'wallet_address',
@@ -228,7 +250,10 @@ export async function generatePassQRCode(data: WalletPassData): Promise<string> 
     walletAddress: data.walletAddress,
     issuer: 'aegis_sovereign',
     merchantId: MERCHANT_ID,
-    balance: data.usdBalance,
+    balance: data.wiseTotalUSD ?? data.wiseUSDBalance ?? data.usdBalance,
+    cadBalance: data.wiseCADBalance ?? 0,
+    wiseLiveSynced: data.wiseLiveSynced ?? false,
+    lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
     timestamp: Date.now()
   });
 

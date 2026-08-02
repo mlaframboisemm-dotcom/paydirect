@@ -10261,8 +10261,8 @@ async function startServer() {
       }
       const txId = `sconv_${crypto.randomUUID()}`;
       db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [txId, userId, 'CONVERT', fromSym, fromAmt, usdValue, Date.now(), `Convert ${fromAmt} ${fromSym} → ${toAmt.toFixed(6)} ${toSym}`, txId, 'completed', fromSym, toSym]);
-      return res.json({ success: true, txId, fromSymbol: fromSym, toSymbol: toSym, fromAmount: fromAmt, toAmount: toAmt, usdValue, fromPrice, toPrice, message: `Converted ${fromAmt} ${fromSym} → ${toAmt.toFixed(6)} ${toSym}. Ledger updated.` });
+        [txId, userId, 'CONVERT', fromSym, fromAmt, usdValue, Date.now(), `Convert ${fromAmt} ${fromSym} -> ${toAmt.toFixed(6)} ${toSym}`, txId, 'completed', fromSym, toSym]);
+      return res.json({ success: true, txId, fromSymbol: fromSym, toSymbol: toSym, fromAmount: fromAmt, toAmount: toAmt, usdValue, fromPrice, toPrice, message: `Converted ${fromAmt} ${fromSym} -> ${toAmt.toFixed(6)} ${toSym}. Ledger updated.` });
     } catch (e: any) {
       return res.status(500).json({ error: 'SOVEREIGN_CONVERT_ERROR', message: e.message });
     }
@@ -10466,7 +10466,8 @@ async function startServer() {
         wiseLiveSynced: Boolean(wiseInfo),
         wiseCADBalance: wiseInfo?.cadBalance || 0,
         wiseUSDBalance: wiseInfo?.usdBalance || 0,
-        wiseTotalUSD: wiseInfo?.totalUSD || 0
+        wiseTotalUSD: wiseInfo?.totalUSD || 0,
+        lastSyncedAt: new Date().toISOString()
       };
 
       const { generateSovereignWalletPassJWT, getAddToWalletUrl, generatePassQRCode, buildPassPageHTML } = await import('./src/lib/google-wallet-pass.js');
@@ -10560,6 +10561,8 @@ async function startServer() {
       const totalPortfolioUsd = wiseTotalUSD + cryptoVal;
       const walletAddress = process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4';
 
+      const nowIso = new Date().toISOString();
+
       // 3. Generate Synchronized Google Wallet Pass Data & JWT
       const passData = {
         userId: String(userId),
@@ -10572,15 +10575,14 @@ async function startServer() {
         wiseLiveSynced: isLiveConnected,
         wiseCADBalance: wiseCAD,
         wiseUSDBalance: wiseUSD,
-        wiseTotalUSD
+        wiseTotalUSD,
+        lastSyncedAt: nowIso
       };
 
       const { generateSovereignWalletPassJWT, getAddToWalletUrl, generatePassQRCode } = await import('./src/lib/google-wallet-pass.js');
       const passJwt = await generateSovereignWalletPassJWT(passData);
       const addToWalletUrl = getAddToWalletUrl(passJwt);
       const qrDataUrl = await generatePassQRCode(passData);
-
-      const nowIso = new Date().toISOString();
 
       // 4. Return Consolidated Account Hub Synchronization Status
       return res.json({
@@ -10888,7 +10890,7 @@ async function startServer() {
         const txId = `wise_payout_${crypto.randomUUID()}`;
         db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [txId, userId, 'WITHDRAWAL', 'USD', amtUsd, amtUsd, Date.now(),
-           `Wise Payout: ${sourceCurrency} ${amt} → ${targetCurrency} ${result.targetAmount?.toFixed(2)} (Transfer #${result.transferId})`,
+           `Wise Payout: ${sourceCurrency} ${amt} -> ${targetCurrency} ${result.targetAmount?.toFixed(2)} (Transfer #${result.transferId})`,
            String(result.transferId || txId), 'completed', 'USD', `wise_${targetCurrency.toLowerCase()}`]);
         await recordLedgerEntry({ type: 'transfer', status: 'executed',
           payload: { action: 'wise.payout', userId, amount: amtUsd, sourceCurrency, targetCurrency, wiseTransferId: result.transferId },
@@ -10896,7 +10898,7 @@ async function startServer() {
         logTransactionEvent('WISE_PAYOUT', { userId, amount: amtUsd, sourceCurrency, targetCurrency, transferId: result.transferId });
         return res.json({
           success: true,
-          message: `Wise transfer created: ${sourceCurrency} ${amt} → ${targetCurrency} ${result.targetAmount?.toFixed(2)}`,
+          message: `Wise transfer created: ${sourceCurrency} ${amt} -> ${targetCurrency} ${result.targetAmount?.toFixed(2)}`,
           transferId: result.transferId,
           quoteId: result.quoteId,
           status: result.status,
@@ -11460,58 +11462,250 @@ async function startServer() {
 
   // Wise Withdrawal & Card Details Endpoints
   app.get('/api/withdrawal/wise/card/details', async (req: any, res: any) => {
+    const { getWiseApiToken } = await import('./src/lib/wise-env.js');
+    const token = getWiseApiToken();
+    const WISE_BASE = 'https://api.transferwise.com';
+    const BUSINESS_PROFILE_ID = process.env.WISE_BUSINESS_PROFILE_ID || '101924589';
+
+    // Attempt to fetch real card data from Wise API
+    // GET /v3/spend/profiles/{profileId}/cards (partner-tier endpoint)
+    // and GET /v1/profiles/{profileId}/cards (personal token endpoint)
+    // Personal tokens can list cards if any are issued on the account.
+    let liveCard: any = null;
+    let liveBalances: any[] = [];
+    let cardApiNote = '';
+
+    try {
+      const cardRes = await fetch(`${WISE_BASE}/v3/spend/profiles/${BUSINESS_PROFILE_ID}/cards`, {
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }
+      });
+      if (cardRes.ok) {
+        const cardData = await cardRes.json();
+        const cards = Array.isArray(cardData) ? cardData : (cardData.cards || cardData.content || []);
+        if (cards.length > 0) {
+          liveCard = cards[0];
+        }
+      } else if (cardRes.status === 403) {
+        // 403 means the endpoint exists but requires partner-level OAuth scope
+        cardApiNote = 'PARTNER_SCOPE_REQUIRED';
+      } else if (cardRes.status === 404) {
+        cardApiNote = 'NO_CARD_ISSUED';
+      }
+    } catch (_e) {
+      cardApiNote = 'API_UNREACHABLE';
+    }
+
+    // Also try personal-token card list endpoint
+    if (!liveCard) {
+      try {
+        const personalProfileId = process.env.WISE_PERSONAL_PROFILE_ID || '101924057';
+        const cardRes2 = await fetch(`${WISE_BASE}/v1/cards?profileId=${personalProfileId}`, {
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }
+        });
+        if (cardRes2.ok) {
+          const cardData2 = await cardRes2.json();
+          const cards2 = Array.isArray(cardData2) ? cardData2 : (cardData2.cards || []);
+          if (cards2.length > 0) liveCard = cards2[0];
+        }
+      } catch (_e) { /* silent */ }
+    }
+
+    // Fetch live balances to attach to response
+    try {
+      const { fetchWiseLiveBalances } = await import('./src/lib/wise-live-integration.js');
+      liveBalances = await fetchWiseLiveBalances();
+    } catch (_e) { /* silent */ }
+
+    const usdBal = liveBalances.find((b: any) => b.currency === 'USD')?.amount ?? 0;
+    const cadBal = liveBalances.find((b: any) => b.currency === 'CAD')?.amount ?? 0;
+
+    if (liveCard) {
+      // Map real Wise card fields to the dashboard format
+      const expiry = liveCard.expiryDate || liveCard.expiry || '';
+      const [expYear, expMonth] = expiry.includes('-') ? expiry.split('-') : ['2028', '12'];
+      return res.json({
+        success: true,
+        source: 'wise_live_api',
+        card: {
+          cardId: liveCard.id || liveCard.cardId || 'card_wise_live_01',
+          cardHolderName: liveCard.cardHolderName || liveCard.nameOnCard || 'Marcel Laframboise',
+          last4: liveCard.maskedCardNumber?.slice(-4) || liveCard.last4 || '****',
+          expMonth: expMonth || '12',
+          expYear: expYear || '2028',
+          brand: liveCard.cardBrand || liveCard.brand || 'Visa',
+          type: liveCard.cardType || liveCard.type || 'BUSINESS_DEBIT',
+          status: liveCard.status || 'ACTIVE',
+          isFrozen: liveCard.status === 'FROZEN' || liveCard.frozen || false,
+          maskedCardNumber: liveCard.maskedCardNumber || `**** **** **** ${liveCard.last4 || '****'}`,
+          expiryDate: expiry || '12/28',
+          profileId: String(liveCard.profileId || BUSINESS_PROFILE_ID),
+          limits: {
+            dailyTotal: { limit: liveCard.spendControls?.dailyTransactionAmountLimit || 10000, currency: 'USD' },
+            dailyContactless: { limit: liveCard.spendControls?.contactlessDailyLimit || 500, currency: 'USD' },
+            dailyAtm: { limit: liveCard.spendControls?.atmDailyLimit || 1000, currency: 'USD' },
+            monthlyTotal: { limit: liveCard.spendControls?.monthlyTransactionAmountLimit || 50000, currency: 'USD' },
+            singleTransaction: { limit: liveCard.spendControls?.transactionAmountLimit || 2500, currency: 'USD' }
+          },
+          channels: {
+            contactlessEnabled: liveCard.spendControls?.contactlessEnabled ?? true,
+            onlinePurchasesEnabled: liveCard.spendControls?.onlinePurchasesEnabled ?? true,
+            internationalEnabled: liveCard.spendControls?.internationalTransactionsEnabled ?? true,
+            atmWithdrawalsEnabled: liveCard.spendControls?.atmEnabled ?? true
+          },
+          digitalWalletAdded: { googlePay: false, applePay: false },
+          cvv: '***',
+          pinCode: '****',
+          googlePayStatus: 'PARTNER_PROVISIONING_REQUIRED',
+          kycStatus: 'REGISTERED_TO_KYC_LIVE'
+        },
+        balances: liveBalances.map((b: any) => ({
+          currency: b.currency,
+          amount: b.amount,
+          name: `Wise ${b.currency} Balance`,
+          account: '176576596814061',
+          isPrimary: b.currency === 'USD'
+        })),
+        liveUsd: usdBal,
+        liveCAD: cadBal
+      });
+    }
+
+    // No live card found — return structured response explaining why
     return res.json({
       success: true,
+      source: cardApiNote === 'PARTNER_SCOPE_REQUIRED' ? 'wise_partner_scope_required' : 'no_card_issued',
+      cardApiNote,
+      googlePayProvisioningNote: 'Adding a Wise card to Google Pay as a payment method requires a Wise Platform Partnership Agreement with mTLS and OAuth 2.0 partner scopes. Contact partnerships@wise.com to begin.',
       card: {
-        id: 'card_wise_live_01',
+        cardId: 'card_wise_pending',
         cardHolderName: 'Marcel Laframboise',
-        last4: '8842',
-        expMonth: '12',
-        expYear: '2028',
+        last4: null,
+        expMonth: null,
+        expYear: null,
         brand: 'Visa',
         type: 'BUSINESS_DEBIT',
-        status: 'ACTIVE',
-        frozen: false,
-        profileId: '101924589',
-        limits: { daily: 10000, monthly: 50000, remainingDaily: 10000 },
-        digitalPassLinked: true,
-        googlePayStatus: 'LINKED',
-        userEmail: 'mlaframboisemm@gmail.com',
+        status: cardApiNote === 'PARTNER_SCOPE_REQUIRED' ? 'PARTNER_SCOPE_REQUIRED' : 'NO_CARD_ISSUED',
+        isFrozen: false,
+        maskedCardNumber: null,
+        expiryDate: null,
+        profileId: BUSINESS_PROFILE_ID,
+        limits: {
+          dailyTotal: { limit: 10000, currency: 'USD' },
+          dailyContactless: { limit: 500, currency: 'USD' },
+          dailyAtm: { limit: 1000, currency: 'USD' },
+          monthlyTotal: { limit: 50000, currency: 'USD' },
+          singleTransaction: { limit: 2500, currency: 'USD' }
+        },
+        channels: {
+          contactlessEnabled: true,
+          onlinePurchasesEnabled: true,
+          internationalEnabled: true,
+          atmWithdrawalsEnabled: true
+        },
+        digitalWalletAdded: { googlePay: false, applePay: false },
+        cvv: '***',
+        pinCode: '****',
+        googlePayStatus: 'PARTNER_PROVISIONING_REQUIRED',
         kycStatus: 'REGISTERED_TO_KYC_LIVE'
-      }
+      },
+      balances: liveBalances.map((b: any) => ({
+        currency: b.currency,
+        amount: b.amount,
+        name: `Wise ${b.currency} Balance`,
+        account: '176576596814061',
+        isPrimary: b.currency === 'USD'
+      })),
+      liveUsd: usdBal,
+      liveCAD: cadBal
     });
   });
 
   app.get('/api/withdrawal/wise/card/transactions', async (req: any, res: any) => {
+    const WISE_BASE = 'https://api.transferwise.com';
+    const BUSINESS_PROFILE_ID = process.env.WISE_BUSINESS_PROFILE_ID || '101924589';
+    const { getWiseApiToken } = await import('./src/lib/wise-env.js');
+    const token = getWiseApiToken();
+
+    let liveBalance = 0;
+    let transactions: any[] = [];
+    let source = 'ledger_db';
+
+    // 1. Fetch live USD balance
     try {
       const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const wiseData = await getWiseTotalCashUSD().catch(() => null);
-      const liveBalance = wiseData?.usdBalance ?? 0;
+      liveBalance = wiseData?.usdBalance ?? 0;
+    } catch (_e) { /* silent */ }
 
-      // Pull real transactions from the ledger db
-      const txRows = db.execute(
-        "SELECT * FROM transactions WHERE type IN ('WISE_WITHDRAWAL','RECEIVE','SEND') ORDER BY timestamp DESC LIMIT 50"
-      ) as any[];
-
-      const txs = (txRows || []).map((t: any) => ({
-        id: t.id,
-        merchantName: t.details ? JSON.parse(t.details)?.reference || 'Wise Transfer' : 'Wise Transfer',
-        amount: t.type === 'RECEIVE' ? Number(t.fiatAmount) : -Math.abs(Number(t.fiatAmount)),
-        currency: t.assetSymbol === 'USD' ? 'USD' : (t.assetSymbol || 'USD'),
-        type: t.type === 'RECEIVE' ? 'CREDIT' : 'CARD_PAYMENT',
-        status: t.status || 'COMPLETED',
-        timestamp: t.timestamp ? new Date(Number(t.timestamp)).toISOString() : new Date().toISOString(),
-        location: 'Wise Live API'
-      }));
-
-      return res.json({
-        success: true,
-        liveBalanceUsd: liveBalance,
-        transactions: txs
-      });
-    } catch (e: any) {
-      return res.json({ success: true, liveBalanceUsd: 0, transactions: [] });
+    // 2. Try to fetch real transfers from Wise API
+    if (token) {
+      try {
+        const url = `${WISE_BASE}/v1/transfers?profile=${BUSINESS_PROFILE_ID}&limit=40&status=outgoing_payment_sent,processing,incoming_payment_waiting`;
+        const transferRes = await fetch(url, {
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }
+        });
+        if (transferRes.ok) {
+          const transferData = await transferRes.json();
+          const transfers = Array.isArray(transferData) ? transferData : [];
+          if (transfers.length > 0) {
+            source = 'wise_live_api';
+            transactions = transfers.map((t: any) => ({
+              id: String(t.id),
+              merchant: t.details?.reference || t.reference || 'Wise Transfer',
+              category: 'TRANSFER',
+              amount: -Math.abs(Number(t.sourceValue || t.targetValue || 0)),
+              currency: t.sourceCurrency || t.targetCurrency || 'USD',
+              timestamp: t.created || new Date().toISOString(),
+              status: t.status === 'outgoing_payment_sent' ? 'COMPLETED'
+                : t.status === 'processing' ? 'PENDING'
+                : t.status === 'cancelled' ? 'DECLINED'
+                : 'COMPLETED',
+              location: `${t.sourceCurrency || 'USD'} -> ${t.targetCurrency || 'USD'}`,
+              cardLast4: '****',
+              authCode: String(t.id).slice(-6).toUpperCase(),
+              fee: Number(t.rate || 0),
+              paymentMethod: 'WISE_TRANSFER',
+              exchangeRate: t.rate ? String(t.rate) : undefined
+            }));
+          }
+        }
+      } catch (_e) { /* fall through to ledger */ }
     }
+
+    // 3. Supplement with ledger rows if Wise API returned nothing
+    if (transactions.length === 0) {
+      try {
+        const txRows = db.execute(
+          "SELECT * FROM transactions WHERE type IN ('WISE_WITHDRAWAL','RECEIVE','SEND') ORDER BY timestamp DESC LIMIT 40"
+        ) as any[];
+        source = 'ledger_db';
+        transactions = (txRows || []).map((t: any) => {
+          let ref = 'Wise Transfer';
+          try { ref = JSON.parse(t.details)?.reference || ref; } catch (_e) { /* ignore */ }
+          return {
+            id: t.id,
+            merchant: ref,
+            category: t.type === 'RECEIVE' ? 'CREDIT' : 'TRANSFER',
+            amount: t.type === 'RECEIVE' ? Number(t.fiatAmount) : -Math.abs(Number(t.fiatAmount)),
+            currency: t.assetSymbol || 'USD',
+            timestamp: t.timestamp ? new Date(Number(t.timestamp)).toISOString() : new Date().toISOString(),
+            status: t.status || 'COMPLETED',
+            location: 'Wise Account',
+            cardLast4: '****',
+            authCode: t.id.slice(-6).toUpperCase(),
+            fee: 0,
+            paymentMethod: 'WISE_BALANCE'
+          };
+        });
+      } catch (_e) { /* silent */ }
+    }
+
+    return res.json({
+      success: true,
+      source,
+      liveBalanceUsd: liveBalance,
+      transactions
+    });
   });
 
   app.post('/api/withdrawal/wise/card/freeze', async (req: any, res: any) => {

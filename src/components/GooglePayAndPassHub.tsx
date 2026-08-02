@@ -1306,25 +1306,43 @@ export default function GooglePayAndPassHub({
                     </div>
 
                     <div className="space-y-2 bg-slate-900/80 rounded-2xl p-4 border border-emerald-800/40 relative z-10">
-                      <span className="text-[9px] text-emerald-300/80 font-bold uppercase tracking-wider block">Live Wise Multi-Currency Liquidity</span>
+                      <span className="text-[9px] text-emerald-300/80 font-bold uppercase tracking-wider block flex items-center gap-1">
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${hubSyncState?.isLiveConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                        Live Wise Multi-Currency Liquidity
+                        {hubSyncState?.isLiveConnected && <span className="text-emerald-500 ml-1">— Synced</span>}
+                      </span>
                       <span className="text-2xl font-black text-emerald-300 font-mono block">
-                        $2,614,350.00 USD
+                        ${(hubSyncState?.wiseCard?.balances?.totalUSD ?? usdBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                       </span>
                       <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 pt-1">
-                        <span>USD: $2,478,350.00</span>
-                        <span>CAD: $185,000.00</span>
+                        <span>USD: ${(hubSyncState?.wiseCard?.balances?.usd ?? usdBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span>CAD: CA${(hubSyncState?.wiseCard?.balances?.cad ?? 0).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
+                      {hubSyncState?.wiseCard?.lastSyncedAt && (
+                        <div className="text-[9px] text-slate-500 font-mono pt-0.5">
+                          Last synced: {new Date(hubSyncState.wiseCard.lastSyncedAt).toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1 text-xs relative z-10 font-mono">
-                      <div className="text-slate-400 text-[10px]">Card Number</div>
+                      <div className="text-slate-400 text-[10px]">Account</div>
                       <div className="text-white font-bold text-base tracking-widest">
-                        4111 •••• •••• 9240
+                        {hubSyncState?.wiseCard?.sourceAccount || '176576596814061'}
                       </div>
-                      <div className="flex justify-between text-[11px] pt-1 text-slate-300">
-                        <span>EXPIRES: 12/28</span>
-                        <span>CVV: ***</span>
+                      <div className="text-slate-400 text-[10px] mt-1">Card Holder</div>
+                      <div className="text-white text-[11px]">{hubSyncState?.wiseCard?.cardholderName || userName}</div>
+                    </div>
+
+                    {/* Google Pay push-provisioning notice */}
+                    <div className="bg-amber-950/60 border border-amber-700/40 rounded-xl p-3 relative z-10 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                        <svg className="h-3 w-3 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+                        Google Pay Card Provisioning — Partner Agreement Required
                       </div>
+                      <p className="text-[9px] text-amber-300/80 leading-relaxed">
+                        Adding this Wise card as a live Google Pay payment card requires a <strong>Wise Platform Partnership Agreement</strong> with mTLS and OAuth 2.0 partner scopes. The "Add to Google Wallet" button below adds a display pass only. To enable full tap-to-pay, contact <span className="font-mono">partnerships@wise.com</span>.
+                      </p>
                     </div>
 
                     <div className="pt-2 border-t border-emerald-900/50 flex flex-col gap-3 relative z-10">
@@ -1342,7 +1360,7 @@ export default function GooglePayAndPassHub({
                           <span className="text-red-400">e</span>
                           <span className="ml-0.5 text-white">Pay</span>
                         </div>
-                        <span>Automatically Link Pass to Google Pay</span>
+                        <span>Add Display Pass to Google Wallet</span>
                       </button>
 
                       <div className="flex justify-between text-[10px] text-emerald-400/90 font-mono">
@@ -1350,7 +1368,7 @@ export default function GooglePayAndPassHub({
                           <Wifi className="h-3 w-3 text-emerald-400" />
                           Contactless Terminal Ready
                         </span>
-                        <span>ACCOUNT: 176576596814061</span>
+                        <span>ACCOUNT: {hubSyncState?.wiseCard?.sourceAccount || '176576596814061'}</span>
                       </div>
                     </div>
                   </motion.div>
