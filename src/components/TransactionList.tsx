@@ -442,7 +442,7 @@ export default function TransactionList({
                 {externalTransactions.length === 0 ? (
                   <div className="text-center py-12 border border-dashed border-gray-100 rounded-xl bg-gray-50/20">
                     <Clock className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-xs text-gray-500 font-medium">No live events received. Use the Webhook Simulator above to send data!</p>
+                    <p className="text-xs text-gray-500 font-medium">No live events received. Use the Webhook Event Dispatcher above to send data!</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5">

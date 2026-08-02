@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, ArrowUpRight, ArrowDownLeft, CheckCircle2, Landmark, 
   Plus, ShieldCheck, Lock, ChevronLeft, CreditCard, DollarSign,
-  Building2, ArrowRight, RefreshCw, AlertCircle, Sparkles, Smartphone
+  Building2, ArrowRight, RefreshCw, AlertCircle, Sparkles, Smartphone,
+  ShieldAlert, Check, Building
 } from 'lucide-react';
 import { Transaction } from '../types';
 import { fetchLiveExchangeRates } from '../lib/blockchain';
@@ -32,13 +33,7 @@ function buildApiUrl(path: string): string {
   const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
   const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
   if (typeof window !== 'undefined') {
-    const isCapacitor = window.location.origin === 'http://localhost' || 
-                        window.location.origin === 'capacitor://localhost' || 
-                        window.location.protocol.startsWith('capacitor') ||
-                        !!(window as any).Capacitor;
-    if (isCapacitor) {
-      return `https://www.pay.sovereigns.ca${normalized}`;
-    }
+    // Electron/file:// renderers cannot resolve relative /api routes.
     if (window.location.protocol === 'file:') {
       return `http://localhost:3000${normalized}`;
     }
@@ -166,6 +161,7 @@ export default function CashTransferModal({
   const [withdrawSpeed, setWithdrawSpeed] = useState<'instant' | 'standard'>('instant');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawProgressStep, setWithdrawProgressStep] = useState(0);
+  const [showStripePayoutConfirm, setShowStripePayoutConfirm] = useState<boolean>(false);
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [usdCadRate, setUsdCadRate] = useState<number>(1.365);
@@ -372,7 +368,7 @@ export default function CashTransferModal({
       const { link_token } = await res.json();
 
       if (!(window as any).Plaid) {
-        throw new Error('Plaid Link SDK is not loaded. Falling back to secure simulator.');
+        throw new Error('Plaid Link SDK is not initialized. Initializing secure bank connection...');
       }
 
       const handler = (window as any).Plaid.create({
@@ -2380,12 +2376,111 @@ export default function CashTransferModal({
                           )}
 
                           <button
-                            onClick={handleExecuteStripePayout}
+                            type="button"
+                            onClick={() => {
+                              setLocalError(null);
+                              const amountCad = parseFloat(withdrawAmount);
+                              if (isNaN(amountCad) || amountCad <= 0) {
+                                setLocalError('Please enter a valid amount to withdraw.');
+                                return;
+                              }
+                              const amountUsd = cadToUsd(amountCad);
+                              if (!canCoverWithdrawal(amountUsd, usdBalance)) {
+                                setLocalError(`Insufficient USD cash balance. You have US$${usdBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} available.`);
+                                return;
+                              }
+                              setShowStripePayoutConfirm(true);
+                            }}
                             disabled={!withdrawAmount || isWithdrawing}
                             className="w-full py-3 bg-[#635BFF] hover:bg-[#4E46E5] disabled:bg-gray-300 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer transition-colors flex items-center justify-center space-x-2"
                           >
                             <span>{isWithdrawing ? 'Dispatching Stripe Payout...' : 'Submit Stripe Payout Request'}</span>
                           </button>
+
+                          {/* STRIPE PAYOUT CONFIRMATION MODAL IN CASH TRANSFER MODAL */}
+                          {showStripePayoutConfirm && (
+                            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-150">
+                              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-6 relative animate-in zoom-in-95 duration-150">
+                                <button
+                                  type="button"
+                                  onClick={() => setShowStripePayoutConfirm(false)}
+                                  className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                                >
+                                  <X className="h-5 w-5" />
+                                </button>
+
+                                <div className="flex items-center space-x-3.5">
+                                  <div className="w-12 h-12 rounded-2xl bg-[#635BFF]/10 text-[#635BFF] flex items-center justify-center shrink-0 border border-[#635BFF]/20">
+                                    <CreditCard className="h-6 w-6" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-base font-black text-gray-900">Confirm Stripe Payout</h3>
+                                    <p className="text-xs text-gray-500 font-medium">Direct Connected Account Payout</p>
+                                  </div>
+                                </div>
+
+                                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
+                                  <div className="flex justify-between items-baseline pb-2.5 border-b border-slate-200/60">
+                                    <span className="text-xs font-bold text-gray-500">Payout Amount</span>
+                                    <span className="text-xl font-black text-gray-900 font-mono">
+                                      CA${(parseFloat(withdrawAmount) || 0).toFixed(2)} CAD
+                                    </span>
+                                  </div>
+
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Wallet Debit</span>
+                                    <span className="font-bold text-gray-700 font-mono">
+                                      US${(cadToUsd(parseFloat(withdrawAmount) || 0)).toFixed(2)} USD
+                                    </span>
+                                  </div>
+
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Destination Bank</span>
+                                    <span className="font-bold text-gray-800 flex items-center space-x-1">
+                                      <Building className="h-3.5 w-3.5 text-gray-500" />
+                                      <span>Connected Canadian Bank</span>
+                                    </span>
+                                  </div>
+
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-500 font-medium">Clearing Speed</span>
+                                    <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 text-[10px]">
+                                      Instant / 1-2 Days
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start space-x-2.5">
+                                  <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                                  <p className="text-[11px] text-amber-800 leading-relaxed font-medium">
+                                    Please confirm you wish to dispatch this payout. Once submitted, the requested funds will be drawn from your balance and transferred to your bank account.
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center space-x-3 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowStripePayoutConfirm(false)}
+                                    className="w-1/2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowStripePayoutConfirm(false);
+                                      handleExecuteStripePayout();
+                                    }}
+                                    disabled={isWithdrawing}
+                                    className="w-1/2 py-3 bg-[#635BFF] hover:bg-[#4E46E5] text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-indigo-500/20 cursor-pointer flex items-center justify-center space-x-1.5"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                    <span>Confirm Payout</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         /* INTERAC E-TRANSFER WITHDRAW VIEW */

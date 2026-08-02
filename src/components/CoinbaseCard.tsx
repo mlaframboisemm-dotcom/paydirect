@@ -30,9 +30,9 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
   ];
 
   // Transaction processing state
-  const [simulatorLoading, setSimulatorLoading] = useState(false);
-  const [simulatorSuccess, setSimulatorSuccess] = useState<string | null>(null);
-  const [simulatorError, setSimulatorError] = useState<string | null>(null);
+  const [posLoading, setPosLoading] = useState(false);
+  const [posSuccess, setPosSuccess] = useState<string | null>(null);
+  const [posError, setPosError] = useState<string | null>(null);
 
   // Secure Vault Registration state
   const [cardTokenInput, setCardTokenInput] = useState('');
@@ -78,32 +78,32 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
 
   // Handle card spending
   const handleCardSwipe = (itemName: string, itemPrice: number) => {
-    setSimulatorError(null);
-    setSimulatorSuccess(null);
+    setPosError(null);
+    setPosSuccess(null);
 
     if (isLocked) {
-      setSimulatorError('Transaction declined: Your Coinbase Debit Card is currently locked.');
+      setPosError('Transaction declined: Your Coinbase Debit Card is currently locked.');
       return;
     }
 
     if (!itemName || !Number.isFinite(itemPrice)) {
-      setSimulatorError('This merchant entry could not be processed.');
+      setPosError('This merchant entry could not be processed.');
       return;
     }
 
-    setSimulatorLoading(true);
+    setPosLoading(true);
     setTimeout(() => {
       const success = onDebitCardSpend(itemPrice, fundingSource, selectedCashback.symbol, selectedCashback.percent);
-      setSimulatorLoading(false);
+      setPosLoading(false);
 
       if (success) {
         const rewardEarned = (itemPrice * (selectedCashback.percent / 100));
-        setSimulatorSuccess(
+        setPosSuccess(
           `Swiped ${itemName} for $${itemPrice.toFixed(2)} using ${fundingSource}. You earned ${rewardEarned.toFixed(6)} ${selectedCashback.symbol} in cashback rewards.`
         );
       } else {
         const fundingBalance = getFundingBalance();
-        setSimulatorError(`Insufficient funds in ${fundingBalance} to complete this transaction at ${itemName}.`);
+        setPosError(`Insufficient funds in ${fundingBalance} to complete this transaction at ${itemName}.`);
       }
     }, 1200);
   };
@@ -274,7 +274,7 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
         </div>
       </div>
 
-      {/* Card Settings, Cashback, and Merchant Simulator - Span 7 Cols */}
+      {/* Card Settings, Cashback, and Merchant Point-of-Sale - Span 7 Cols */}
       <div className="lg:col-span-7 space-y-6">
         <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Debit Card Controls & Spending</h3>
 
@@ -329,7 +329,7 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
           </div>
         </div>
 
-        {/* Merchant simulated checkout terminal */}
+        {/* Merchant Point-of-Sale checkout terminal */}
         <div className="bg-gray-50/50 border border-gray-200 rounded-2xl p-6 relative">
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center">
             <ShoppingBag className="w-4 h-4 text-gray-600 mr-1.5" /> Point-of-Sale Checkout
@@ -342,7 +342,7 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
             {purchaseOptions.map((opt) => (
               <button
                 key={opt.name}
-                disabled={simulatorLoading}
+                disabled={posLoading}
                 onClick={() => handleCardSwipe(opt.name, opt.price)}
                 className="p-3 bg-white hover:bg-gray-50 border border-gray-100 rounded-xl text-left cursor-pointer transition-all flex justify-between items-center hover:shadow-xs group"
               >
@@ -358,26 +358,26 @@ export default function CoinbaseCard({ holdings, coins, onDebitCardSpend }: Coin
           </div>
 
           {/* Payment response notifications */}
-          {simulatorLoading && (
+          {posLoading && (
             <div className="p-3 bg-blue-50 text-blue-700 text-xs rounded-xl flex items-center justify-center space-x-2 font-semibold">
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Transacting card swipe wirelessly with Visa Network...</span>
             </div>
           )}
 
-          {simulatorError && (
+          {posError && (
             <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl flex items-start space-x-2 border border-red-100">
               <Lock className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{simulatorError}</span>
+              <span>{posError}</span>
             </div>
           )}
 
-          {simulatorSuccess && (
+          {posSuccess && (
             <div className="p-4 bg-green-50 text-green-800 text-xs sm:text-sm rounded-xl flex items-start space-x-3 border border-green-100 animate-fade-in">
               <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
               <div>
                 <h5 className="font-bold">Transaction Confirmed</h5>
-                <p className="mt-1 text-xs text-gray-600 leading-relaxed">{simulatorSuccess}</p>
+                <p className="mt-1 text-xs text-gray-600 leading-relaxed">{posSuccess}</p>
               </div>
             </div>
           )}

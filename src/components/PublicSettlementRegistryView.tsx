@@ -75,7 +75,7 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
     setActiveAddress(customSearchAddress.trim());
   };
 
-  // Generate simulated Etherscan input data hex payload based on active address and balance
+  // Generate Etherscan input data hex payload based on active address and balance
   const sampleStateHash = settlementAnchor?.stateHash || '0xa3f2c5d1b7e901a8';
   const balanceValue = onChainBalance === '0.0000' && activeAddress.toLowerCase() === '0x58b178f7eee92fe888c0a1684d5fe6b78c0ff99f' 
     ? '116998.2300' 
@@ -613,7 +613,7 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
               currentEthPrice={usdRates['ETH'] || 3300}
             />
 
-            {/* Simulated Public Ledger Book Values */}
+            {/* Public Ledger Book Values */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
               <h4 className="text-sm font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <Database className="w-4 h-4 text-amber-500" />

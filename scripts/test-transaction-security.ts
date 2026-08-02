@@ -7,6 +7,7 @@ import crypto from 'crypto';
 const repoRoot = process.cwd();
 const dbPath = path.join(repoRoot, 'src', 'db', 'database.json');
 const verificationPath = path.join(repoRoot, 'src', 'db', 'email_verifications.json');
+const lockPath = path.join(repoRoot, 'src', 'db', 'bootstrap.lock');
 const nodeExecPath = process.execPath;
 const tsxCliPath = path.join(repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
@@ -81,6 +82,7 @@ async function main() {
 
   const originalDb = readFileIfExists(dbPath);
   const originalVerification = readFileIfExists(verificationPath);
+  const originalLock = readFileIfExists(lockPath);
 
   let serverProc: ReturnType<typeof spawn> | null = null;
 
@@ -93,6 +95,9 @@ async function main() {
       'utf-8'
     );
     fs.writeFileSync(verificationPath, JSON.stringify({}, null, 2), 'utf-8');
+    if (fs.existsSync(lockPath)) {
+      fs.unlinkSync(lockPath);
+    }
 
     serverProc = spawn(nodeExecPath, [tsxCliPath, 'server.ts'], {
       cwd: repoRoot,
@@ -233,6 +238,7 @@ async function main() {
 
     writeFileOrDelete(dbPath, originalDb);
     writeFileOrDelete(verificationPath, originalVerification);
+    writeFileOrDelete(lockPath, originalLock);
   }
 }
 

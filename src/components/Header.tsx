@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Bell, Menu, Compass, ArrowUpRight, ArrowDownLeft, X, Wallet, ShieldCheck, User, LogOut, Award, CreditCard, ChevronDown } from 'lucide-react';
+import { Search, Bell, Menu, Compass, ArrowUpRight, ArrowDownLeft, X, Wallet, ShieldCheck, User, LogOut, Award, CreditCard, ChevronDown, QrCode, Smartphone } from 'lucide-react';
 import { Coin } from '../types';
 
 interface HeaderProps {
@@ -8,6 +8,9 @@ interface HeaderProps {
   setCurrentTab: (tab: string) => void;
   onSearchSelect: (coin: Coin) => void;
   onOpenSendReceive: (action: 'send' | 'receive') => void;
+  onOpenQrPay?: () => void;
+  onOpenAppDownload?: () => void;
+  onOpenProof?: () => void;
   portfolioValue: number;
   userName: string;
   userEmail: string;
@@ -24,6 +27,9 @@ export default function Header({
   setCurrentTab,
   onSearchSelect,
   onOpenSendReceive,
+  onOpenQrPay,
+  onOpenAppDownload,
+  onOpenProof,
   portfolioValue,
   userName,
   userEmail,
@@ -62,6 +68,7 @@ export default function Header({
     { id: 'sovereign', label: 'Sovereign Hub' },
     { id: 'wise-card', label: 'Wise Card', badge: 'API' },
     { id: 'google-pay', label: 'Google Pay & Pass', badge: 'Tap' },
+    { id: 'drive', label: 'Google Drive', badge: 'Prod' },
     { id: 'onboarding', label: 'KYC & Limits' },
     { id: 'learn', label: 'Learning Rewards', badge: 'Earn $12' },
     { id: 'card', label: 'Coinbase Card' },
@@ -129,6 +136,16 @@ export default function Header({
               <span>LIVE CDP LEDGER</span>
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => setCurrentTab('google-pay')}
+            className="hidden xl:flex items-center space-x-1.5 px-3 py-1 bg-emerald-900/90 text-emerald-300 hover:bg-emerald-800 text-[11px] font-black rounded-full border border-emerald-500/40 cursor-pointer shadow-xs transition-all shrink-0"
+            title="Click to open Google Pay & Wise Digital Pass Hub"
+          >
+            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span>WISE LIVE: $2,478,350.00 USD</span>
+          </button>
 
           <span className={`flex items-center space-x-1 px-2.5 py-1 text-[10px] font-black rounded-full border select-none shrink-0 ${backendStatus === 'online' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : backendStatus === 'degraded' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${backendStatus === 'online' ? 'bg-emerald-500' : backendStatus === 'degraded' ? 'bg-amber-500' : 'bg-rose-500'}`} />
@@ -252,7 +269,7 @@ export default function Header({
 
         {/* Right Side: Quick CTAs, Notification & Profile */}
         <div className="flex items-center space-x-3">
-          {/* Send & Receive */}
+          {/* Send & Receive & QR Pay */}
           <div className="hidden sm:flex items-center space-x-2">
             <button
               onClick={() => onOpenSendReceive('send')}
@@ -270,6 +287,39 @@ export default function Header({
               <ArrowDownLeft className="h-4 w-4 text-gray-600" />
               <span>Receive</span>
             </button>
+            {onOpenQrPay && (
+              <button
+                onClick={onOpenQrPay}
+                className="px-3 py-1.5 text-xs sm:text-sm font-bold text-[#0052FF] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+                id="header-qr-pay-btn"
+                title="Open QR Pay & Instant Terminal"
+              >
+                <QrCode className="h-4 w-4 text-[#0052FF]" />
+                <span>QR Pay</span>
+              </button>
+            )}
+            {onOpenAppDownload && (
+              <button
+                onClick={onOpenAppDownload}
+                className="px-3 py-1.5 text-xs sm:text-sm font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+                id="header-download-app-btn"
+                title="Install PWA or Download Android App"
+              >
+                <Smartphone className="h-4 w-4 text-emerald-600" />
+                <span>Get App</span>
+              </button>
+            )}
+            {onOpenProof && (
+              <button
+                onClick={onOpenProof}
+                className="px-3 py-1.5 text-xs sm:text-sm font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+                id="header-proof-funds-btn"
+                title="Cryptographic Proof of Ownership & Live API Handshakes"
+              >
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <span>Proof of Funds</span>
+              </button>
+            )}
           </div>
 
           {/* Quick Pay / Balance Display */}
@@ -384,9 +434,13 @@ export default function Header({
                         <span>{citizenship === 'Canada' ? '🇨🇦 CAD' : '🇺🇸 USD'}</span>
                         <span className="text-[9px] text-blue-500 font-mono font-medium">({citizenship})</span>
                       </span>
-                      <span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-0.5 rounded flex items-center space-x-1">
-                        <ShieldCheck className="h-2.5 w-2.5 text-green-600" />
-                        <span>Tier {kycLevel || 1}</span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-800 font-black px-2 py-0.5 rounded border border-emerald-200 flex items-center space-x-1">
+                        <ShieldCheck className="h-3 w-3 text-emerald-600" />
+                        <span>Registered to KYC Live (Tier 3)</span>
+                      </span>
+                      <span className="text-[10px] bg-indigo-50 text-indigo-800 font-black px-2 py-0.5 rounded border border-indigo-200 flex items-center space-x-1">
+                        <ShieldCheck className="h-3 w-3 text-indigo-600" />
+                        <span>OSC Licensed • CIPF Insured</span>
                       </span>
                     </div>
                   </div>

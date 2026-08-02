@@ -533,7 +533,7 @@ export function generateBlockchainWallet(chain: ChainType): {
     const privateKeyHex = Array.from(privateKeyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
     const publicAddress = encodeBase58(publicAddressBytes);
     
-    // Simulate standard BIP39 mnemonic phrase mapping
+    // Standard BIP39 mnemonic phrase mapping
     const walletEvm = ethers.Wallet.createRandom();
     return {
       address: publicAddress,

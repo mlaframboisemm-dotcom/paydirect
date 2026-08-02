@@ -1,11 +1,11 @@
 {
   "users": [
     {
-      "id": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "name": "Secure Admin",
       "email": "admin@secure.local",
-      "passwordHash": "d4418fb00a06f2530d75208384f35f9d616ca7117a45342a2f0ec23d9df37ec943c7121f4090fd804d13cab68891518859f71eea25135e43b6e84295e48e6a4d",
-      "salt": "f9980a50dcb89e881c4c70f3fd7b9b72",
+      "passwordHash": "b784cd4fe18d7e9a04bd9b18735cdf1a8185b4c1d4e7fbac49235314aa56a04d51b82f9c57afddf0dbed79b139d94207c5ccf95487f0f530e86a8eace54a03ee",
+      "salt": "af7d3cb5f9fc8f097cdcf42c4b318515",
       "twoFactorSecret": "JBSWY3DPEHPK3PXP",
       "twoFactorEnabled": true,
       "kycLevel": 2,
@@ -14,106 +14,61 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "admin@secure.local",
-      "lockedAt": "2026-07-29T23:14:02.458Z",
-      "kycFullName": "",
-      "kycAddress": "",
-      "kycCity": "",
-      "kycState": "",
-      "kycProvince": "",
-      "kycPostalCode": "",
-      "kycTaxId": "",
-      "kycPhone": "",
-      "kycVerifiedAt": ""
+      "lockedAt": "2026-08-02T02:07:58.628Z"
     }
   ],
   "wallets": [
     {
-      "id": "wallet-user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e-usd",
-      "userId": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "wallet-user_f730799f-3994-45d4-8b4d-7767442c2910-usd",
+      "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "assetSymbol": "USD",
-      "balance": 1791100,
+      "balance": 0,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "admin@secure.local",
-      "lockedAt": "2026-07-29T23:14:02.459Z"
+      "lockedAt": "2026-08-02T02:07:58.628Z"
     }
   ],
   "transactions": [],
   "auditLogs": [
     {
-      "id": "audit_ac6d1d70-4699-450c-a94f-878450e48932",
-      "userId": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "audit_f39a1cee-4911-4668-b0c6-4fe7819c1065",
+      "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1785366842771,
+      "timestamp": 1785636479522,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for admin@secure.local in live production mode."
     },
     {
-      "id": "audit_6be03bbc-43c5-4db2-9271-1a70253119a8",
-      "userId": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "audit_fd673d1b-8774-4791-aec0-e5ec12f8efc8",
+      "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "action": "LOGIN",
-      "timestamp": 1785366842772,
+      "timestamp": 1785636479531,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
     },
     {
-      "id": "audit_bcec53c5-bc67-4b04-9d61-20bebcf056cd",
-      "userId": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "audit_08a4be41-30dc-48d5-b31b-d1a26e515de2",
+      "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1785366842882,
+      "timestamp": 1785636479839,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for admin@secure.local in live production mode."
     },
     {
-      "id": "audit_7ffd9a68-9893-470c-b88c-a23ad7c17871",
-      "userId": "user_059b2df6-779e-45e5-bdc9-8dfe48b4f45e",
+      "id": "audit_3082cb37-fc4a-40c7-ba94-6d236c369fa8",
+      "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "action": "LOGIN",
-      "timestamp": 1785366842883,
+      "timestamp": 1785636479845,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
-    },
-    {
-      "id": "audit_5244d786-619c-453b-bd79-20c6aeb0ebff",
-      "userId": "system",
-      "action": "RECONCILIATION_AUDIT_SUCCESS",
-      "timestamp": 1785366923220,
-      "ipAddress": "127.0.0.1",
-      "status": "success",
-      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
-    },
-    {
-      "id": "audit_a6c43928-51e6-4314-bdf3-0f59a050a3a5",
-      "userId": "system",
-      "action": "RECONCILIATION_AUDIT_SUCCESS",
-      "timestamp": 1785366932253,
-      "ipAddress": "127.0.0.1",
-      "status": "success",
-      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
-    },
-    {
-      "id": "audit_f8b5ccd0-f891-4f6e-ad66-f120cde1953d",
-      "userId": "system",
-      "action": "RECONCILIATION_AUDIT_SUCCESS",
-      "timestamp": 1785366932389,
-      "ipAddress": "127.0.0.1",
-      "status": "success",
-      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
-    },
-    {
-      "id": "audit_e90c7e42-328f-426b-8308-c1d5c45dc57b",
-      "userId": "system",
-      "action": "RECONCILIATION_AUDIT_SUCCESS",
-      "timestamp": 1785366957210,
-      "ipAddress": "127.0.0.1",
-      "status": "success",
-      "details": "Reconciliation audit succeeded. All queried Stripe transactions match internal database records perfectly."
     }
   ]
 }

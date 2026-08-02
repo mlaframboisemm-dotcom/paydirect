@@ -20,13 +20,6 @@ function buildApiUrl(path: string): string {
   const safePath = typeof path === 'string' && path.trim().length > 0 ? path.trim() : '/';
   const normalized = safePath.startsWith('/') ? safePath : `/${safePath}`;
   if (typeof window !== 'undefined') {
-    const isCapacitor = window.location.origin === 'http://localhost' || 
-                        window.location.origin === 'capacitor://localhost' || 
-                        window.location.protocol.startsWith('capacitor') ||
-                        !!(window as any).Capacitor;
-    if (isCapacitor) {
-      return `https://www.pay.sovereigns.ca${normalized}`;
-    }
     if (window.location.protocol === 'file:') {
       return `http://localhost:3000${normalized}`;
     }

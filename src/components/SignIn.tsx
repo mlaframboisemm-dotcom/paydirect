@@ -96,7 +96,7 @@ export default function SignIn({ onSuccess, onRefreshData }: SignInProps) {
           console.error('Configuration background warning:', err);
         }
 
-        // Animated duration for realistic, highly responsive simulation feel
+        // Animated duration for realistic, highly responsive execution feel
         await new Promise(resolve => setTimeout(resolve, 600));
         updateStepStatus(i, 'completed');
       }

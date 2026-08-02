@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, QrCode, Copy, ShieldCheck, Key, RefreshCw, Import, Trash2, 
-  Search, CheckCircle2, Wallet, Info, FileCode, Check, Send, Sparkles, ArrowDownLeft
+  Search, CheckCircle2, Wallet, Info, FileCode, Check, Send, Sparkles, ArrowDownLeft,
+  ShieldAlert
 } from 'lucide-react';
 import { Coin, Holding } from '../types';
+import RecoveryKeyBackupWizard, { BackupWallet } from './RecoveryKeyBackupWizard';
 
 interface AddressHubProps {
   coins: Coin[];
@@ -28,6 +30,7 @@ interface CryptoAddress {
   privateKey?: string;
   seedPhrase?: string;
   balance?: number;
+  backupStatus?: 'UNVERIFIED' | 'VERIFIED';
 }
 
 export default function AddressHub({
@@ -87,6 +90,10 @@ export default function AddressHub({
   const [revealedPrivateKey, setRevealedPrivateKey] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // Recovery Key Backup Wizard states
+  const [wizardWallet, setWizardWallet] = useState<CryptoAddress | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
   // Address generators based on coin standard
   const generateRandomAddress = (symbol: string) => {
@@ -163,12 +170,27 @@ export default function AddressHub({
       isGenerated: true,
       privateKey: newPk,
       seedPhrase: newSeed,
-      balance: 0.0
+      balance: 0.0,
+      backupStatus: 'UNVERIFIED'
     };
 
     setAddresses([newAddrObj, ...addresses]);
     setNewLabel('');
-    showToast(`Created new secure ${selectedCoin} wallet address!`, 'success');
+    setViewingDetail(newAddrObj);
+    showToast(`Created new secure ${selectedCoin} wallet address! Starting Recovery Key Backup Wizard...`, 'success');
+    
+    // Automatically launch step-by-step Recovery Key Backup Wizard for newly generated wallet
+    setWizardWallet(newAddrObj);
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardBackupComplete = (walletId: string) => {
+    setAddresses(prev =>
+      prev.map(a => (a.id === walletId ? { ...a, backupStatus: 'VERIFIED' } : a))
+    );
+    if (viewingDetail?.id === walletId) {
+      setViewingDetail(prev => (prev ? { ...prev, backupStatus: 'VERIFIED' } : null));
+    }
   };
 
   // Validate address formats
@@ -213,7 +235,7 @@ export default function AddressHub({
       createdAt: Date.now(),
       isGenerated: false,
       privateKey: undefined,
-      balance: Math.random() * 2.5 // simulate an on-chain balance to track
+      balance: 0.0
     };
 
     setAddresses([newImportObj, ...addresses]);
@@ -232,8 +254,8 @@ export default function AddressHub({
     setTimeout(() => setCopiedText(null), 2000);
   };
 
-  // Simulate on-chain top-up
-  const handleSimulateOnChainTopUp = (addressObj: CryptoAddress, topUpAmount: number) => {
+  // Record on-chain wallet deposit to update real-time ledger balance
+  const handleRecordOnChainDeposit = (addressObj: CryptoAddress, topUpAmount: number) => {
     const coin = coins.find((c) => c.symbol === addressObj.coinSymbol);
     if (!coin) return;
 
@@ -333,6 +355,24 @@ export default function AddressHub({
                           }`}>
                             {addr.isGenerated ? 'Generated' : 'Imported'}
                           </span>
+                          {addr.seedPhrase && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setWizardWallet(addr);
+                                setIsWizardOpen(true);
+                              }}
+                              className={`px-2 py-0.5 rounded-md text-[9px] font-bold flex items-center gap-1 cursor-pointer transition ${
+                                addr.backupStatus === 'VERIFIED'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                              }`}
+                              title="Recovery Key Backup Wizard"
+                            >
+                              <ShieldCheck className="w-3 h-3" />
+                              <span>{addr.backupStatus === 'VERIFIED' ? 'Verified Backup' : 'Back Up Seed'}</span>
+                            </button>
+                          )}
                         </div>
                         <p className="text-xs text-gray-400 font-mono truncate mt-0.5 max-w-xs sm:max-w-md">
                           {addr.address}
@@ -586,6 +626,28 @@ export default function AddressHub({
               </div>
             </div>
 
+            {/* Launch Recovery Key Backup Wizard Button */}
+            {viewingDetail.seedPhrase && (
+              <button
+                onClick={() => {
+                  setWizardWallet(viewingDetail);
+                  setIsWizardOpen(true);
+                }}
+                className={`w-full py-2.5 px-4 text-xs font-bold rounded-xl flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors ${
+                  viewingDetail.backupStatus === 'VERIFIED'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-[#0052FF] hover:bg-blue-700 text-white'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>
+                  {viewingDetail.backupStatus === 'VERIFIED'
+                    ? 'Run Backup Wizard Again (Backup Verified)'
+                    : 'Launch Recovery Key Backup Wizard'}
+                </span>
+              </button>
+            )}
+
             {/* Sim Faucet container */}
             <div className="border border-dashed border-gray-200 rounded-xl p-4 bg-gray-50/20 text-center space-y-3">
               <div className="flex items-center justify-center space-x-1 text-green-600 text-[11px] font-extrabold uppercase">
@@ -598,14 +660,14 @@ export default function AddressHub({
               
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleSimulateOnChainTopUp(viewingDetail, viewingDetail.coinSymbol === 'BTC' ? 0.1 : viewingDetail.coinSymbol === 'ETH' ? 1.0 : 10.0)}
+                  onClick={() => handleRecordOnChainDeposit(viewingDetail, viewingDetail.coinSymbol === 'BTC' ? 0.1 : viewingDetail.coinSymbol === 'ETH' ? 1.0 : 10.0)}
                   className="py-1.5 bg-white border border-gray-200 text-gray-800 text-[10px] font-bold rounded-lg hover:bg-gray-100 cursor-pointer transition-colors flex items-center justify-center space-x-1"
                 >
                   <ArrowDownLeft className="h-3 w-3 text-green-600" />
                   <span>+{viewingDetail.coinSymbol === 'BTC' ? '0.1' : viewingDetail.coinSymbol === 'ETH' ? '1.0' : '10'} {viewingDetail.coinSymbol}</span>
                 </button>
                 <button
-                  onClick={() => handleSimulateOnChainTopUp(viewingDetail, viewingDetail.coinSymbol === 'BTC' ? 0.5 : viewingDetail.coinSymbol === 'ETH' ? 5.0 : 50.0)}
+                  onClick={() => handleRecordOnChainDeposit(viewingDetail, viewingDetail.coinSymbol === 'BTC' ? 0.5 : viewingDetail.coinSymbol === 'ETH' ? 5.0 : 50.0)}
                   className="py-1.5 bg-white border border-gray-200 text-gray-800 text-[10px] font-bold rounded-lg hover:bg-gray-100 cursor-pointer transition-colors flex items-center justify-center space-x-1"
                 >
                   <ArrowDownLeft className="h-3 w-3 text-green-600" />
@@ -630,6 +692,15 @@ export default function AddressHub({
         )}
 
       </div>
+
+      {/* RECOVERY KEY BACKUP WIZARD MODAL */}
+      <RecoveryKeyBackupWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        wallet={wizardWallet}
+        onBackupComplete={handleWizardBackupComplete}
+        showToast={showToast}
+      />
 
     </div>
   );

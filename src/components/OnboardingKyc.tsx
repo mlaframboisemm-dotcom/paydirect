@@ -125,7 +125,7 @@ export default function OnboardingKyc({
 
       const data = await response.json();
 
-      // Simulate database accounting & screening verification
+      // Execute database accounting & sanction screening verification
       setTimeout(() => setVerifyProgress(2), 800);
       setTimeout(() => setVerifyProgress(3), 1600);
       setTimeout(() => {

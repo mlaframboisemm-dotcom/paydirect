@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Key, Eye, EyeOff, Trash2, ShieldCheck, Terminal, Code2, 
-  Play, RefreshCw, Copy, Check, CheckCircle2, Globe, ArrowRight, Sparkles, Send
+  Play, RefreshCw, Copy, Check, CheckCircle2, Globe, ArrowRight, Sparkles, Send,
+  Lock, Building2, CreditCard, Save, Database, ShieldAlert
 } from 'lucide-react';
 import { Coin, Holding } from '../types';
 
@@ -405,7 +406,35 @@ print("Order executed:", order['order_id'])`;
     }, 1500);
   };
 
-  const [hubTab, setHubTab] = useState<'api' | 'cypress' | 'real_coinbase'>('api');
+  const [hubTab, setHubTab] = useState<'api' | 'cypress' | 'real_coinbase' | 'wise_plaid'>('api');
+
+  // Wise & Plaid Integrations State
+  const [wiseApiToken, setWiseApiToken] = useState('');
+  const [wiseProfileId, setWiseProfileId] = useState('101924589');
+  const [wiseStatus, setWiseStatus] = useState<{ configured: boolean; tokenMasked: string; profileId: string; status: string }>({
+    configured: false,
+    tokenMasked: '',
+    profileId: '101924589',
+    status: 'STANDBY'
+  });
+
+  const [plaidClientId, setPlaidClientId] = useState('');
+  const [plaidSecret, setPlaidSecret] = useState('');
+  const [plaidEnv, setPlaidEnv] = useState<'sandbox' | 'development' | 'production'>('sandbox');
+  const [plaidStatus, setPlaidStatus] = useState<{ configured: boolean; clientIdMasked: string; hasSecret: boolean; environment: string; status: string }>({
+    configured: false,
+    clientIdMasked: '',
+    hasSecret: false,
+    environment: 'sandbox',
+    status: 'STANDBY'
+  });
+
+  const [showWiseToken, setShowWiseToken] = useState(false);
+  const [showPlaidSecret, setShowPlaidSecret] = useState(false);
+  const [isSavingIntegrations, setIsSavingIntegrations] = useState(false);
+  const [isTestingWise, setIsTestingWise] = useState(false);
+  const [isTestingPlaid, setIsTestingPlaid] = useState(false);
+  const [integrationLogs, setIntegrationLogs] = useState<string[]>([]);
 
   // Real Coinbase Connection States
   const [cdpApiKeyName, setCdpApiKeyName] = useState('');
@@ -580,6 +609,155 @@ print("Order executed:", order['order_id'])`;
     }
   };
 
+  // Fetch Wise & Plaid integration credentials
+  const fetchIntegrationsConfig = async () => {
+    try {
+      const res = await fetch('/api/integrations/credentials', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          if (data.wise) {
+            setWiseStatus(data.wise);
+            setWiseProfileId(data.wise.profileId || '101924589');
+            if (data.wise.tokenMasked) {
+              setWiseApiToken(data.wise.tokenMasked);
+            }
+          }
+          if (data.plaid) {
+            setPlaidStatus(data.plaid);
+            if (data.plaid.clientIdMasked) {
+              setPlaidClientId(data.plaid.clientIdMasked);
+            }
+            if (data.plaid.hasSecret) {
+              setPlaidSecret('••••••••••••••••••••••••••••••••');
+            }
+            if (data.plaid.environment) {
+              setPlaidEnv(data.plaid.environment as any);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching integration config:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (hubTab === 'wise_plaid') {
+      fetchIntegrationsConfig();
+    }
+  }, [hubTab]);
+
+  const handleSaveIntegrationsConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingIntegrations(true);
+    try {
+      const res = await fetch('/api/integrations/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          wiseApiToken: wiseApiToken.includes('••••') ? undefined : wiseApiToken,
+          wiseProfileId,
+          plaidClientId: plaidClientId.includes('••••') ? undefined : plaidClientId,
+          plaidSecret: plaidSecret.includes('••••') ? undefined : plaidSecret,
+          plaidEnv
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Wise and Plaid API credentials persisted successfully!', 'success');
+        setIntegrationLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ✅ Wise & Plaid credentials saved and persisted into configuration storage.`
+        ]);
+        await fetchIntegrationsConfig();
+      } else {
+        showToast(data.message || 'Failed to save integrations config.', 'error');
+      }
+    } catch (err: any) {
+      showToast(`Error saving configuration: ${err.message}`, 'error');
+    } finally {
+      setIsSavingIntegrations(false);
+    }
+  };
+
+  const handleTestWiseHandshake = async () => {
+    setIsTestingWise(true);
+    setIntegrationLogs(prev => [
+      ...prev,
+      `[${new Date().toLocaleTimeString()}] 🚀 Executing Wise API connection handshake...`
+    ]);
+    try {
+      const res = await fetch('/api/integrations/test-wise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          wiseApiToken: wiseApiToken.includes('••••') ? undefined : wiseApiToken,
+          wiseProfileId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setIntegrationLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ✅ ${data.message}`,
+          `[WISE LEDGER] USD Balance: $${data.data?.usdBalance?.toLocaleString() || '0'}, CAD Balance: $${data.data?.cadBalance?.toLocaleString() || '0'}, Total USD Value: $${data.data?.totalUSD?.toLocaleString() || '0'}`
+        ]);
+      } else {
+        showToast(data.message, 'info');
+        setIntegrationLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ℹ️ Wise Handshake: ${data.message}`
+        ]);
+      }
+    } catch (err: any) {
+      showToast(`Wise handshake test error: ${err.message}`, 'error');
+    } finally {
+      setIsTestingWise(false);
+    }
+  };
+
+  const handleTestPlaidHandshake = async () => {
+    setIsTestingPlaid(true);
+    setIntegrationLogs(prev => [
+      ...prev,
+      `[${new Date().toLocaleTimeString()}] 🚀 Verifying Plaid credentials & environment mode (${plaidEnv})...`
+    ]);
+    try {
+      const res = await fetch('/api/integrations/test-plaid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          plaidClientId: plaidClientId.includes('••••') ? undefined : plaidClientId,
+          plaidSecret: plaidSecret.includes('••••') ? undefined : plaidSecret,
+          plaidEnv
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setIntegrationLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ✅ ${data.message}`
+        ]);
+      } else {
+        showToast(data.message, 'error');
+        setIntegrationLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ❌ Plaid Handshake: ${data.message}`
+        ]);
+      }
+    } catch (err: any) {
+      showToast(`Plaid handshake test error: ${err.message}`, 'error');
+    } finally {
+      setIsTestingPlaid(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Level Nav Tabs */}
@@ -613,6 +791,18 @@ print("Order executed:", order['order_id'])`;
           <ShieldCheck className="h-4 w-4" />
           <span>Cypress E2E Integration Suite</span>
           <span className="text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-full">Step 6</span>
+        </button>
+        <button
+          onClick={() => setHubTab('wise_plaid')}
+          className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition-all cursor-pointer flex items-center space-x-2 ${
+            hubTab === 'wise_plaid' ? 'border-[#0052FF] text-[#0052FF]' : 'border-transparent text-gray-400 hover:text-gray-900'
+          }`}
+        >
+          <Building2 className="h-4 w-4 text-indigo-500" />
+          <span>Wise & Plaid API Settings</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${wiseStatus.configured && plaidStatus.configured ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+            {wiseStatus.configured && plaidStatus.configured ? 'Configured' : 'Credentials'}
+          </span>
         </button>
       </div>
 
@@ -1405,6 +1595,259 @@ print("Order executed:", order['order_id'])`;
               </ol>
             </div>
           </div>
+        </div>
+      )}
+
+      {hubTab === 'wise_plaid' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-blue-950 text-white p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-sm border border-indigo-800/40">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <Building2 className="w-56 h-56 text-indigo-400" />
+            </div>
+            <div className="relative z-10 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] bg-indigo-500 text-white font-bold px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Integration Configuration Storage
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold px-2.5 py-1 rounded-full uppercase">
+                  Server-Side Encrypted
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">
+                Wise & Plaid API Credentials Settings
+              </h2>
+              <p className="text-xs text-indigo-200/80 leading-relaxed max-w-3xl">
+                Configure and persist your live credentials for Wise multi-currency banking ledger sync and Plaid ACH bank authentication into server process storage.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveIntegrationsConfig} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* LEFT COLUMN: Wise Credentials */}
+            <div className="lg:col-span-6 space-y-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">Wise (TransferWise) API</h3>
+                      <p className="text-[11px] text-gray-500">Multi-currency balance & transfer API</p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${wiseStatus.configured ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {wiseStatus.configured ? 'ACTIVE' : 'STANDBY'}
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Wise Personal / Business API Bearer Token (<code className="text-indigo-600">WISE_API_TOKEN</code>)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showWiseToken ? 'text' : 'password'}
+                        placeholder="Paste Wise API Token (e.g. wise_live_...)"
+                        value={wiseApiToken}
+                        onChange={(e) => setWiseApiToken(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowWiseToken(!showWiseToken)}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs cursor-pointer"
+                      >
+                        {showWiseToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">Obtain from Wise Account Settings &gt; API Tokens.</p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Wise Profile ID (<code className="text-indigo-600">WISE_PROFILE_ID</code>)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 101924589"
+                      value={wiseProfileId}
+                      onChange={(e) => setWiseProfileId(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={handleTestWiseHandshake}
+                      disabled={isTestingWise}
+                      className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isTestingWise ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>Test Wise API Handshake</span>
+                    </button>
+                    <span className="text-[11px] text-gray-400">
+                      {wiseStatus.tokenMasked ? `Saved: ${wiseStatus.tokenMasked}` : 'No token saved'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Plaid Credentials */}
+            <div className="lg:col-span-6 space-y-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center font-bold">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900">Plaid Financial API</h3>
+                      <p className="text-[11px] text-gray-500">ACH direct bank authentication & Link API</p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${plaidStatus.configured ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {plaidStatus.configured ? 'ACTIVE' : 'STANDBY'}
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Plaid Client ID (<code className="text-slate-700">PLAID_CLIENT_ID</code>)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 60a9f821b0213a00..."
+                      value={plaidClientId}
+                      onChange={(e) => setPlaidClientId(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-700 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Plaid API Secret (<code className="text-slate-700">PLAID_SECRET</code>)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPlaidSecret ? 'text' : 'password'}
+                        placeholder="Paste Plaid API Secret"
+                        value={plaidSecret}
+                        onChange={(e) => setPlaidSecret(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-700 pr-10 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPlaidSecret(!showPlaidSecret)}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs cursor-pointer"
+                      >
+                        {showPlaidSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                      Plaid Target Environment (<code className="text-slate-700">PLAID_ENV</code>)
+                    </label>
+                    <select
+                      value={plaidEnv}
+                      onChange={(e) => setPlaidEnv(e.target.value as any)}
+                      className="w-full bg-gray-50 border border-gray-200 text-xs sm:text-sm px-3 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-slate-700 font-semibold text-gray-800"
+                    >
+                      <option value="sandbox">Sandbox (Development / Test Environment)</option>
+                      <option value="development">Development (Real Accounts / Dev Tier)</option>
+                      <option value="production">Production (Live Financial Network)</option>
+                    </select>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={handleTestPlaidHandshake}
+                      disabled={isTestingPlaid}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isTestingPlaid ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                      <span>Test Plaid Format</span>
+                    </button>
+                    <span className="text-[11px] font-mono text-gray-400">
+                      Env: {plaidEnv.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FULL-WIDTH SAVE ACTION FOOTER & LOG TERMINAL */}
+            <div className="lg:col-span-12 space-y-6">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <Save className="w-4 h-4 text-indigo-400" />
+                    <span>Persist Configuration to Application Storage</span>
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Saves Wise & Plaid credentials securely into process environment variables and updates runtime configuration storage.
+                  </p>
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSavingIntegrations}
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl text-xs font-bold transition-colors shadow-lg shadow-indigo-600/20 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingIntegrations ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  <span>Save & Persist Credentials</span>
+                </button>
+              </div>
+
+              {/* Real-time Integration Terminal Logs */}
+              <div className="bg-[#0f111a] border border-gray-800 rounded-2xl p-5 shadow-lg space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                  <span className="text-xs font-bold text-gray-400 flex items-center space-x-2">
+                    <Terminal className="h-4 w-4 text-indigo-400" />
+                    <span className="font-mono">WISE & PLAID INTEGRATION DIAGNOSTIC LOGS</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIntegrationLogs([])}
+                    className="text-[10px] text-gray-500 hover:text-gray-300 font-mono"
+                  >
+                    Clear Logs
+                  </button>
+                </div>
+
+                <div className="font-mono text-[11px] leading-relaxed text-gray-300 min-h-[120px] max-h-[220px] overflow-y-auto space-y-1.5 scrollbar-thin">
+                  {integrationLogs.length > 0 ? (
+                    integrationLogs.map((log, index) => (
+                      <div key={index} className={
+                        log.includes('✅') ? 'text-emerald-400' :
+                        log.includes('❌') ? 'text-rose-400 font-semibold' :
+                        log.includes('🚀') ? 'text-indigo-300' :
+                        'text-gray-400'
+                      }>
+                        {log}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-500 italic text-center py-8">
+                      No diagnostic output yet. Click "Test Wise API Handshake" or "Test Plaid Format" to inspect connection response data.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </form>
         </div>
       )}
     </div>

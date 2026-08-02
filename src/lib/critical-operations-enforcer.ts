@@ -430,16 +430,3 @@ export function enforceExternalProofRequirement(result: TestResult): void {
 export function isFinancialOperationVerified(result: TestResult): boolean {
   return result.internalResult.success === true && result.externalProof?.status === 'verified';
 }
-
-export function getFinancialOperationVerificationSummary(result: any) {
-  const status = result.externalProof?.status || 'pending';
-  const isVerified = result.internalResult.success === true && status === 'verified';
-  const message = isVerified
-    ? 'Verified'
-    : `Awaiting external confirmation. Status: ${status}`;
-  return {
-    isVerified,
-    status,
-    message
-  };
-}

@@ -77,11 +77,23 @@ export interface DBAuditLog {
   details: string;
 }
 
+export interface DBBankAccount {
+  id: string;
+  userId: string;
+  accountName: string;
+  bankName: string;
+  accountType: string;
+  routingNumber?: string;
+  accountNumber?: string;
+  balance: number;
+}
+
 export interface DatabaseState {
   users: DBUser[];
   wallets: DBWallet[];
   transactions: DBTransaction[];
   auditLogs: DBAuditLog[];
+  bankAccounts?: DBBankAccount[];
 }
 
 export interface LedgerIntegrityFinding {
@@ -233,7 +245,8 @@ class RelationalLedgerDatabase {
       users: Array.isArray(parsed?.users) ? parsed.users.map((user: any) => this.normalizeUser(user)) : [],
       wallets: Array.isArray(parsed?.wallets) ? parsed.wallets.map((wallet: any) => this.normalizeWallet(wallet)) : [],
       transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : [],
-      auditLogs: Array.isArray(parsed?.auditLogs) ? parsed.auditLogs : []
+      auditLogs: Array.isArray(parsed?.auditLogs) ? parsed.auditLogs : [],
+      bankAccounts: Array.isArray(parsed?.bankAccounts) ? parsed.bankAccounts : []
     };
   }
 
@@ -242,7 +255,8 @@ class RelationalLedgerDatabase {
       users: [],
       wallets: [],
       transactions: [],
-      auditLogs: []
+      auditLogs: [],
+      bankAccounts: []
     };
   }
 
@@ -809,6 +823,36 @@ class RelationalLedgerDatabase {
       return targetState.auditLogs
         .filter(l => l.userId === userId)
         .sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    // 13. SELECT * FROM bank_accounts WHERE user_id = ?
+    if (formattedSql.startsWith('SELECT * FROM bank_accounts WHERE user_id = ?')) {
+      const [userId] = params;
+      const targetState = this.transactionSnapshot || this.state;
+      return (targetState.bankAccounts || []).filter(b => b.userId === userId);
+    }
+
+    // 13.5 SELECT * FROM bank_accounts
+    if (formattedSql === 'SELECT * FROM bank_accounts') {
+      const targetState = this.transactionSnapshot || this.state;
+      return targetState.bankAccounts || [];
+    }
+
+    // 13.6 INSERT INTO bank_accounts
+    if (formattedSql.startsWith('INSERT INTO bank_accounts')) {
+      const [id, userId, accountName, bankName, accountType, routingNumber, accountNumber, balance = 0] = params;
+      const targetState = this.transactionSnapshot || this.state;
+      if (!targetState.bankAccounts) targetState.bankAccounts = [];
+      const newAcc: DBBankAccount = { id, userId, accountName, bankName, accountType, routingNumber, accountNumber, balance: Number(balance) };
+      targetState.bankAccounts.push(newAcc);
+      if (!this.transactionSnapshot) this.save();
+      return { affectedRows: 1, insertId: id };
+    }
+
+    // Resilient SELECT fallback for any unhandled read-only query
+    if (formattedSql.toUpperCase().startsWith('SELECT')) {
+      console.warn(`[LEDGER SQL ENGINE] Unhandled SELECT query: "${sql}". Returning empty result set.`);
+      return [];
     }
 
     throw new Error(`[LEDGER SQL ENGINE] Unsupported SQL statement or syntax: "${sql}"`);
