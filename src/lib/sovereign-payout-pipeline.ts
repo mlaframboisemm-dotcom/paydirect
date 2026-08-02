@@ -43,7 +43,8 @@ function buildCoinbaseJWT(method: string, path: string): string {
     nbf: nowSeconds - 10,
     exp: nowSeconds + 110,
     sub: kid,
-    aud: ['direct']
+    aud: ['direct'],
+    uri: `${method.toUpperCase()} api.coinbase.com${path}`
   };
 
   const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');

@@ -3029,7 +3029,7 @@ app.get('/api/prices', async (req, res) => {
  * Cryptographic helper to generate Coinbase Advanced Trade API v3 JWTs.
  * Uses standard ES256 (or falls back gracefully to HS256 if secret is not a PEM EC key).
  */
-function generateCoinbaseJWT(keyId: string, secretRaw: string, path: string): string {
+function generateCoinbaseJWT(keyId: string, secretRaw: string, path: string, method = 'GET'): string {
   const kid = keyId;
   const alg = 'ES256';
   
@@ -3046,7 +3046,8 @@ function generateCoinbaseJWT(keyId: string, secretRaw: string, path: string): st
     nbf: nowSeconds - 10,
     exp: nowSeconds + 110,
     sub: kid,
-    aud: ['direct']
+    aud: ['direct'],
+    uri: `${method.toUpperCase()} api.coinbase.com${path}`
   };
 
   const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
@@ -3151,7 +3152,7 @@ async function executeCoinbaseOrder(side: 'BUY' | 'SELL', symbol: string, amount
   };
 
   const path = '/api/v3/brokerage/orders';
-  const jwt = generateCoinbaseJWT(apiKeyId, apiSecretRaw, path);
+  const jwt = generateCoinbaseJWT(apiKeyId, apiSecretRaw, path, 'POST');
 
   const response = await fetch(`https://api.coinbase.com${path}`, {
     method: 'POST',
