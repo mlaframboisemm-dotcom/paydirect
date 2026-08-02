@@ -8098,6 +8098,33 @@ async function createKlaviyoProfile(email: string, first_name?: string, attribut
   }
 }
 
+// Sovereign Auto-Liquidation Payout Pipeline (Sell Token -> Stripe -> Tangerine Bank)
+app.post('/api/withdrawal/sovereign-payout', requireAuth, requireMfa, async (req: any, res: any) => {
+  const { symbol, amount, targetCurrency } = req.body || {};
+  if (!symbol || typeof symbol !== 'string') {
+    return res.status(400).json({ error: 'INVALID_SYMBOL', message: 'Token symbol is required.' });
+  }
+  const amt = Number(amount);
+  if (isNaN(amt) || amt <= 0) {
+    return res.status(400).json({ error: 'INVALID_AMOUNT', message: 'Positive amount is required.' });
+  }
+
+  try {
+    const { executeSovereignPayoutPipeline } = await import('./src/lib/sovereign-payout-pipeline.js');
+    const result = await executeSovereignPayoutPipeline({
+      symbol: symbol.toUpperCase(),
+      amount: amt,
+      targetCurrency: targetCurrency || 'CAD'
+    });
+    return res.json(result);
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Sovereign payout pipeline failed.'
+    });
+  }
+});
+
 // Sovereigns White-Label Interbank Gateway Endpoints
 
 // Sovereign FAPI Withdrawal Initiation

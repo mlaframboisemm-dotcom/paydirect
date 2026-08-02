@@ -208,6 +208,13 @@ export default function App() {
   const [stripePayoutSuccess, setStripePayoutSuccess] = useState<string | null>(null);
   const [showStripePayoutConfirmModal, setShowStripePayoutConfirmModal] = useState<boolean>(false);
   const [isStripeConfigured, setIsStripeConfigured] = useState<boolean>(false);
+
+  // Sovereign auto-liquidation pipeline states
+  const [pipelineToken, setPipelineToken] = useState('USDC');
+  const [pipelineAmount, setPipelineAmount] = useState('');
+  const [isProcessingPipeline, setIsProcessingPipeline] = useState(false);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [pipelineSuccess, setPipelineSuccess] = useState<string | null>(null);
   
   // Market search & filters
   const [marketFilter, setMarketFilter] = useState<'all' | 'gainers' | 'losers' | 'watchlist'>('all');
@@ -910,6 +917,49 @@ export default function App() {
       setStripePayoutError(err.message || 'Payout request failed.');
     } finally {
       setIsProcessingStripePayout(false);
+    }
+  };
+
+  const handleTriggerSovereignPayoutPipeline = async () => {
+    setPipelineError(null);
+    setPipelineSuccess(null);
+    const amt = parseFloat(pipelineAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setPipelineError('Please enter a valid token amount.');
+      return;
+    }
+    setIsProcessingPipeline(true);
+
+    try {
+      const res = await fetch(buildApiUrl('/api/withdrawal/sovereign-payout'), {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          symbol: pipelineToken,
+          amount: amt,
+          targetCurrency: 'CAD'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.success || data.steps?.coinbase_sell?.success || data.steps?.kraken_sell?.success) {
+          setPipelineSuccess(`Auto-liquidation payout of ${amt} ${pipelineToken} initiated! Sold on exchange, routed proceeds to Stripe, and queued instant payout to Tangerine Bank.`);
+          showToast(`Sovereign liquidation pipeline executed!`, 'success');
+        } else {
+          setPipelineSuccess(data.message || 'Liquidation pipeline executed.');
+          showToast(`Sovereign liquidation pipeline completed.`, 'info');
+        }
+        setPipelineAmount('');
+        fetchStripeBalance();
+        syncCoinbaseBalances();
+      } else {
+        const errorMsg = data.message || data.error || 'Failed to dispatch liquidation payout.';
+        setPipelineError(errorMsg);
+      }
+    } catch (err: any) {
+      setPipelineError(err.message || 'Liquidation payout request failed.');
+    } finally {
+      setIsProcessingPipeline(false);
     }
   };
 
@@ -2719,6 +2769,104 @@ export default function App() {
                         </>
                       ) : (
                         <span>Initiate Connected Payout</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sovereign Liquidation Pipeline (Token -> Stripe -> Tangerine) */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-xs space-y-4">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 flex items-center space-x-1.5">
+                      <Building className="h-4 w-4 text-emerald-500" />
+                      <span>Sovereign Liquidation Pipeline</span>
+                    </h4>
+                    <p className="text-[10px] text-gray-400 mt-1 font-semibold leading-relaxed">
+                      Instantly liquidate on-chain crypto assets on Coinbase/Kraken and route the proceeds automatically through your Stripe CAD Hub directly to your Tangerine bank account.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                        Select On-Chain Token
+                      </label>
+                      <select
+                        value={pipelineToken}
+                        onChange={(e) => setPipelineToken(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 text-xs py-2 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#635BFF] font-bold"
+                      >
+                        <option value="XAUT">Tether Gold (XAUt)</option>
+                        <option value="USDC">USD Coin (USDC)</option>
+                        <option value="USDT">Tether (USDT)</option>
+                        <option value="ETH">Ethereum (ETH)</option>
+                        <option value="PAXG">Paxos Gold (PAXG)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">
+                        Liquidate Amount
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={pipelineAmount}
+                          onChange={(e) => setPipelineAmount(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 text-xs pl-3 pr-16 py-2.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#635BFF] font-mono"
+                        />
+                        <span className="absolute right-3 top-2.5 text-gray-400 font-extrabold text-xs font-mono">
+                          {pipelineToken}
+                        </span>
+                      </div>
+                    </div>
+
+                    {pipelineError && (
+                      <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-semibold flex items-center space-x-2">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{pipelineError}</span>
+                      </div>
+                    )}
+
+                    {pipelineSuccess && (
+                      <div className="p-2.5 bg-green-50 border border-green-100 rounded-xl text-green-700 text-xs font-semibold flex items-center space-x-2">
+                        <Check className="h-4 w-4 shrink-0" />
+                        <span>{pipelineSuccess}</span>
+                      </div>
+                    )}
+
+                    <div className="bg-emerald-50/50 border border-emerald-100/60 p-3 rounded-xl space-y-1.5 text-[10px]">
+                      <div className="flex justify-between items-center text-emerald-800 font-medium">
+                        <span>1. Market Sell Token:</span>
+                        <span className="font-bold font-mono">Coinbase Prime OTC</span>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-800 font-medium">
+                        <span>2. Liquidation Settlement:</span>
+                        <span className="font-bold">Stripe CAD Hub</span>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-800 font-medium">
+                        <span>3. Final Destination Bank:</span>
+                        <span className="font-bold">Tangerine Checkings (614)</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleTriggerSovereignPayoutPipeline}
+                      disabled={isProcessingPipeline || !pipelineAmount || parseFloat(pipelineAmount) <= 0}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center space-x-2 shadow-md shadow-emerald-500/10"
+                    >
+                      {isProcessingPipeline ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Executing Liquidation...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Building className="h-4 w-4" />
+                          <span>Execute Liquidation & Payout</span>
+                        </>
                       )}
                     </button>
                   </div>
