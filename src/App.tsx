@@ -3239,12 +3239,16 @@ export default function App() {
                     <span className="text-gray-500 font-medium">Bank Institution:</span>
                     <span className="font-bold text-gray-900 flex items-center space-x-1">
                       <Building className="h-3.5 w-3.5 text-[#635BFF]" />
-                      <span>Tangerine / Connected Checking</span>
+                      <span>Tangerine Checking (614)</span>
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 font-medium">Account Routing / Transit:</span>
-                    <span className="font-mono text-gray-800 font-semibold">•••••••• 6140</span>
+                    <span className="font-mono text-gray-800 font-semibold">Transit: 00152 | Bank: 614</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Account Number:</span>
+                    <span className="font-mono text-gray-800 font-semibold">•••••••• 9879</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-500 font-medium">Account Beneficiary:</span>
