@@ -20,7 +20,22 @@ async function run() {
   }
 
   await import('../server.ts');
-  await new Promise((resolve) => setTimeout(resolve, 4500));
+  
+  console.log('Waiting for server to start...');
+  let retries = 30;
+  while (retries > 0) {
+    try {
+      // Empty POST request to register endpoint to verify server is listening
+      await fetch('http://localhost:4011/api/auth/register', { method: 'POST' });
+      break;
+    } catch (e) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      retries--;
+    }
+  }
+  if (retries === 0) {
+    throw new Error('Server did not start within 30 seconds.');
+  }
 
   const email = `tg-redirect-${Date.now()}@example.com`;
   const password = 'CorrectHorseBatteryStaple!42';

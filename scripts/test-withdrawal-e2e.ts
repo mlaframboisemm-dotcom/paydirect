@@ -33,7 +33,21 @@ async function run() {
   process.env.PORT = '4001';
   process.env.BYPASS_EMAIL_VERIFICATION = 'true';
   await import('../server.ts');
-  await new Promise((r) => setTimeout(r, 4000));
+  
+  console.log('Waiting for server to start...');
+  let retries = 30;
+  while (retries > 0) {
+    try {
+      await fetch('http://localhost:4001/api/auth/register', { method: 'POST' });
+      break;
+    } catch (e) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      retries--;
+    }
+  }
+  if (retries === 0) {
+    throw new Error('Server did not start within 30 seconds.');
+  }
 
   try {
     const email = `e2e-${Date.now()}@example.com`;
