@@ -1148,13 +1148,13 @@ const wiseCardTransactions = [
  * Fetch Wise card metadata, status, limits, channels, and balances
  */
 withdrawalRouter.get('/wise/card/details', requireRouterAuth, async (_req, res) => {
-  let usdBalance = 2478350.00;
+  let usdBalance = 0;
   let cadBalance = 0.00;
   try {
     const { getWiseTotalCashUSD } = await import('../src/lib/wise-live-integration.js');
     const wiseData = await getWiseTotalCashUSD();
     if (wiseData && typeof wiseData.usdBalance === 'number') {
-      usdBalance = wiseData.usdBalance || 2478350.00;
+      usdBalance = wiseData.usdBalance;
       cadBalance = wiseData.cadBalance || 0.00;
     }
   } catch (e) {

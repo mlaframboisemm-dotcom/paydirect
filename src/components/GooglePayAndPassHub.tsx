@@ -42,35 +42,7 @@ export interface WiseWalletAccount {
 }
 
 export function useWiseWallets() {
-  const [wiseWallets, setWiseWallets] = useState<WiseWalletAccount[]>([
-    {
-      id: '176576596814061',
-      name: 'Wise Multi-Currency USD Wallet',
-      currency: 'USD',
-      balance: 2478350.00,
-      accountNumber: '176576596814061',
-      type: 'Wise Multi-Currency',
-      status: 'synced'
-    },
-    {
-      id: '176576596814062',
-      name: 'Wise CAD Primary Account',
-      currency: 'CAD',
-      balance: 185000.00,
-      accountNumber: '176576596814062',
-      type: 'Wise Checking',
-      status: 'synced'
-    },
-    {
-      id: 'SOV_CASH_VAULT_01',
-      name: 'Sovereign Cash Reserve',
-      currency: 'USD',
-      balance: 500000.00,
-      accountNumber: 'SOV_CASH_01',
-      type: 'Sovereign Hub Vault',
-      status: 'active'
-    }
-  ]);
+  const [wiseWallets, setWiseWallets] = useState<WiseWalletAccount[]>([]);
   const [activeWiseWalletId, setActiveWiseWalletId] = useState<string>('176576596814061');
   const [isLoadingWallets, setIsLoadingWallets] = useState<boolean>(true);
 
@@ -82,8 +54,8 @@ export function useWiseWallets() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          const liveUsd = data.usdBalance ?? data.totalUSD ?? 2478350.00;
-          const liveCad = data.cadBalance ?? 185000.00;
+          const liveUsd = data.usdBalance ?? data.totalUSD ?? 0;
+          const liveCad = data.cadBalance ?? 0;
 
           if (Array.isArray(data.balances) && data.balances.length > 0) {
             const fetched: WiseWalletAccount[] = data.balances.map((b: any, idx: number) => {
@@ -156,7 +128,7 @@ export interface WiseLedgerCheckResult {
 export function useWiseLedgerEnforcer() {
   const [ledgerStatus, setLedgerStatus] = useState<WiseLedgerCheckResult>({
     isVerified: true,
-    reconciledUsdBalance: 2478350.00,
+    reconciledUsdBalance: 0,
     lastReconciledAt: new Date().toISOString(),
     sourceAccount: '176576596814061'
   });

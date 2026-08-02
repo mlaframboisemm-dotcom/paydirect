@@ -289,42 +289,7 @@ export async function getWiseTotalCashUSD(): Promise<{
     if (b.currency === 'USD') usdBalance += b.amount;
   }
 
-  let totalUSD = usdBalance + (cadBalance * cadRate);
-
-  // Synchronize with Marcel Laframboise's active reconciled Wise business balance (Profile 101924589 - sovereigns, Account 176576596814061)
-  const ACTIVE_RECONCILED_USD = 2478350.00;
-  if (totalUSD < ACTIVE_RECONCILED_USD) {
-    usdBalance = ACTIVE_RECONCILED_USD;
-    totalUSD = ACTIVE_RECONCILED_USD;
-  }
-
-  // Ensure individual balances array also reflects the reconciled balance for USD account 176576596814061
-  if (balances && balances.length > 0) {
-    const usdBalEntry = balances.find(b => b.currency === 'USD');
-    if (usdBalEntry) {
-      if (usdBalEntry.amount < ACTIVE_RECONCILED_USD) {
-        usdBalEntry.amount = ACTIVE_RECONCILED_USD;
-      }
-    } else {
-      balances.push({
-        balanceId: 176576596814061,
-        currency: 'USD',
-        amount: ACTIVE_RECONCILED_USD,
-        type: 'business',
-        profileId: 101924589
-      });
-    }
-  } else {
-    balances = [
-      {
-        balanceId: 176576596814061,
-        currency: 'USD',
-        amount: ACTIVE_RECONCILED_USD,
-        type: 'business',
-        profileId: 101924589
-      }
-    ];
-  }
+  const totalUSD = usdBalance + (cadBalance * cadRate);
 
   return {
     cadBalance,

@@ -10505,10 +10505,10 @@ async function startServer() {
       const userName = req.user?.name || req.user?.fullName || 'Marcel Laframboise';
 
       // 1. Fetch live Wise Multi-Currency Balances & Reconcile Account Hub Ledger
-      let wiseUSD = 2478350.00;
-      let wiseCAD = 185000.00;
+      let wiseUSD = 0;
+      let wiseCAD = 0;
       let wiseEUR = 0.00;
-      let wiseTotalUSD = 2614350.00;
+      let wiseTotalUSD = 0;
       let isLiveConnected = false;
 
       try {
@@ -11384,7 +11384,7 @@ async function startServer() {
     try {
       const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const wiseData = await getWiseTotalCashUSD().catch(() => null);
-      const totalUSD = wiseData?.totalUSD || 2478350.00;
+      const totalUSD = wiseData?.totalUSD || 0;
       return res.json({
         success: true,
         connected: true,
@@ -11403,15 +11403,38 @@ async function startServer() {
   });
 
   app.get('/api/coinbase55/wallets', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      wallets: [
-        { id: 'cb-usd', symbol: 'USD', balance: 2478350.00, usdValue: 2478350.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' },
-        { id: 'cb-btc', symbol: 'BTC', balance: 12.5, usdValue: 825000.00, address: 'bc1q9v8903marcellaframboise' },
-        { id: 'cb-eth', symbol: 'ETH', balance: 180.2, usdValue: 576640.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' },
-        { id: 'cb-cad', symbol: 'CAD', balance: 185000.00, usdValue: 131996.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' }
-      ]
-    });
+    try {
+      // Fetch live Wise USD balance for the primary USD wallet
+      const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+      const wiseData = await getWiseTotalCashUSD().catch(() => null);
+      const usdBalance = wiseData?.usdBalance ?? 0;
+      const cadBalance = wiseData?.cadBalance ?? 0;
+      const cadUsdValue = cadBalance * (wiseData?.cadRate ?? 0.7099);
+
+      // Pull crypto wallets from the ledger db
+      const walletRows = db.execute(
+        "SELECT asset_symbol, balance FROM wallets WHERE asset_symbol != 'USD' AND asset_symbol != 'CAD' AND balance > 0"
+      ) as any[];
+
+      const cryptoWallets = (walletRows || []).map((w: any) => ({
+        id: `cb-${(w.asset_symbol || '').toLowerCase()}`,
+        symbol: w.asset_symbol,
+        balance: Number(w.balance),
+        usdValue: Number(w.balance),
+        address: process.env.VITE_MARSHALL_ADDRESS || ''
+      }));
+
+      return res.json({
+        success: true,
+        wallets: [
+          { id: 'cb-usd', symbol: 'USD', balance: usdBalance, usdValue: usdBalance, address: process.env.VITE_MARSHALL_ADDRESS || '' },
+          { id: 'cb-cad', symbol: 'CAD', balance: cadBalance, usdValue: cadUsdValue, address: process.env.VITE_MARSHALL_ADDRESS || '' },
+          ...cryptoWallets
+        ]
+      });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
   });
 
   app.get('/api/coinbase55/transactions', async (req: any, res: any) => {
@@ -11460,31 +11483,35 @@ async function startServer() {
   });
 
   app.get('/api/withdrawal/wise/card/transactions', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      transactions: [
-        {
-          id: 'pos_tx_01',
-          merchantName: 'Google Pay POS Terminal',
-          amount: -45.00,
-          currency: 'USD',
-          type: 'CARD_PAYMENT',
-          status: 'COMPLETED',
-          timestamp: new Date().toISOString(),
-          location: 'Google Wallet NFC Tap'
-        },
-        {
-          id: 'pos_tx_02',
-          merchantName: 'Wise Multi-Currency Settlement',
-          amount: 2478350.00,
-          currency: 'USD',
-          type: 'CREDIT',
-          status: 'COMPLETED',
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          location: 'Wise Live API'
-        }
-      ]
-    });
+    try {
+      const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+      const wiseData = await getWiseTotalCashUSD().catch(() => null);
+      const liveBalance = wiseData?.usdBalance ?? 0;
+
+      // Pull real transactions from the ledger db
+      const txRows = db.execute(
+        "SELECT * FROM transactions WHERE type IN ('WISE_WITHDRAWAL','RECEIVE','SEND') ORDER BY timestamp DESC LIMIT 50"
+      ) as any[];
+
+      const txs = (txRows || []).map((t: any) => ({
+        id: t.id,
+        merchantName: t.details ? JSON.parse(t.details)?.reference || 'Wise Transfer' : 'Wise Transfer',
+        amount: t.type === 'RECEIVE' ? Number(t.fiatAmount) : -Math.abs(Number(t.fiatAmount)),
+        currency: t.assetSymbol === 'USD' ? 'USD' : (t.assetSymbol || 'USD'),
+        type: t.type === 'RECEIVE' ? 'CREDIT' : 'CARD_PAYMENT',
+        status: t.status || 'COMPLETED',
+        timestamp: t.timestamp ? new Date(Number(t.timestamp)).toISOString() : new Date().toISOString(),
+        location: 'Wise Live API'
+      }));
+
+      return res.json({
+        success: true,
+        liveBalanceUsd: liveBalance,
+        transactions: txs
+      });
+    } catch (e: any) {
+      return res.json({ success: true, liveBalanceUsd: 0, transactions: [] });
+    }
   });
 
   app.post('/api/withdrawal/wise/card/freeze', async (req: any, res: any) => {
@@ -11569,12 +11596,25 @@ async function startServer() {
   });
 
   app.post('/api/withdrawal/wise/reconcile', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      reconciled: true,
-      totalUsd: 2478350.00,
-      userEmail: 'mlaframboisemm@gmail.com'
-    });
+    try {
+      const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+      const wiseData = await getWiseTotalCashUSD();
+      return res.json({
+        success: true,
+        reconciled: true,
+        totalUsd: wiseData.totalUSD,
+        usdBalance: wiseData.usdBalance,
+        cadBalance: wiseData.cadBalance,
+        cadRate: wiseData.cadRate,
+        balances: wiseData.balances,
+        accountNumber: wiseData.accountNumber,
+        routingNumber: wiseData.routingNumber,
+        bankName: wiseData.bankName,
+        profileId: wiseData.profileId
+      });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e.message });
+    }
   });
 
   // Serve APK download directly with correct Android MIME type
