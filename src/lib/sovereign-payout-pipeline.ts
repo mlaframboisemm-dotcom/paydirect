@@ -26,31 +26,47 @@ function getCoinbaseSecret(): string {
 
 function buildCoinbaseJWT(method: string, path: string): string {
   const keyId = getCoinbaseKeyId();
-  const rawKey = getCoinbaseSecret();
-  const uri = `${method} api.coinbase.com${path}`;
-  const nonce = crypto.randomBytes(16).toString('hex');
+  const secretRaw = getCoinbaseSecret();
+  const kid = keyId;
+  const alg = 'ES256';
+  
+  const header = {
+    alg,
+    kid,
+    nonce: crypto.randomBytes(16).toString('hex'),
+    typ: 'JWT'
+  };
 
-  const header = Buffer.from(JSON.stringify({
-    typ: 'JWT', kid: keyId, nonce, alg: 'ES256'
-  })).toString('base64url');
-
-  const payload = Buffer.from(JSON.stringify({
-    sub: keyId,
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload = {
     iss: 'coinbase-cloud',
-    nbf: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 120,
-    uri
-  })).toString('base64url');
+    nbf: nowSeconds - 10,
+    exp: nowSeconds + 110,
+    sub: kid,
+    aud: ['direct']
+  };
 
-  const keyPem = rawKey.includes('BEGIN') ? rawKey
-    : `-----BEGIN EC PRIVATE KEY-----\n${rawKey}\n-----END EC PRIVATE KEY-----`;
+  const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  const privKey = crypto.createPrivateKey({ key: keyPem, format: 'pem' });
-  const sig = crypto.sign('sha256', Buffer.from(`${header}.${payload}`), {
-    key: privKey, dsaEncoding: 'ieee-p1363'
-  });
+  let pemKey = secretRaw;
+  if (!pemKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    pemKey = pemKey.replace(/\\n/g, '\n');
+  }
 
-  return `${header}.${payload}.${Buffer.from(sig).toString('base64url')}`;
+  try {
+    const sign = crypto.createSign('SHA256');
+    sign.update(unsignedToken);
+    sign.end();
+    const signatureB64 = sign.sign(pemKey, 'base64url');
+    return `${unsignedToken}.${signatureB64}`;
+  } catch (err) {
+    const signatureHS256 = crypto.createHmac('sha256', secretRaw)
+      .update(unsignedToken)
+      .digest('base64url');
+    return `${unsignedToken}.${signatureHS256}`;
+  }
 }
 
 async function coinbaseRequest(method: string, path: string, body?: any): Promise<any> {
@@ -245,7 +261,7 @@ export async function executeSovereignPayoutPipeline(params: {
       console.log(`[PIPELINE] Coinbase sell order created: ${orderId}, est. $${proceedsUSD.toFixed(2)} USD`);
     } else {
       // Fallback to Kraken
-      throw new Error(orderResult.error_response?.message || orderResult.error || 'Coinbase order failed');
+      throw new Error(orderResult.error_response?.message || orderResult.error || JSON.stringify(orderResult));
     }
   } catch (cbErr: any) {
     console.warn(`[PIPELINE] Coinbase failed (${cbErr.message}), trying Kraken...`);
