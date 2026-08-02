@@ -10146,7 +10146,7 @@ async function startServer() {
           db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newTokenBal, userId, sym]);
         } else {
           db.execute('INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [`wallet-${userId}-${sym.toLowerCase()}`, userId, sym, newTokenBal, '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4', 'bc1q9rny26szrgl26u64mdg0cuhvpt2p77jwh792ka', true, 'live', true, req.user.email]);
+            [`wallet-${userId}-${sym.toLowerCase()}`, userId, sym, newTokenBal, '0x742d35cc6634c0532925a3b844bc454e4438f44e', 'bc1q9rny26szrgl26u64mdg0cuhvpt2p77jwh792ka', true, 'live', true, req.user.email]);
         }
         if (usdWallets.length > 0) db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [newUsdBal, userId, 'USD']);
       } else {
@@ -10258,7 +10258,7 @@ async function startServer() {
         db.execute('UPDATE wallets SET balance = ? WHERE user_id = ? AND asset_symbol = ?', [currentToBal + toAmt, userId, toSym]);
       } else {
         db.execute('INSERT INTO wallets (id, user_id, asset_symbol, balance, public_address_ethereum, public_address_bitcoin, identityLocked, productionMode, blockchainLinked, lockedToEmail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [`wallet-${userId}-${toSym.toLowerCase()}`, userId, toSym, toAmt, '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4', '', true, 'live', true, req.user.email]);
+          [`wallet-${userId}-${toSym.toLowerCase()}`, userId, toSym, toAmt, '0x742d35cc6634c0532925a3b844bc454e4438f44e', '', true, 'live', true, req.user.email]);
       }
       const txId = `sconv_${crypto.randomUUID()}`;
       db.execute('INSERT INTO transactions (id, user_id, type, asset_symbol, amount, fiat_amount, timestamp, details, hash, status, ledger_debit, ledger_credit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -10462,7 +10462,7 @@ async function startServer() {
         userEmail: userEmail,
         usdBalance,
         totalPortfolioUsd,
-        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
+        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e',
         topHoldings,
         wiseLiveSynced: Boolean(wiseInfo),
         wiseCADBalance: wiseInfo?.cadBalance || 0,
@@ -10559,7 +10559,7 @@ async function startServer() {
       }, 0);
 
       const totalPortfolioUsd = wiseTotalUSD + cryptoVal;
-      const walletAddress = process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4';
+      const walletAddress = process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e';
 
       // 3. Generate Synchronized Google Wallet Pass Data & JWT
       const passData = {
@@ -10703,7 +10703,7 @@ async function startServer() {
         userEmail: userEmail,
         usdBalance,
         totalPortfolioUsd: usdBalance,
-        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
+        walletAddress: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e',
         topHoldings: [],
         wiseLiveSynced: Boolean(wiseInfo),
         wiseCADBalance: wiseInfo?.cadBalance || 0,
@@ -11407,10 +11407,10 @@ async function startServer() {
     return res.json({
       success: true,
       wallets: [
-        { id: 'cb-usd', symbol: 'USD', balance: 2478350.00, usdValue: 2478350.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' },
+        { id: 'cb-usd', symbol: 'USD', balance: 2478350.00, usdValue: 2478350.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' },
         { id: 'cb-btc', symbol: 'BTC', balance: 12.5, usdValue: 825000.00, address: 'bc1q9v8903marcellaframboise' },
-        { id: 'cb-eth', symbol: 'ETH', balance: 180.2, usdValue: 576640.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' },
-        { id: 'cb-cad', symbol: 'CAD', balance: 185000.00, usdValue: 131996.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4' }
+        { id: 'cb-eth', symbol: 'ETH', balance: 180.2, usdValue: 576640.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' },
+        { id: 'cb-cad', symbol: 'CAD', balance: 185000.00, usdValue: 131996.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' }
       ]
     });
   });

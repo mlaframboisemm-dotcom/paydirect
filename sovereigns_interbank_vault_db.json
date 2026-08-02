@@ -218,5 +218,25 @@
     "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
     "params": [],
     "timestamp": "2026-07-20T23:21:48.507Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-02T23:24:57.018Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-02T23:24:57.034Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-02T23:25:08.196Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-02T23:25:08.225Z"
   }
 ]
