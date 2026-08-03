@@ -29,7 +29,7 @@ interface TreasurySnapshot {
 }
 
 const DEFAULT_SNAPSHOT: TreasurySnapshot = {
-  address: '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f',
+  address: '0x44fe44fe44fe44fe44fe44fe44fe44fe44fe44fe',
   ledgerBalanceUsd: 697448955.00,
   cadOperating: 952017823.58,
   usdTreasury: 697448955.00,
