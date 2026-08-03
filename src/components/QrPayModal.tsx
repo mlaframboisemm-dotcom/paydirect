@@ -60,7 +60,7 @@ export default function QrPayModal({
   const [posStatus, setPosStatus] = useState<'awaiting' | 'scanned' | 'settled'>('awaiting');
 
   // Default Receive Wallet Address
-  const defaultWalletAddress = '0x58b178f7eee92fe888c0a1684d5fe6b78c0ff99f';
+  const defaultWalletAddress = '0x742d35cc6634c0532925a3b844bc454e4438f44e';
 
   // Generate QR code for Receive tab
   useEffect(() => {

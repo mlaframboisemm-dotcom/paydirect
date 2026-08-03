@@ -34,6 +34,7 @@ import { convertUsdToCad, DEFAULT_USD_CAD_RATE } from './lib/financial-hardening
 import { debouncedStorageSetItem } from './lib/sync-to-storage';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { getPrimaryWalletAddress, getLiveWalletSnapshot } from './lib/live-wallet-config';
 
 const configuredApiBase = String(
   (import.meta as any).env?.VITE_API_BASE ||
@@ -337,7 +338,7 @@ export default function App() {
       lastAuditDate: new Date().toISOString(),
       nodesOnline: 12,
       autoYieldEnabled: true,
-      targetYieldAddress: '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f',
+      targetYieldAddress: '0x742d35cc6634c0532925a3b844bc454e4438f44e',
       delegationPepeStatus: 'PENDING',
       delegationBlockdaemonStatus: 'PENDING',
       delegationMpcStatus: 'PENDING',
@@ -368,10 +369,26 @@ export default function App() {
 
   const [marshallConfig, setMarshallConfig] = useState<any>(() => {
     const saved = localStorage.getItem('cb_marshall_config');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const runtimeAddress = getPrimaryWalletAddress();
+        return {
+          ...parsed,
+          address: parsed?.address || runtimeAddress,
+          ledgerBalance: parsed?.ledgerBalance ?? getLiveWalletSnapshot().ledgerBalance,
+          lastUpdate: parsed?.lastUpdate || new Date().toISOString(),
+          status: parsed?.status || 'SECURED'
+        };
+      } catch {
+        // fall through to runtime defaults
+      }
+    }
+
+    const runtimeSnapshot = getLiveWalletSnapshot();
     return {
-      address: '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f',
-      ledgerBalance: 260668051.49,
+      address: runtimeSnapshot.address,
+      ledgerBalance: runtimeSnapshot.ledgerBalance,
       baseline: 250000000,
       hasPrivateKey: true,
       lastUpdate: new Date().toISOString(),
@@ -2903,8 +2920,8 @@ export default function App() {
               }}
               wallets={[
                 { walletId: 'sovereign-hub-cash', name: 'Sovereign Hub USD Deposit Account (Marcel laframboise)', address: '176576596814061', chainType: 'Wise Domestic ACH/Wire (Routing: 084009519)' },
-                { walletId: 'marshall-main', name: 'Marshall Sovereign Treasury', address: marshallConfig?.address || '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f', chainType: 'Ethereum Enclave' },
-                { walletId: 'yield-vault', name: 'High-Yield Multi-Sig Enclave', address: '0x438aE245D8a3C58B178F7EEe92fe888c0A1684D5FE', chainType: 'Multi-Sig Enclave' }
+                { walletId: 'marshall-main', name: 'Marshall Sovereign Treasury', address: marshallConfig?.address || '0x742d35cc6634c0532925a3b844bc454e4438f44e', chainType: 'Ethereum Enclave' },
+                { walletId: 'yield-vault', name: 'High-Yield Multi-Sig Enclave', address: '0x742d35cc6634c0532925a3b844bc454e4438f44e', chainType: 'Multi-Sig Enclave' }
               ]}
               marshallConfig={marshallConfig}
               onCreateYieldWallet={handleCreateYieldWallet}

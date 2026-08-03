@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
+import { getPrimaryWalletAddress } from '../src/lib/live-wallet-config';
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ interface TreasurySnapshot {
 }
 
 const DEFAULT_SNAPSHOT: TreasurySnapshot = {
-  address: '0x742d35cc6634c0532925a3b844bc454e4438f44e',
+  address: getPrimaryWalletAddress(),
   ledgerBalanceUsd: 697448955.00,
   cadOperating: 952017823.58,
   usdTreasury: 697448955.00,

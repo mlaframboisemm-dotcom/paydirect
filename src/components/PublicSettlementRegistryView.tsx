@@ -22,6 +22,7 @@ import { getBlockchainBalance } from '../lib/blockchain';
 import { ethers } from 'ethers';
 import { LedgerBalanceD3Chart } from './LedgerBalanceD3Chart';
 import { SettlementRegistryTable } from './SettlementRegistryTable';
+import { getPrimaryWalletAddress } from '../lib/live-wallet-config';
 
 interface PublicSettlementRegistryViewProps {
   marshallConfig: any;
@@ -40,9 +41,10 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
   onBack,
   settlementAnchor
 }) => {
-  const [activeAddress, setActiveAddress] = useState(
-    marshallConfig?.address || '0x742d35cc6634c0532925a3b844bc454e4438f44e'
-  );
+  const [activeAddress, setActiveAddress] = useState(() => {
+    const configuredAddress = marshallConfig?.address || getPrimaryWalletAddress();
+    return configuredAddress || '0x742d35cc6634c0532925a3b844bc454e4438f44e';
+  });
   const [customSearchAddress, setCustomSearchAddress] = useState('');
   const [onChainBalance, setOnChainBalance] = useState<string>('0.0000');
   const [loadingBalance, setLoadingBalance] = useState(false);
@@ -77,8 +79,8 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
 
   // Generate Etherscan input data hex payload based on active address and balance
   const sampleStateHash = settlementAnchor?.stateHash || '0xa3f2c5d1b7e901a8';
-  const balanceValue = onChainBalance === '0.0000' && activeAddress.toLowerCase() === '0x742d35cc6634c0532925a3b844bc454e4438f44e' 
-    ? '116998.2300' 
+  const balanceValue = onChainBalance === '0.0000' && activeAddress.toLowerCase() === getPrimaryWalletAddress().toLowerCase()
+    ? '116998.2300'
     : onChainBalance;
     
   const plainTextPayload = `SOVEREIGN-SETTLE:ST:${sampleStateHash}:${activeAddress.toLowerCase()}:${balanceValue}ETH`;

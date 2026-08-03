@@ -306,7 +306,7 @@ export default function SovereignIntelligenceView({
 
   // Target Yield Destination input state
   const [targetAddressInput, setTargetAddressInput] = useState<string>(
-    sovIntelState.targetYieldAddress || marshallConfig?.address || '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f'
+    sovIntelState.targetYieldAddress || marshallConfig?.address || '0x742d35cc6634c0532925a3b844bc454e4438f44e'
   );
 
   useEffect(() => {
@@ -625,7 +625,7 @@ export default function SovereignIntelligenceView({
       doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
 
-      const addressVal = marshallConfig?.address || '0x58B178F7EEe92fe888c0A1684D5FE6b78C0Ff99f';
+      const addressVal = marshallConfig?.address || '0x742d35cc6634c0532925a3b844bc454e4438f44e';
       const balanceValStr = `$${(marshallConfig?.ledgerBalance || totalValue).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
       const keyStatusStr = marshallConfig?.hasPrivateKey ? 'Fully Seeded / Encrypted On-Chain Ledger' : 'View-Only Public Address Tracking';
       const lastUpdateStr = marshallConfig?.lastUpdate ? new Date(marshallConfig.lastUpdate).toUTCString() : new Date().toUTCString();
@@ -3077,7 +3077,7 @@ export default function SovereignIntelligenceView({
                   <div>
                     <label className="text-[10px] font-mono text-slate-400 block mb-1">Target Rail</label>
                     <select className="w-full bg-slate-950 text-white text-xs p-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-cyan-500">
-                      <option value="yield_address">Target Yield Address ({sovIntelState.targetYieldAddress ? sovIntelState.targetYieldAddress.slice(0, 10) + '...' : '0x58B178...'})</option>
+                      <option value="yield_address">Target Yield Address ({sovIntelState.targetYieldAddress ? sovIntelState.targetYieldAddress.slice(0, 10) + '...' : '0x742d35...'})</option>
                       <option value="chase_checking">Chase Checking (Plaid Linked)</option>
                       <option value="wise_outbound">External Global Wire Payout</option>
                     </select>
