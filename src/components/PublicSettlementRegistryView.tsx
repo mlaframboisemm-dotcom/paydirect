@@ -41,7 +41,7 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
   settlementAnchor
 }) => {
   const [activeAddress, setActiveAddress] = useState(
-    marshallConfig?.address || '0x44fe44fe44fe44fe44fe44fe44fe44fe44fe44fe'
+    marshallConfig?.address || '0x742d35cc6634c0532925a3b844bc454e4438f44e'
   );
   const [customSearchAddress, setCustomSearchAddress] = useState('');
   const [onChainBalance, setOnChainBalance] = useState<string>('0.0000');
@@ -77,7 +77,7 @@ export const PublicSettlementRegistryView: React.FC<PublicSettlementRegistryView
 
   // Generate Etherscan input data hex payload based on active address and balance
   const sampleStateHash = settlementAnchor?.stateHash || '0xa3f2c5d1b7e901a8';
-  const balanceValue = onChainBalance === '0.0000' && activeAddress.toLowerCase() === '0x44fe44fe44fe44fe44fe44fe44fe44fe44fe44fe' 
+  const balanceValue = onChainBalance === '0.0000' && activeAddress.toLowerCase() === '0x742d35cc6634c0532925a3b844bc454e4438f44e' 
     ? '116998.2300' 
     : onChainBalance;
     
