@@ -54,6 +54,9 @@ function loadEnvFileIfPresent(filePath: string) {
 }
 
 const dotenvLoaded = [
+  path.join(REPO_ROOT, '.env.local'),
+  path.join(process.cwd(), '.env.local'),
+  USER_HOME ? path.join(USER_HOME, '.env.local') : '',
   path.join(REPO_ROOT, '.env'),
   path.join(process.cwd(), '.env'),
   USER_HOME ? path.join(USER_HOME, '.env') : ''
