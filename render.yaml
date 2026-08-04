@@ -15,6 +15,8 @@ services:
         value: 3000
       - key: APP_URL
         value: "https://www.pay.sovereigns.ca"
+      - key: STRICT_PRODUCTION_STARTUP_VALIDATION
+        value: "false"
       - key: WISE_WEBHOOK_CALLBACK_URL
         value: "https://www.pay.sovereigns.ca/api/withdrawal/wise/webhooks"
       - key: WISE_WEBHOOK_PUBLIC_KEY_PATH
