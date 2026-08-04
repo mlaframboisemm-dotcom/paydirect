@@ -54,8 +54,8 @@ export function useWiseWallets() {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
-          const liveUsd = data.usdBalance ?? data.totalUSD ?? 2478350.00;
-          const liveCad = data.cadBalance ?? 185000.00;
+          const liveUsd = Number(data.usdBalance ?? data.totalUSD ?? 0);
+          const liveCad = Number(data.cadBalance ?? 0);
 
           if (Array.isArray(data.balances) && data.balances.length > 0) {
             const fetched: WiseWalletAccount[] = data.balances.map((b: any, idx: number) => {
@@ -92,6 +92,29 @@ export function useWiseWallets() {
             if (fetched.length > 0) {
               setActiveWiseWalletId(fetched[0].id);
             }
+          } else {
+            const fallbackWallets: WiseWalletAccount[] = [
+              {
+                id: '176576596814061',
+                name: 'Wise USD Primary Wallet (Acc 176576596814061)',
+                currency: 'USD',
+                balance: liveUsd,
+                accountNumber: '176576596814061',
+                type: 'Wise Direct Sync',
+                status: 'synced'
+              },
+              {
+                id: 'wise-cad-primary',
+                name: 'Wise CAD Primary Wallet',
+                currency: 'CAD',
+                balance: liveCad,
+                accountNumber: '176576596814061',
+                type: 'Wise Direct Sync',
+                status: 'synced'
+              }
+            ];
+            setWiseWallets(fallbackWallets);
+            setActiveWiseWalletId(fallbackWallets[0].id);
           }
         }
       }
@@ -213,7 +236,7 @@ export default function GooglePayAndPassHub({
   const [isLoadingPass, setIsLoadingPass] = useState<boolean>(true);
   const [copiedAddress, setCopiedAddress] = useState<boolean>(false);
   const [isSyncingWise, setIsSyncingWise] = useState<boolean>(false);
-  const [liveWiseUsdBalance, setLiveWiseUsdBalance] = useState<number>(0);
+  const [liveWiseUsdBalance, setLiveWiseUsdBalance] = useState<number>(usdBalance);
   const [liveWiseCadBalance, setLiveWiseCadBalance] = useState<number>(0);
   
   // Custom Hook: Active Wise Wallets & Payment Mapping
@@ -251,6 +274,33 @@ export default function GooglePayAndPassHub({
     if (usd > 0) setLiveWiseUsdBalance(usd);
     if (cad >= 0) setLiveWiseCadBalance(cad);
   }, [wiseWallets]);
+
+  useEffect(() => {
+    if (liveWiseUsdBalance <= 0 && Number.isFinite(usdBalance)) {
+      setLiveWiseUsdBalance(usdBalance);
+    }
+  }, [usdBalance, liveWiseUsdBalance]);
+
+  useEffect(() => {
+    const syncedUsd = Number(hubSyncState?.wiseCard?.balances?.usd);
+    const syncedCad = Number(hubSyncState?.wiseCard?.balances?.cad);
+    if (Number.isFinite(syncedUsd) && syncedUsd >= 0) {
+      setLiveWiseUsdBalance(syncedUsd);
+    }
+    if (Number.isFinite(syncedCad) && syncedCad >= 0) {
+      setLiveWiseCadBalance(syncedCad);
+    }
+  }, [hubSyncState]);
+
+  const displayedWiseUsdBalance =
+    Number.isFinite(liveWiseUsdBalance) && liveWiseUsdBalance > 0
+      ? liveWiseUsdBalance
+      : Number(hubSyncState?.wiseCard?.balances?.usd ?? passData?.passData?.wiseUSDBalance ?? usdBalance ?? 0);
+
+  const displayedWiseCadBalance =
+    Number.isFinite(liveWiseCadBalance) && liveWiseCadBalance > 0
+      ? liveWiseCadBalance
+      : Number(hubSyncState?.wiseCard?.balances?.cad ?? passData?.passData?.wiseCADBalance ?? 0);
 
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -851,14 +901,14 @@ export default function GooglePayAndPassHub({
                 Wise Live USD Balance
               </span>
               <span className="text-lg font-black font-mono text-emerald-300 block">
-                ${liveWiseUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                ${displayedWiseUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </span>
             </div>
 
             <div className="bg-slate-800/90 border border-slate-700/80 px-3.5 py-2 rounded-2xl">
               <span className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider block">Wise CAD Balance</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
-                CA${liveWiseCadBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                CA${displayedWiseCadBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 
