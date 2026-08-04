@@ -42,35 +42,7 @@ export interface WiseWalletAccount {
 }
 
 export function useWiseWallets() {
-  const [wiseWallets, setWiseWallets] = useState<WiseWalletAccount[]>([
-    {
-      id: '176576596814061',
-      name: 'Wise Multi-Currency USD Wallet',
-      currency: 'USD',
-      balance: 2478350.00,
-      accountNumber: '176576596814061',
-      type: 'Wise Multi-Currency',
-      status: 'synced'
-    },
-    {
-      id: '176576596814062',
-      name: 'Wise CAD Primary Account',
-      currency: 'CAD',
-      balance: 185000.00,
-      accountNumber: '176576596814062',
-      type: 'Wise Checking',
-      status: 'synced'
-    },
-    {
-      id: 'SOV_CASH_VAULT_01',
-      name: 'Sovereign Cash Reserve',
-      currency: 'USD',
-      balance: 500000.00,
-      accountNumber: 'SOV_CASH_01',
-      type: 'Sovereign Hub Vault',
-      status: 'active'
-    }
-  ]);
+  const [wiseWallets, setWiseWallets] = useState<WiseWalletAccount[]>([]);
   const [activeWiseWalletId, setActiveWiseWalletId] = useState<string>('176576596814061');
   const [isLoadingWallets, setIsLoadingWallets] = useState<boolean>(true);
 
@@ -156,7 +128,7 @@ export interface WiseLedgerCheckResult {
 export function useWiseLedgerEnforcer() {
   const [ledgerStatus, setLedgerStatus] = useState<WiseLedgerCheckResult>({
     isVerified: true,
-    reconciledUsdBalance: 2478350.00,
+    reconciledUsdBalance: 0,
     lastReconciledAt: new Date().toISOString(),
     sourceAccount: '176576596814061'
   });
@@ -224,7 +196,7 @@ interface GooglePayAndPassHubProps {
   userEmail: string;
   usdBalance: number;
   portfolioValue: number;
-  onRefreshBalance?: () => void;
+  onRefreshBalance?: (preferredUsdBalance?: number) => void;
   showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
 
@@ -241,6 +213,8 @@ export default function GooglePayAndPassHub({
   const [isLoadingPass, setIsLoadingPass] = useState<boolean>(true);
   const [copiedAddress, setCopiedAddress] = useState<boolean>(false);
   const [isSyncingWise, setIsSyncingWise] = useState<boolean>(false);
+  const [liveWiseUsdBalance, setLiveWiseUsdBalance] = useState<number>(0);
+  const [liveWiseCadBalance, setLiveWiseCadBalance] = useState<number>(0);
   
   // Custom Hook: Active Wise Wallets & Payment Mapping
   const {
@@ -265,6 +239,18 @@ export default function GooglePayAndPassHub({
     syncNow: triggerHubSync,
     syncNowDebounced: triggerHubSyncDebounced
   } = useWiseGooglePassSync(60000);
+
+  useEffect(() => {
+    const usd = wiseWallets
+      .filter((w) => String(w.currency || '').toUpperCase() === 'USD')
+      .reduce((sum, w) => sum + Number(w.balance || 0), 0);
+    const cad = wiseWallets
+      .filter((w) => String(w.currency || '').toUpperCase() === 'CAD')
+      .reduce((sum, w) => sum + Number(w.balance || 0), 0);
+
+    if (usd > 0) setLiveWiseUsdBalance(usd);
+    if (cad >= 0) setLiveWiseCadBalance(cad);
+  }, [wiseWallets]);
 
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -718,15 +704,24 @@ export default function GooglePayAndPassHub({
   const handleSyncWise = async () => {
     setIsSyncingWise(true);
     try {
+      const authHeaders = await getFirebaseAuthHeaders();
       const res = await fetch('/api/wise/reconcile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         credentials: 'include'
       });
       const data = await res.json();
       if (res.ok && data.success) {
+        if (typeof data.wiseUSDBalance === 'number') {
+          setLiveWiseUsdBalance(data.wiseUSDBalance);
+        }
+        if (typeof data.wiseCADBalance === 'number') {
+          setLiveWiseCadBalance(data.wiseCADBalance);
+        }
+        await refreshWallets();
+        await triggerHubSync();
         showToast?.(`Wise balance synced! Total: $${data.wiseTotalUSD.toFixed(2)} USD (CAD ${data.wiseCADBalance.toFixed(2)} + USD ${data.wiseUSDBalance.toFixed(2)})`, 'success');
-        onRefreshBalance?.();
+        onRefreshBalance?.(typeof data.reconciledAppUSDBalance === 'number' ? data.reconciledAppUSDBalance : data.wiseTotalUSD);
         fetchWalletPass();
       } else {
         showToast?.(data.message || 'Wise sync failed', 'error');
@@ -856,14 +851,14 @@ export default function GooglePayAndPassHub({
                 Wise Live USD Balance
               </span>
               <span className="text-lg font-black font-mono text-emerald-300 block">
-                $2,478,350.00 USD
+                ${liveWiseUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
               </span>
             </div>
 
             <div className="bg-slate-800/90 border border-slate-700/80 px-3.5 py-2 rounded-2xl">
               <span className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider block">Wise CAD Balance</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
-                CA$185,000.00
+                CA${liveWiseCadBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
 

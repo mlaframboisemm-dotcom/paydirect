@@ -856,6 +856,37 @@ export default function App() {
     }
   };
 
+  const refreshUnifiedBalances = async (preferredUsdBalance?: number) => {
+    if (typeof preferredUsdBalance === 'number' && Number.isFinite(preferredUsdBalance)) {
+      setUsdBalance(preferredUsdBalance);
+    }
+
+    if (!isAuthenticated || !hasSessionToken()) return;
+
+    try {
+      const res = await fetch(buildApiUrl('/api/sync/unified'), {
+        method: 'GET',
+        headers: buildAuthHeaders(),
+        credentials: 'include'
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleAuthExpired();
+        }
+        return;
+      }
+
+      const data = await res.json();
+      const nextUsd = Number(data?.balances?.totalCashUsd);
+      if (Number.isFinite(nextUsd)) {
+        setUsdBalance(nextUsd);
+      }
+    } catch (err) {
+      console.warn('Failed to refresh unified balances:', err);
+    }
+  };
+
   const handleTriggerStripePayout = async (amountNum: number) => {
     setStripePayoutError(null);
     setStripePayoutSuccess(null);
@@ -2894,7 +2925,7 @@ export default function App() {
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
             usdBalance={usdBalance}
             portfolioValue={netWorth}
-            onRefreshBalance={() => fetchStripeBalance(true)}
+            onRefreshBalance={refreshUnifiedBalances}
             showToast={showToast}
           />
         )}
@@ -2904,7 +2935,7 @@ export default function App() {
           <WiseCardDashboard
             userName={userName || 'Marcel laframboise'}
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
-            onRefreshGlobalState={() => fetchStripeBalance(true)}
+            onRefreshGlobalState={() => refreshUnifiedBalances()}
             showToast={showToast}
           />
         )}
