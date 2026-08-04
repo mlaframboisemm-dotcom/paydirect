@@ -513,7 +513,11 @@ Sovereigns Banking Hub / Wise Business`;
     }
   };
 
-  const primaryUsdBalance = balances.find(b => b.currency === 'USD')?.amount || 2478350.00;
+  const primaryUsdBalance = Number(
+    balances.find(b => b.currency === 'USD')?.amount ??
+    card?.balances?.usd ??
+    0
+  );
 
   if (isLoading) {
     return (
