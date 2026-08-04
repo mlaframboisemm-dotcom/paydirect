@@ -19,14 +19,134 @@ services:
         value: "https://www.pay.sovereigns.ca/api/withdrawal/wise/webhooks"
       - key: WISE_WEBHOOK_PUBLIC_KEY_PATH
         value: "config/wise-webhook-public.pem"
+      - key: WISE_API_TOKEN
+        sync: false
       - key: WISE_CLIENT_ID
         sync: false
       - key: WISE_CLIENT_SECRET
         sync: false
       - key: WISE_CLIENT_KEY
         sync: false
+      - key: WISE_PROFILE_ID
+        sync: false
       - key: SOV_PIN
         sync: false
         placeholder: "Your 6-digit Sovereign Security PIN"
       - key: SOV_TERMINAL_URL
         value: "https://ais-dev-vsguby4cvne7edjk3z4bzv-522633331757.us-east1.run.app"
+      - key: JWT_SECRET
+        sync: false
+      - key: SOVEREIGN_ENCRYPTION_KEY
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: BOOTSTRAP_ADMIN_PASSWORD
+        sync: false
+      - key: BOOTSTRAP_ADMIN_TOTP_SECRET
+        sync: false
+      - key: SOVEREIGN_ADMIN_EMAILS
+        sync: false
+      - key: COINBASE_API_KEY_ID
+        sync: false
+      - key: COINBASE_API_SECRET_RAW
+        sync: false
+      - key: KRAKEN_API_KEY
+        sync: false
+      - key: KRAKEN_API_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET2
+        sync: false
+      - key: STRIPE_AUTO_TOPUP_ENABLED
+        value: "true"
+      - key: MAILERSEND_API_KEY
+        sync: false
+      - key: MAILERSEND_SMS_FROM
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_DATABASE_ID
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_DATABASE_ID
+        sync: false
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: MARSHALL_WALLET_PRIVATE_KEY
+        sync: false
+      - key: VITE_MARSHALL_ADDRESS
+        sync: false
+      - key: VITE_RPC_ETHEREUM
+        value: "https://ethereum-rpc.publicnode.com"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: FAPI_CALLBACK_URI
+        value: "https://www.pay.sovereigns.ca/api/v1/interac/callback"
+      - key: SOVEREIGN_LEDGER_PATH
+        value: "./data_ledger.json"
+      - key: SOVEREIGN_LEDGER_BACKUP_DIR
+        value: "./ledger-backups"
+      - key: SOVEREIGN_LEDGER_BACKUP_INTERVAL_MS
+        value: "3600000"
+      - key: SOVEREIGN_LEDGER_BACKUP_MAX
+        value: "20"
+      - key: SOVEREIGN_CSRF_PROTECTION
+        value: "true"
+      - key: SOVEREIGN_DISABLE_SCHEDULERS
+        value: "false"
+      - key: SOVEREIGN_AUTO_TOKEN_DISCOVERY
+        value: "1"
+      - key: SOVEREIGN_USE_ADVANCED_RATE_LIMITER
+        value: "true"
+      - key: ENABLE_AUTO_RECOVERY
+        value: "true"
+      - key: ENABLE_CONSENSUS_VALIDATION
+        value: "true"
+      - key: CONSENSUS_REQUIRED_SOURCES
+        value: "2"
+      - key: CONSENSUS_TOLERANCE_PERCENTAGE
+        value: "0.1"
+      - key: OPERATOR_INTERVAL_MS
+        value: "30000"
+      - key: SOVEREIGN_RECONCILIATION_INTERVAL_MS
+        value: "300000"
+      - key: SOVEREIGN_WALLET_SYNC_INTERVAL_MS
+        value: "300000"
+      - key: PAYOUT_QUEUE_WORKER_ENABLED
+        value: "true"
+      - key: LEDGER_PAYOUT_EXTERNAL_FALLBACK_ENABLED
+        value: "true"
+      - key: PAYOUT_FALLBACK_PROVIDER
+        value: "coinbase"
+      - key: ENABLE_VIRTUAL_MEMPOOL_SIMULATION
+        value: "true"
