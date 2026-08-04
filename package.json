@@ -14,6 +14,7 @@
     "cert:pdf": "tsx scripts/generate-pdf.ts",
     "test:verification": "tsx scripts/test-verification-system.ts",
     "test:financial-hardening": "tsx scripts/test-financial-hardening.ts",
+    "test:asset-operations": "tsx scripts/test-asset-operations.ts",
     "bridge:check": "tsx scripts/bridge-check.ts",
     "test:auth-security": "tsx scripts/test-auth-security.ts",
     "test:bootstrap-security": "tsx scripts/test-bootstrap-security.ts",

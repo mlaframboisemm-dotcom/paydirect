@@ -448,9 +448,14 @@ export default function CashTransferModal({
     setLocalError(null);
     setIsPlaidConnecting(true);
 
+    if (!plaidSelectedBank) {
+      setLocalError('Please select a bank before continuing.');
+      setIsPlaidConnecting(false);
+      return;
+    }
+
     const lastFour = selectedBankAccount === 'chequing' ? '4910' : selectedBankAccount === 'savings' ? '8271' : '1042';
     const accountSubtype = selectedBankAccount === 'chequing' ? 'checking' : selectedBankAccount === 'savings' ? 'savings' : 'checking';
-    const mockPublicToken = `public-sandbox-${Date.now()}`;
 
     try {
       const linkRes = await fetch(buildApiUrl('/api/plaid/link'), {
@@ -458,24 +463,31 @@ export default function CashTransferModal({
         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         credentials: 'include',
         body: JSON.stringify({
-          public_token: mockPublicToken,
-          metadata: {
-            institution: { name: plaidSelectedBank },
-            account: { mask: lastFour, subtype: accountSubtype }
-          }
+          institution: plaidSelectedBank,
+          account_mask: lastFour,
+          account_subtype: accountSubtype,
+          username,
+          password
         })
       });
 
+      const payload = await linkRes.json().catch(() => ({}));
       if (!linkRes.ok) {
-        throw new Error('Failed to link bank account with secure database.');
+        throw new Error(payload?.message || payload?.error || 'Failed to link bank account with the secure backend.');
       }
 
-      const newBank = await linkRes.json();
+      const newBank = {
+        id: payload?.id || `bank-${Date.now()}`,
+        bankName: payload?.bankName || plaidSelectedBank,
+        accountType: payload?.accountType || accountSubtype,
+        lastFour: payload?.lastFour || lastFour
+      };
       const updated = [...linkedBanks, newBank];
       setLinkedBanks(updated);
       setDepositBankId(newBank.id);
       setWithdrawBankId(newBank.id);
       setLinkingStep('success');
+      showToast('Bank connection request was accepted by the production backend.', 'success');
     } catch (err: any) {
       setLocalError(err.message || 'Verification failed.');
     } finally {

@@ -413,21 +413,33 @@ export default function QrPayModal({
               </div>
             </div>
 
-            {/* Quick Demo Pre-fill Buttons */}
+            {/* Production-ready quick actions */}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => handleParsePayload('paydirect:coffee-shop@sovereigns.ca?amount=4.75&currency=USD&memo=Morning%20Espresso')}
+                onClick={() => {
+                  if (userEmail) {
+                    handleParsePayload(`paydirect:${userEmail}?amount=4.75&currency=USD&memo=Invoice%20Preview`);
+                  } else {
+                    showToast('Your signed-in email is not available yet.', 'info');
+                  }
+                }}
                 className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#0052FF] text-[10px] font-bold rounded-lg border border-blue-200 cursor-pointer"
               >
-                Sample Coffee QR ($4.75)
+                Preview Invoice Amount
               </button>
               <button
                 type="button"
-                onClick={() => handleParsePayload('paydirect:app-store@sovereigns.ca?amount=49.00&currency=USD&memo=Software%20License')}
+                onClick={() => {
+                  if (userEmail) {
+                    handleParsePayload(`paydirect:${userEmail}?amount=49.00&currency=USD&memo=Settlement%20Request`);
+                  } else {
+                    showToast('Your signed-in email is not available yet.', 'info');
+                  }
+                }}
                 className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-200 cursor-pointer"
               >
-                Sample Merchant Invoice ($49.00)
+                Preview Settlement Request
               </button>
             </div>
 
@@ -463,7 +475,7 @@ export default function QrPayModal({
               <div className="p-8 border border-dashed border-gray-200 rounded-2xl text-center bg-gray-50/50 space-y-2">
                 <Smartphone className="h-8 w-8 text-gray-400 mx-auto" />
                 <p className="text-xs text-gray-500 font-medium">
-                  Paste a payment payload or select a sample invoice above to preview and settle
+                  Paste a payment payload or use the real recipient fields above to preview and settle it.
                 </p>
               </div>
             )}

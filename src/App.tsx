@@ -256,56 +256,14 @@ export default function App() {
 
   // Sovereign/Unified Finance State
   const [sovereignTokens, setSovereignTokens] = useState<any[]>(() => {
-    const defaultTokens = [
-      { symbol: 'USDF', name: 'Falcon USD', balance: 260668051.49, chain: 'Ethereum', priceFallback: 1.00, liveSymbol: null, icon: '🦅' },
-      { symbol: 'ETH', name: 'Ethereum', balance: 116998.23, chain: 'Ethereum', priceFallback: 3300.00, liveSymbol: 'ETH', icon: 'Ξ' },
-      { symbol: 'XAUT', name: 'Tether Gold (oz)', balance: 31045.29, chain: 'Ethereum', priceFallback: 2350.00, liveSymbol: null, icon: '🏆' },
-      { symbol: 'LEO', name: 'UNUS SED LEO', balance: 8981561.45, chain: 'Ethereum', priceFallback: 5.80, liveSymbol: 'LEO', icon: '🦁' },
-      { symbol: 'USDC', name: 'USD Coin', balance: 7747906.26, chain: 'Ethereum', priceFallback: 1.00, liveSymbol: 'USDC', icon: '💵' },
-      { symbol: 'LIF3', name: 'Lif3 Token', balance: 398715682.24, chain: 'Ethereum', priceFallback: 0.012, liveSymbol: null, icon: '🧬' },
-      { symbol: 'MXNT', name: 'Tether MXN', balance: 19294729.42, chain: 'Ethereum', priceFallback: 0.055, liveSymbol: null, icon: '🇲🇽' },
-      { symbol: 'PEPE', name: 'Pepe', balance: 115238198655.69, chain: 'Ethereum', priceFallback: 0.000012, liveSymbol: 'PEPE', icon: '🐸' },
-      { symbol: 'SHIB', name: 'Shiba Inu', balance: 40000892027.24, chain: 'Ethereum', priceFallback: 0.000018, liveSymbol: 'SHIB', icon: '🐕' },
-      { symbol: 'LINK', name: 'Chainlink', balance: 652949.04, chain: 'Ethereum', priceFallback: 15.00, liveSymbol: 'LINK', icon: '🔗' },
-      { symbol: 'HYPE', name: 'Hyperliquid', balance: 61182.43, chain: 'HyperEVM', priceFallback: 4.50, liveSymbol: null, icon: '⚡' },
-      { symbol: 'USDT0', name: 'USDT Stable', balance: 1950000.01, chain: 'Stable', priceFallback: 1.00, liveSymbol: null, icon: '🔒' },
-      { symbol: 'POL', name: 'POL (ex-MATIC)', balance: 4715975.07, chain: 'Ethereum', priceFallback: 0.50, liveSymbol: 'POL', icon: '⬡' },
-      { symbol: 'USDT', name: 'Tether USD', balance: 148124.34, chain: 'Ethereum', priceFallback: 1.00, liveSymbol: 'USDT', icon: '🟢' },
-      { symbol: 'TOKEN', name: 'TokenFi', balance: 2670364.39, chain: 'Ethereum', priceFallback: 0.085, liveSymbol: null, icon: '🪙' },
-      { symbol: 'BOB', name: 'BOB Token', balance: 9505100.00, chain: 'Ethereum', priceFallback: 1.00, liveSymbol: null, icon: '🤖' },
-      { symbol: 'SPELL', name: 'Spell Token', balance: 119467146.14, chain: 'Ethereum', priceFallback: 0.00082, liveSymbol: 'SPELL', icon: '🪄' },
-      { symbol: 'EURC', name: 'Euro Union', balance: 1770.00, chain: 'Ethereum', priceFallback: 1.09, liveSymbol: 'EURC', icon: '🇪🇺' },
-      { symbol: 'EUR', name: 'Euro', balance: 100.00, chain: 'Ethereum', priceFallback: 1.09, liveSymbol: null, icon: '💶' },
-      { symbol: 'WSB', name: 'WallStreetBets DApp', balance: 348962.62, chain: 'Ethereum', priceFallback: 0.00015, liveSymbol: null, icon: '📈' },
-      { symbol: 'GTAVI', name: 'Grand Theft Auto VI', balance: 419123911.00, chain: 'Ethereum', priceFallback: 0.0000021, liveSymbol: null, icon: '🎮' },
-      { symbol: 'MANA', name: 'Decentraland', balance: 957.37, chain: 'Ethereum', priceFallback: 0.35, liveSymbol: 'MANA', icon: '🌲' },
-      { symbol: 'KPER', name: 'Kper.network', balance: 3377.47, chain: 'Ethereum', priceFallback: 0.42, liveSymbol: null, icon: '🏢' },
-      { symbol: 'ZIK', name: 'ZIK coin', balance: 1213.00, chain: 'Ethereum', priceFallback: 0.002, liveSymbol: null, icon: '🪙' },
-      { symbol: 'ODI', name: 'odius.ai', balance: 1029.59, chain: 'Ethereum', priceFallback: 0.05, liveSymbol: null, icon: '🧠' },
-      { symbol: 'SOLI', name: 'Soli Coin', balance: 1003.00, chain: 'Ethereum', priceFallback: 0.0015, liveSymbol: null, icon: '🪙' }
-    ];
-    
     const saved = localStorage.getItem('cb_sovereign_tokens');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const merged = [...parsed];
-        defaultTokens.forEach(dt => {
-          if (!merged.some(m => m.symbol === dt.symbol)) {
-            merged.push(dt);
-          } else {
-            const existing = merged.find(m => m.symbol === dt.symbol);
-            if (existing && (existing.balance === 7747769.18 || existing.balance === 40000000000 || existing.balance === 115240000000000)) {
-              existing.balance = dt.balance;
-            }
-          }
-        });
-        return merged;
-      } catch {
-        return defaultTokens;
-      }
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
     }
-    return defaultTokens;
   });
 
   const [sovIntelState, setSovIntelState] = useState<{
@@ -548,7 +506,7 @@ export default function App() {
     }
 
     try {
-      const scopedEmails = read('cb_simulated_emails');
+      const scopedEmails = read('cb_inbox_emails') || read('cb_simulated_emails');
       if (scopedEmails) setEmails(JSON.parse(scopedEmails));
     } catch {
       // keep existing state on parse failure

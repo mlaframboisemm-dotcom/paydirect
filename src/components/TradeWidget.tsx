@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowUpDown, HelpCircle, CheckCircle2, Wallet, RefreshCw, AlertCircle } from 'lucide-react';
 import { Coin, Holding } from '../types';
+import { mergeAssetOptions } from '../lib/asset-operations';
 
 function isReactEventTargetValue(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): string {
   return e.target.value;
@@ -65,6 +66,7 @@ export default function TradeWidget({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const assetOptions = mergeAssetOptions(coins, holdings);
   const selectedCoin = coins.find((c) => c.symbol === selectedCoinSymbol) || coins[0];
   const fromCoin = coins.find((c) => c.symbol === convertFromSymbol) || coins[0];
   const toCoin = coins.find((c) => c.symbol === convertToSymbol) || coins[1];
@@ -267,9 +269,9 @@ export default function TradeWidget({
                     onChange={(e) => setSelectedCoinSymbol(isReactEventTargetValue(e))}
                     className="bg-gray-50 border border-gray-200 text-gray-800 text-sm font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0052FF] cursor-pointer"
                   >
-                    {coins.map((coin) => (
-                      <option key={coin.symbol} value={coin.symbol}>
-                        {coin.name} ({coin.symbol})
+                    {assetOptions.map((asset) => (
+                      <option key={asset.symbol} value={asset.symbol}>
+                        {asset.name} ({asset.symbol})
                       </option>
                     ))}
                   </select>
@@ -283,9 +285,9 @@ export default function TradeWidget({
                       onChange={(e) => setConvertFromSymbol(isReactEventTargetValue(e))}
                       className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold px-2 py-1.5 rounded-lg focus:outline-none cursor-pointer"
                     >
-                      {coins.map((coin) => (
-                        <option key={coin.symbol} value={coin.symbol}>
-                          {coin.symbol}
+                      {assetOptions.map((asset) => (
+                        <option key={asset.symbol} value={asset.symbol}>
+                          {asset.symbol}
                         </option>
                       ))}
                     </select>
@@ -297,9 +299,9 @@ export default function TradeWidget({
                       onChange={(e) => setConvertToSymbol(isReactEventTargetValue(e))}
                       className="w-full bg-gray-50 border border-gray-200 text-gray-800 text-xs font-semibold px-2 py-1.5 rounded-lg focus:outline-none cursor-pointer"
                     >
-                      {coins.map((coin) => (
-                        <option key={coin.symbol} value={coin.symbol}>
-                          {coin.symbol}
+                      {assetOptions.map((asset) => (
+                        <option key={asset.symbol} value={asset.symbol}>
+                          {asset.symbol}
                         </option>
                       ))}
                     </select>
