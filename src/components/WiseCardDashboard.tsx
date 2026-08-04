@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   CreditCard,
   ShieldCheck,
@@ -36,6 +36,7 @@ import {
   FileText
 } from 'lucide-react';
 import { useWiseGooglePassSync } from '../lib/wise-google-pass-sync-service';
+import { buildTreasuryDisplayState } from '../lib/treasury-display';
 
 interface WiseBalanceItem {
   currency: string;
@@ -107,6 +108,7 @@ interface WiseCardTransaction {
 interface WiseCardDashboardProps {
   userName?: string;
   userEmail?: string;
+  cadBalance?: number;
   onRefreshGlobalState?: () => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -114,6 +116,7 @@ interface WiseCardDashboardProps {
 export default function WiseCardDashboard({
   userName = 'Marcel laframboise',
   userEmail = 'mlaframboisemm@gmail.com',
+  cadBalance,
   onRefreshGlobalState,
   showToast
 }: WiseCardDashboardProps) {
@@ -513,11 +516,16 @@ Sovereigns Banking Hub / Wise Business`;
     }
   };
 
+<<<<<<< HEAD
   const primaryUsdBalance = Number(
     balances.find(b => b.currency === 'USD')?.amount ??
     card?.balances?.usd ??
     0
   );
+=======
+  const primaryUsdBalance = balances.find(b => b.currency === 'USD')?.amount || 0;
+  const treasuryDisplay = useMemo(() => buildTreasuryDisplayState(primaryUsdBalance, Number.isFinite(cadBalance) ? cadBalance : primaryUsdBalance * 1.3622), [primaryUsdBalance, cadBalance]);
+>>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
 
   if (isLoading) {
     return (
@@ -562,7 +570,7 @@ Sovereigns Banking Hub / Wise Business`;
             <div className="bg-slate-800/90 border border-slate-700/80 px-4 py-2.5 rounded-2xl">
               <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Wise USD Available</span>
               <span className="text-lg font-black font-mono text-emerald-400">
-                ${primaryUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                {treasuryDisplay.usdEquivalentLabel}
               </span>
             </div>
 

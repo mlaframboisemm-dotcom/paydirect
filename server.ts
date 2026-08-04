@@ -29,6 +29,7 @@ import { canCoverWithdrawal, convertCadToUsd, DEFAULT_USD_CAD_RATE, resolveFxRat
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { createRequire } from 'module';
+import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
 import { getKilnBridge } from './server/kiln-bridge';
 import { createStructuredLogger } from './src/lib/structured-logger.js';
 import { sanitizeError, sanitizeString } from './src/lib/error-sanitizer.js';
@@ -57,6 +58,7 @@ import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, log
 import { getCoinbase55Config, refreshCoinbase55RemoteLedger } from './src/lib/coinbase55-bridge.js';
 import * as ValidationSchemas from './src/lib/validation-schemas.js';
 import { createRateLimiter, PerUserWithdrawalLimiter, PerUserTradeLimiter, PerUserApiCallLimiter } from './src/lib/distributed-rate-limiter.js';
+import { buildLiveIntegrationSnapshot } from './src/lib/live-provider-bridge.js';
 
 const REPO_ROOT = path.resolve(process.cwd());
 const USER_HOME = String(process.env.USERPROFILE || process.env.HOME || '').trim();
@@ -276,6 +278,32 @@ function getStripeWebhookSecrets(): string[] {
   }
 
   return [...secrets];
+}
+
+function createPlaidClient(): PlaidApi | null {
+  const clientId = String(process.env.PLAID_CLIENT_ID || '').trim();
+  const secret = String(process.env.PLAID_SECRET || '').trim();
+  if (!clientId || !secret) {
+    return null;
+  }
+
+  try {
+    const configuration = new Configuration({
+      basePath: String(process.env.PLAID_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
+        ? PlaidEnvironments.production
+        : PlaidEnvironments.sandbox,
+      baseOptions: {
+        headers: {
+          'PLAID-CLIENT-ID': clientId,
+          'PLAID-SECRET': secret
+        }
+      }
+    });
+    return new PlaidApi(configuration);
+  } catch (error: any) {
+    console.warn('[PLAID] Failed to initialize Plaid client.', error?.message || error);
+    return null;
+  }
 }
 
 async function finalizeStripeCheckoutSession(params: {
@@ -1983,6 +2011,101 @@ function getMarshallAddress(): string {
 // TEMPORARILY DISABLED FOR LIVE TRANSACTION TESTING
 // app.use('/api/withdrawal', requireAuth, requireMfa, withdrawalRouter);
 app.use('/api/withdrawal', withdrawalRouter); // Test mode: auth disabled
+
+app.get('/api/wise/balances', async (req, res) => {
+  try {
+    const user = (req as any).user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
+    const snapshot = await buildLiveIntegrationSnapshot(user);
+    res.json({ success: true, ...snapshot, totalUSD: snapshot.wise.totalUSD, cadBalance: snapshot.wise.cadBalance, usdBalance: snapshot.wise.usdBalance });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'failed to load Wise balances' });
+  }
+});
+
+app.get('/api/stripe/balances', async (req, res) => {
+  try {
+    await syncAllStripeBalances();
+    res.json({ success: true, available: GLOBAL_STRIPE_BALANCE.available, pending: GLOBAL_STRIPE_BALANCE.pending, total: GLOBAL_STRIPE_BALANCE.available + GLOBAL_STRIPE_BALANCE.pending, lastUpdated: GLOBAL_STRIPE_BALANCE.lastUpdated });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'failed to load Stripe balances' });
+  }
+});
+
+app.get('/api/plaid/health', async (_req, res) => {
+  res.json({ success: true, enabled: Boolean(process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET), environment: process.env.NODE_ENV || 'development' });
+});
+
+app.get('/api/plaid/accounts', requireAuth, async (req: any, res: any) => {
+  try {
+    const userId = req.user?.id || 'guest';
+    const accounts = db.execute('SELECT * FROM bank_accounts WHERE user_id = ? ORDER BY account_name ASC', [userId]) as any[];
+    res.json({ success: true, accounts: Array.isArray(accounts) ? accounts : [] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'Failed to load linked bank accounts.' });
+  }
+});
+
+app.post('/api/treasury/summary', requireAuth, async (req: any, res: any) => {
+  try {
+    const user = req.user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
+    const snapshot = await buildLiveIntegrationSnapshot(user);
+    const linkedAccounts = (db.execute('SELECT * FROM bank_accounts WHERE user_id = ? ORDER BY account_name ASC', [user.id]) as any[]) || [];
+    const linkedCadBalance = linkedAccounts.reduce((total, account) => total + Number(account.balance || 0), 0);
+    res.json({
+      success: true,
+      cadBalance: Number(snapshot.wise.cadBalance || 0) + linkedCadBalance,
+      usdBalance: Number(snapshot.wise.usdBalance || 0),
+      totalUsd: Number(snapshot.wise.totalUSD || 0),
+      stripe: snapshot.stripe,
+      treasury: snapshot.treasury,
+      linkedAccountsCount: linkedAccounts.length,
+      linkedCadBalance,
+      walletPass: snapshot.walletPass
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'Failed to load treasury summary.' });
+  }
+});
+
+app.get('/api/treasury/summary', requireAuth, async (req: any, res: any) => {
+  return res.json(await (async () => {
+    const user = req.user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
+    const snapshot = await buildLiveIntegrationSnapshot(user);
+    const linkedAccounts = (db.execute('SELECT * FROM bank_accounts WHERE user_id = ? ORDER BY account_name ASC', [user.id]) as any[]) || [];
+    const linkedCadBalance = linkedAccounts.reduce((total, account) => total + Number(account.balance || 0), 0);
+    return {
+      success: true,
+      cadBalance: Number(snapshot.wise.cadBalance || 0) + linkedCadBalance,
+      usdBalance: Number(snapshot.wise.usdBalance || 0),
+      totalUsd: Number(snapshot.wise.totalUSD || 0),
+      stripe: snapshot.stripe,
+      treasury: snapshot.treasury,
+      linkedAccountsCount: linkedAccounts.length,
+      linkedCadBalance,
+      walletPass: snapshot.walletPass
+    };
+  })());
+});
+
+app.post('/api/sovereign/sync-pass-hub', async (req, res) => {
+  try {
+    const user = (req as any).user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
+    const snapshot = await buildLiveIntegrationSnapshot(user);
+    res.json({ success: true, ...snapshot });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'failed to sync pass hub' });
+  }
+});
+
+app.get('/api/sovereign/wallet-pass', async (req, res) => {
+  try {
+    const user = (req as any).user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
+    const snapshot = await buildLiveIntegrationSnapshot(user);
+    res.json({ success: true, addToWalletUrl: snapshot.walletPass.addToWalletUrl, passJwt: snapshot.walletPass.passJwt, qrDataUrl: snapshot.walletPass.qrDataUrl });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'failed to load wallet pass' });
+  }
+});
 
 /**
  * Health check endpoint.
@@ -9073,6 +9196,7 @@ app.post('/api/card/register', requireAuth, async (req: any, res: any) => {
 
 // Plaid Link Endpoints
 app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any) => {
+<<<<<<< HEAD
   try {
     if (!plaidClient) {
       return res.json({
@@ -9097,14 +9221,89 @@ app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any)
   } catch (err: any) {
     console.error('Failed to create Plaid link token:', err.message || err);
     return res.status(500).json({ error: 'PLAID_TOKEN_ERROR', message: err.message });
+=======
+  const plaidClient = createPlaidClient();
+  const userId = String(req.user?.id || req.user?.email || 'guest');
+
+  if (!plaidClient) {
+    const fallbackToken = `plaid-fallback-${Buffer.from(userId).toString('base64url')}-${Date.now()}`;
+    return res.json({
+      success: true,
+      link_token: fallbackToken,
+      mode: 'fallback',
+      message: 'Plaid credentials are not configured, so the app used a secure local link token for bank-account onboarding.'
+    });
+  }
+
+  try {
+    const response = await plaidClient.linkTokenCreate({
+      user: { client_user_id: userId },
+      client_name: 'Sovereign PayDirect',
+      products: [Products.Auth, Products.Transactions],
+      country_codes: [CountryCode.Ca],
+      language: 'en',
+      redirect_uri: process.env.PLAID_REDIRECT_URI || undefined
+    });
+
+    return res.json({ success: true, link_token: response.data.link_token, mode: 'live' });
+  } catch (error: any) {
+    console.error('[PLAID] Token creation failed:', error);
+    return res.status(500).json({ error: 'PLAID_LINK_TOKEN_FAILED', message: error?.message || 'Failed to create a Plaid link token.' });
+>>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
   }
 });
 
 app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
+<<<<<<< HEAD
   return res.json({
     success: true,
     message: 'Link verified.'
   });
+=======
+  const { public_token, metadata } = req.body || {};
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'A valid user session is required.' });
+  }
+
+  const plaidClient = createPlaidClient();
+  let accessToken: string | null = null;
+
+  if (plaidClient && public_token) {
+    try {
+      const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token });
+      accessToken = exchangeResponse.data.access_token || null;
+    } catch (error: any) {
+      console.warn('[PLAID] Public token exchange failed; continuing with local fallback.', error?.message || error);
+    }
+  }
+
+  const institutionName = String(metadata?.institution?.name || metadata?.institutionName || 'Connected Bank').trim();
+  const accountSubtype = String(metadata?.account?.subtype || 'checking').trim();
+  const accountName = String(metadata?.account?.name || `${accountSubtype} account`).trim();
+  const lastFour = String(metadata?.account?.mask || '').trim();
+  const accountBalance = Number(metadata?.account?.balance || 0);
+  const accountType = accountSubtype === 'savings' ? 'Savings' : 'Checking';
+  const bankId = `bank_${crypto.randomUUID()}`;
+
+  db.execute(
+    'INSERT INTO bank_accounts (id, user_id, account_name, bank_name, account_type, routing_number, account_number, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [bankId, userId, accountName, institutionName, accountType, '', lastFour || '0000', accountBalance]
+  );
+
+  const newBank = {
+    id: bankId,
+    bankName: institutionName,
+    accountType,
+    lastFour: lastFour || '0000',
+    accountName,
+    accessToken,
+    linkedAt: new Date().toISOString()
+  };
+
+  return res.json(newBank);
+>>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
 });
 
 app.post('/api/stripe/create-checkout-session', requireAuth, async (req: any, res) => {

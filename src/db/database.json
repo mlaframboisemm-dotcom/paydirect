@@ -14,7 +14,16 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "admin@secure.local",
-      "lockedAt": "2026-08-02T02:07:58.628Z"
+      "lockedAt": "2026-08-02T02:07:58.628Z",
+      "kycFullName": "",
+      "kycAddress": "",
+      "kycCity": "",
+      "kycState": "",
+      "kycProvince": "",
+      "kycPostalCode": "",
+      "kycTaxId": "",
+      "kycPhone": "",
+      "kycVerifiedAt": ""
     },
     {
       "id": "user_mlaframboisemm",
@@ -39,7 +48,7 @@
       "kycPostalCode": "l1h4s7",
       "kycTaxId": "0512",
       "kycPhone": "9057184275",
-      "kycVerifiedAt": "2026-07-22T08:04:11.439Z"
+      "kycVerifiedAt": "2026-08-04T16:58:47.724Z"
     }
   ],
   "wallets": [
@@ -47,7 +56,7 @@
       "id": "wallet-user_f730799f-3994-45d4-8b4d-7767442c2910-usd",
       "userId": "user_f730799f-3994-45d4-8b4d-7767442c2910",
       "assetSymbol": "USD",
-      "balance": 0,
+      "balance": 1791100,
       "publicAddressEthereum": "",
       "publicAddressBitcoin": "",
       "identityLocked": true,
@@ -329,7 +338,7 @@
       "amount": 10000,
       "fiatAmount": 10005.699999999999,
       "timestamp": 1784703582405,
-      "details": "Convert 10000 USDC \u2192 5.218477 ETH",
+      "details": "Convert 10000 USDC → 5.218477 ETH",
       "hash": "sconv_a49918e9-188d-44f6-bce0-2d16b42d6f12",
       "status": "completed",
       "ledgerDebit": "USDC",
@@ -441,7 +450,7 @@
       "amount": 10,
       "fiatAmount": 10,
       "timestamp": 1784704947033,
-      "details": "Wise Payout: USD 10 \u2192 CAD 14.04 (Transfer #2263779240)",
+      "details": "Wise Payout: USD 10 → CAD 14.04 (Transfer #2263779240)",
       "hash": "2263779240",
       "status": "completed",
       "ledgerDebit": "USD",
@@ -925,6 +934,16 @@
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
+    },
+    {
+      "id": "audit_7d3eb7f5-72d3-4ca3-af67-fde784e4b4dd",
+      "userId": "user_mlaframboisemm",
+      "action": "LOGIN",
+      "timestamp": 1785863038973,
+      "ipAddress": "127.0.0.1",
+      "status": "failure",
+      "details": "Password verification failed"
     }
-  ]
+  ],
+  "bankAccounts": []
 }

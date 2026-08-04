@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { CreditCard, QrCode, Smartphone, ExternalLink, CheckCircle2, ShieldCheck, Zap, ArrowRight, RefreshCw, Copy, Check, Lock, DollarSign, Store, Download, DownloadCloud, Wifi, CheckCircle, Radio, Signal, Wallet, Nfc, Activity, Sparkles, AlertCircle, Volume2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GooglePayButton } from './GooglePayButton';
 import { auth } from '../lib/firebase';
 import { useWiseGooglePassSync } from '../lib/wise-google-pass-sync-service';
+import { buildTreasuryDisplayState } from '../lib/treasury-display';
 
 export async function getFirebaseAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -218,6 +219,7 @@ interface GooglePayAndPassHubProps {
   userName: string;
   userEmail: string;
   usdBalance: number;
+  cadBalance?: number;
   portfolioValue: number;
   onRefreshBalance?: (preferredUsdBalance?: number) => void;
   showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -227,6 +229,7 @@ export default function GooglePayAndPassHub({
   userName,
   userEmail,
   usdBalance,
+  cadBalance,
   portfolioValue,
   onRefreshBalance,
   showToast
@@ -325,6 +328,8 @@ export default function GooglePayAndPassHub({
 
   // Quick Top-up amount for Google Pay
   const [topUpAmount, setTopUpAmount] = useState<string>('25.00');
+
+  const treasuryDisplay = useMemo(() => buildTreasuryDisplayState(usdBalance, Number.isFinite(cadBalance) ? cadBalance : usdBalance), [usdBalance, cadBalance]);
 
   // Active Hub Tab View Mode ('terminal' | 'wallet' | 'topup' | 'history')
   const [activeTab, setActiveTab] = useState<'terminal' | 'wallet' | 'topup' | 'history'>('terminal');
@@ -901,14 +906,14 @@ export default function GooglePayAndPassHub({
                 Wise Live USD Balance
               </span>
               <span className="text-lg font-black font-mono text-emerald-300 block">
-                ${displayedWiseUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                {treasuryDisplay.usdEquivalentLabel}
               </span>
             </div>
 
             <div className="bg-slate-800/90 border border-slate-700/80 px-3.5 py-2 rounded-2xl">
               <span className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider block">Wise CAD Balance</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
-                CA${displayedWiseCadBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {treasuryDisplay.cadEquivalentLabel}
               </span>
             </div>
 
@@ -1325,7 +1330,7 @@ export default function GooglePayAndPassHub({
                     <div className="space-y-2 bg-slate-900/90 rounded-2xl p-4 border border-slate-800 relative z-10">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Reconciled Cash Balance</span>
                       <span className="text-2xl font-black text-emerald-400 font-mono block">
-                        ${usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                        {treasuryDisplay.usdEquivalentLabel}
                       </span>
                       <p className="text-[10px] text-slate-400 pt-1 font-mono">
                         Wise Synced Account: 176576596814061
@@ -1381,11 +1386,11 @@ export default function GooglePayAndPassHub({
                     <div className="space-y-2 bg-slate-900/80 rounded-2xl p-4 border border-emerald-800/40 relative z-10">
                       <span className="text-[9px] text-emerald-300/80 font-bold uppercase tracking-wider block">Live Wise Multi-Currency Liquidity</span>
                       <span className="text-2xl font-black text-emerald-300 font-mono block">
-                        $2,614,350.00 USD
+                        {treasuryDisplay.usdEquivalentLabel}
                       </span>
                       <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 pt-1">
-                        <span>USD: $2,478,350.00</span>
-                        <span>CAD: $185,000.00</span>
+                        <span>USD: {treasuryDisplay.usdEquivalentLabel}</span>
+                        <span>CAD: {treasuryDisplay.cadEquivalentLabel}</span>
                       </div>
                     </div>
 
@@ -1610,7 +1615,7 @@ export default function GooglePayAndPassHub({
                   <div className="inline-block p-3 bg-slate-50 rounded-2xl border border-slate-200">
                     <img src={qrCodeUrl} alt="Sovereign Pass QR" className="w-44 h-44 mx-auto rounded-lg" />
                     <div className="mt-2 text-[10px] font-mono font-bold text-slate-600">
-                      ENC: ${usdBalance.toFixed(2)} USD • Wise Synced
+                      ENC: {treasuryDisplay.summaryLabel} • Wise Synced
                     </div>
                   </div>
                 ) : (

@@ -166,6 +166,12 @@ export default function App() {
     const saved = localStorage.getItem('cb_usd_balance');
     return saved ? parseFloat(saved) : 0;
   });
+  const [cadBalance, setCadBalance] = useState<number>(() => {
+    const saved = localStorage.getItem('cb_cad_balance');
+    return saved ? parseFloat(saved) : 0;
+  });
+  const [liveTreasurySummary, setLiveTreasurySummary] = useState<any>(null);
+  const [isRefreshingLiveTreasury, setIsRefreshingLiveTreasury] = useState(false);
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('cb_transactions');
@@ -397,6 +403,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('cb_auth_email', userEmail);
   }, [userEmail]);
+
+  useEffect(() => {
+    localStorage.setItem('cb_usd_balance', String(usdBalance));
+    if (isAuthenticated && userEmail) {
+      localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_usd_balance'), String(usdBalance));
+    }
+    localStorage.setItem('cb_cad_balance', String(cadBalance));
+    if (isAuthenticated && userEmail) {
+      localStorage.setItem(getUserScopedStorageKey(userEmail, 'cb_cad_balance'), String(cadBalance));
+    }
+  }, [usdBalance, cadBalance, isAuthenticated, userEmail]);
 
   useEffect(() => {
     localStorage.setItem('cb_auth_name', userName);
@@ -667,6 +684,44 @@ export default function App() {
     showToast('Session expired. Please sign in again.', 'info');
   };
 
+  const refreshLiveTreasury = async (showSuccessToast = false) => {
+    if (!hasSessionToken()) {
+      return;
+    }
+
+    try {
+      setIsRefreshingLiveTreasury(true);
+      const response = await fetch(buildApiUrl('/api/treasury/summary'), {
+        headers: buildAuthHeaders(),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Treasury sync failed');
+      }
+
+      const payload = await response.json();
+      if (!payload?.success) {
+        throw new Error(payload?.error || 'Treasury sync failed');
+      }
+
+      const nextUsdBalance = Number(payload.usdBalance ?? payload.treasury?.availableBalanceUsd ?? 0);
+      const nextCadBalance = Number(payload.cadBalance ?? payload.treasury?.availableBalanceCad ?? 0);
+      setUsdBalance(Number.isFinite(nextUsdBalance) ? nextUsdBalance : 0);
+      setCadBalance(Number.isFinite(nextCadBalance) ? nextCadBalance : 0);
+      setLiveTreasurySummary(payload);
+      if (showSuccessToast) {
+        showToast('Treasury synchronized with live banking and card rails.', 'success');
+      }
+    } catch (error: any) {
+      if (showSuccessToast) {
+        showToast(error?.message || 'Failed to sync treasury.', 'error');
+      }
+    } finally {
+      setIsRefreshingLiveTreasury(false);
+    }
+  };
+
   const syncCoinbaseBalances = async () => {
     if (!hasSessionToken()) {
       return;
@@ -718,6 +773,7 @@ export default function App() {
         if (config.stripeConfigured) {
           await fetchStripeBalance(true);
         }
+        await refreshLiveTreasury(false);
         if (isReal) {
           showToast('Synchronized portfolios live with Coinbase Brokerage ledger!', 'success');
         }
@@ -2924,6 +2980,7 @@ export default function App() {
             userName={userName || 'Marcel Laframboise'}
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
             usdBalance={usdBalance}
+            cadBalance={cadBalance}
             portfolioValue={netWorth}
             onRefreshBalance={refreshUnifiedBalances}
             showToast={showToast}
@@ -2935,7 +2992,12 @@ export default function App() {
           <WiseCardDashboard
             userName={userName || 'Marcel laframboise'}
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
+<<<<<<< HEAD
             onRefreshGlobalState={() => refreshUnifiedBalances()}
+=======
+            cadBalance={cadBalance}
+            onRefreshGlobalState={() => fetchStripeBalance(true)}
+>>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
             showToast={showToast}
           />
         )}
