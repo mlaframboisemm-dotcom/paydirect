@@ -241,6 +241,8 @@ export default function GooglePayAndPassHub({
   const [isSyncingWise, setIsSyncingWise] = useState<boolean>(false);
   const [liveWiseUsdBalance, setLiveWiseUsdBalance] = useState<number>(usdBalance);
   const [liveWiseCadBalance, setLiveWiseCadBalance] = useState<number>(0);
+  const [liveAvailableUsdBalance, setLiveAvailableUsdBalance] = useState<number>(Number.isFinite(usdBalance) ? usdBalance : 0);
+  const [liveAvailableCadBalance, setLiveAvailableCadBalance] = useState<number>(Number.isFinite(cadBalance) ? cadBalance : 0);
   
   // Custom Hook: Active Wise Wallets & Payment Mapping
   const {
@@ -265,6 +267,15 @@ export default function GooglePayAndPassHub({
     syncNow: triggerHubSync,
     syncNowDebounced: triggerHubSyncDebounced
   } = useWiseGooglePassSync(60000);
+
+  useEffect(() => {
+    if (Number.isFinite(usdBalance) && usdBalance >= 0) {
+      setLiveAvailableUsdBalance(usdBalance);
+    }
+    if (Number.isFinite(cadBalance) && cadBalance >= 0) {
+      setLiveAvailableCadBalance(cadBalance);
+    }
+  }, [usdBalance, cadBalance]);
 
   useEffect(() => {
     const usd = wiseWallets
@@ -305,6 +316,18 @@ export default function GooglePayAndPassHub({
       ? liveWiseCadBalance
       : Number(hubSyncState?.wiseCard?.balances?.cad ?? passData?.passData?.wiseCADBalance ?? 0);
 
+  const effectiveUsdBalanceForPass = Number.isFinite(liveAvailableUsdBalance) && liveAvailableUsdBalance > 0
+    ? liveAvailableUsdBalance
+    : Number.isFinite(displayedWiseUsdBalance) && displayedWiseUsdBalance > 0
+      ? displayedWiseUsdBalance
+      : Number.isFinite(usdBalance) ? usdBalance : 0;
+
+  const effectiveCadBalanceForPass = Number.isFinite(liveAvailableCadBalance) && liveAvailableCadBalance > 0
+    ? liveAvailableCadBalance
+    : Number.isFinite(displayedWiseCadBalance) && displayedWiseCadBalance > 0
+      ? displayedWiseCadBalance
+      : Number.isFinite(cadBalance) ? cadBalance : (effectiveUsdBalanceForPass * 1.3602);
+
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(false);
@@ -329,7 +352,10 @@ export default function GooglePayAndPassHub({
   // Quick Top-up amount for Google Pay
   const [topUpAmount, setTopUpAmount] = useState<string>('25.00');
 
-  const treasuryDisplay = useMemo(() => buildTreasuryDisplayState(usdBalance, Number.isFinite(cadBalance) ? cadBalance : usdBalance), [usdBalance, cadBalance]);
+  const treasuryDisplay = useMemo(
+    () => buildTreasuryDisplayState(effectiveUsdBalanceForPass, effectiveCadBalanceForPass),
+    [effectiveUsdBalanceForPass, effectiveCadBalanceForPass]
+  );
 
   // Active Hub Tab View Mode ('terminal' | 'wallet' | 'topup' | 'history')
   const [activeTab, setActiveTab] = useState<'terminal' | 'wallet' | 'topup' | 'history'>('terminal');
@@ -447,12 +473,12 @@ export default function GooglePayAndPassHub({
     const generateLiveQrCode = async () => {
       try {
         const QRCode = await import('qrcode');
-        const cadEquivalentBalance = usdBalance * FX_USD_TO_CAD;
+        const cadEquivalentBalance = effectiveUsdBalanceForPass * FX_USD_TO_CAD;
         const qrPayload = JSON.stringify({
           type: 'sovereign_pay',
           userId: passData?.passData?.userId || passData?.userId || 'user_mlaframboisemm',
           email: userEmail,
-          usdBalance: usdBalance,
+          usdBalance: effectiveUsdBalanceForPass,
           cadBalanceEquivalent: parseFloat(cadEquivalentBalance.toFixed(2)),
           portfolioValue: portfolioValue,
           walletAddress: passData?.passData?.walletAddress || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
@@ -489,9 +515,33 @@ export default function GooglePayAndPassHub({
     return () => {
       isMounted = false;
     };
-  }, [usdBalance, portfolioValue, userEmail, activeWallet, passData]);
+  }, [effectiveUsdBalanceForPass, portfolioValue, userEmail, activeWallet, passData]);
+
+  const refreshAvailableTreasuryBalance = async () => {
+    try {
+      const authHeaders = await getFirebaseAuthHeaders();
+      const res = await fetch('/api/treasury/summary', { headers: authHeaders, credentials: 'include' });
+      if (!res.ok) {
+        return;
+      }
+      const payload = await res.json();
+      if (payload?.success) {
+        const nextUsd = Number(payload.usdBalance ?? payload.treasury?.availableBalanceUsd ?? payload.totalUsd ?? 0);
+        const nextCad = Number(payload.cadBalance ?? payload.treasury?.availableBalanceCad ?? 0);
+        if (Number.isFinite(nextUsd) && nextUsd >= 0) {
+          setLiveAvailableUsdBalance(nextUsd);
+        }
+        if (Number.isFinite(nextCad) && nextCad >= 0) {
+          setLiveAvailableCadBalance(nextCad);
+        }
+      }
+    } catch (error) {
+      console.warn('[GooglePayAndPassHub] Unable to refresh treasury summary balance:', error);
+    }
+  };
 
   useEffect(() => {
+    void refreshAvailableTreasuryBalance();
     fetchWalletPass();
 
     if ('NDEFReader' in window) {
@@ -773,8 +823,17 @@ export default function GooglePayAndPassHub({
         if (typeof data.wiseCADBalance === 'number') {
           setLiveWiseCadBalance(data.wiseCADBalance);
         }
+        if (typeof data.reconciledAppUSDBalance === 'number' && data.reconciledAppUSDBalance >= 0) {
+          setLiveAvailableUsdBalance(data.reconciledAppUSDBalance);
+        }
+        if (typeof data.cadBalance === 'number' && data.cadBalance >= 0) {
+          setLiveAvailableCadBalance(data.cadBalance);
+        } else if (typeof data.wiseCADBalance === 'number' && data.wiseCADBalance >= 0) {
+          setLiveAvailableCadBalance(data.wiseCADBalance);
+        }
         await refreshWallets();
         await triggerHubSync();
+        await refreshAvailableTreasuryBalance();
         showToast?.(`Wise balance synced! Total: $${data.wiseTotalUSD.toFixed(2)} USD (CAD ${data.wiseCADBalance.toFixed(2)} + USD ${data.wiseUSDBalance.toFixed(2)})`, 'success');
         onRefreshBalance?.(typeof data.reconciledAppUSDBalance === 'number' ? data.reconciledAppUSDBalance : data.wiseTotalUSD);
         fetchWalletPass();
@@ -881,7 +940,7 @@ export default function GooglePayAndPassHub({
   return (
     <div className="max-w-5xl mx-auto space-y-6 py-2">
       {/* Sleek Executive Header */}
-      <div className="bg-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-lg border border-slate-800 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 rounded-3xl p-6 sm:p-7 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-slate-700/70 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
           <div className="space-y-1.5">
             <div className="flex items-center space-x-2">

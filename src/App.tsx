@@ -31,7 +31,8 @@ import AppDownloadModal from './components/AppDownloadModal';
 import RealtimeProofModal from './components/RealtimeProofModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { convertUsdToCad, DEFAULT_USD_CAD_RATE } from './lib/financial-hardening';
-import { debouncedStorageSetItem } from './lib/sync-to-storage';
+import { debounceStorageSetItem } from './lib/sync-to-storage';
+import { resolveSharedBalance } from './lib/shared-balance';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getPrimaryWalletAddress, getLiveWalletSnapshot } from './lib/live-wallet-config';
@@ -1322,7 +1323,15 @@ export default function App() {
     }, 0);
   }, [holdings, coins]);
 
-  const liveCashBalance = usdBalance;
+  const sharedBalances = useMemo(() => resolveSharedBalance({
+    preferredUsdBalance: usdBalance,
+    preferredCadBalance: cadBalance,
+    fallbackUsdBalance: usdBalance,
+    fallbackCadBalance: cadBalance
+  }), [usdBalance, cadBalance]);
+
+  const liveCashBalance = sharedBalances.usdBalance;
+  const liveCashBalanceCad = sharedBalances.cadBalance;
 
   const netWorth = cryptoTotalValue + liveCashBalance;
 
@@ -1698,7 +1707,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 text-gray-900 font-sans flex flex-col">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(0,82,255,0.16),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(56,189,248,0.1),_transparent_26%),linear-gradient(140deg,_#020617_0%,_#0f172a_46%,_#111827_100%)] text-slate-100 font-sans flex flex-col">
       {/* Dynamic Toast Notifications */}
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-0 scale-100 flex items-center space-x-2 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-white/5 max-w-sm">
@@ -1743,7 +1752,7 @@ export default function App() {
             <div className="lg:col-span-8 space-y-8">
               
               {/* Google Drive Production Folder Widget */}
-              <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-indigo-950 rounded-2xl p-5 text-white shadow-md border border-blue-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 rounded-2xl p-5 text-white shadow-[0_20px_60px_rgba(15,23,42,0.16)] border border-slate-700/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center space-x-3.5">
                   <div className="w-11 h-11 rounded-xl bg-blue-500/20 text-blue-300 flex items-center justify-center border border-blue-400/30 flex-shrink-0">
                     <HardDrive className="w-6 h-6 text-blue-400" />
@@ -1782,27 +1791,27 @@ export default function App() {
               {/* Balanced Portfolio Summary Hero Grid */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                 {/* Primary Net Worth & Daily Change Card - Spans 7 cols on desktop */}
-                <div className="md:col-span-7 bg-white rounded-3xl border border-gray-100 p-6 sm:p-7 shadow-xs relative flex flex-col justify-between space-y-6">
+                <div className="md:col-span-7 bg-gradient-to-br from-slate-900/95 via-slate-900 to-blue-950/90 rounded-[28px] border border-slate-800/80 p-5 sm:p-6 shadow-[0_24px_70px_rgba(2,6,23,0.35)] relative flex flex-col justify-between space-y-5 transition-all duration-300 hover:-translate-y-0.5">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                           Total Portfolio Net Worth ({getCurrencySymbol(citizenship)})
                         </span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-[#0052FF] text-[10px] font-black rounded-full border border-blue-100">
+                        <span className="px-2 py-0.5 bg-blue-500/15 text-blue-300 text-[10px] font-black rounded-full border border-blue-400/20">
                           REAL-TIME
                         </span>
                       </div>
                       
                       {/* Main Net Worth Display */}
                       <div className="mt-2 flex items-baseline space-x-3 select-none">
-                        <span className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight font-mono">
+                        <span className="text-3xl sm:text-4xl font-black text-white tracking-tight font-mono">
                           ${formatBalanceByCurrency(netWorth, citizenship).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
 
                       {/* Prioritized 24h Daily Change Indicators */}
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
                         <div className={`flex items-center text-xs sm:text-sm font-extrabold rounded-full px-3 py-1 ${
                           netWorthChangeUSD >= 0 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-rose-700 bg-rose-50 border border-rose-200'
                         }`}>
@@ -1811,8 +1820,8 @@ export default function App() {
                           <span className="mx-1 text-gray-400">|</span>
                           <span>{netWorthChangeUSD >= 0 ? '+' : ''}{netWorthChangePercent.toFixed(2)}% (24h)</span>
                         </div>
-                        <span className="text-[11px] text-gray-400 font-semibold">
-                          All-Time Portfolio Yield: <strong className="text-emerald-600">+14.2%</strong>
+                        <span className="text-[11px] text-slate-400 font-semibold">
+                          All-Time Portfolio Yield: <strong className="text-emerald-400">+14.2%</strong>
                         </span>
                       </div>
                     </div>
@@ -1861,16 +1870,16 @@ export default function App() {
                   </div>
 
                   {/* 24h Daily Performance Progress Indicator Bar */}
-                  <div className="pt-4 border-t border-gray-100 space-y-1.5">
-                    <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="pt-3 border-t border-slate-800/70 space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                       <span>24h Range Indicator</span>
-                      <span className="text-gray-700 font-mono">
+                      <span className="text-slate-200 font-mono">
                         Low: ${formatBalanceByCurrency(netWorth * 0.982, citizenship).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         {' — '}
                         High: ${formatBalanceByCurrency(netWorth * 1.018, citizenship).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </span>
                     </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden relative">
+                    <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden relative">
                       <div 
                         className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, Math.max(15, 50 + netWorthChangePercent * 10))}%` }}
@@ -1882,16 +1891,16 @@ export default function App() {
                 {/* Secondary Balanced Cards - Spans 5 cols on desktop */}
                 <div className="md:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Card 1: Live USD Cash & Stripe Hub */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-xs flex flex-col justify-between space-y-3">
+                  <div className="bg-gradient-to-br from-slate-900/95 via-slate-900 to-blue-950/70 rounded-[24px] border border-slate-800/80 p-4 shadow-[0_16px_40px_rgba(2,6,23,0.25)] flex flex-col justify-between space-y-2.5 transition-all duration-300 hover:-translate-y-0.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fiat Cash & Payouts</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fiat Cash & Payouts</span>
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                     </div>
                     <div>
-                      <div className="text-xl sm:text-2xl font-black text-gray-900 font-mono">
-                        ${liveCashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs font-bold text-gray-400">USD</span>
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
+                        ${liveCashBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs font-bold text-slate-400">USD</span>
                       </div>
-                      <p className="text-[11px] text-gray-400 mt-0.5 font-medium">
+                      <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
                         Synced with Stripe & Direct Bank Deposit
                       </p>
                     </div>
@@ -1905,19 +1914,19 @@ export default function App() {
                   </div>
 
                   {/* Card 2: Active Crypto Portfolio */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-5 shadow-xs flex flex-col justify-between space-y-3">
+                  <div className="bg-gradient-to-br from-slate-900/95 via-slate-900 to-emerald-950/70 rounded-[24px] border border-slate-800/80 p-4 shadow-[0_16px_40px_rgba(2,6,23,0.25)] flex flex-col justify-between space-y-2.5 transition-all duration-300 hover:-translate-y-0.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Crypto Backing</span>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded-md border border-emerald-200">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Crypto Backing</span>
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-300 font-extrabold px-2 py-0.5 rounded-md border border-emerald-400/20">
                         {holdings.length} Assets
                       </span>
                     </div>
                     <div>
-                      <div className="text-xl sm:text-2xl font-black text-gray-900 font-mono">
-                        ${(netWorth - liveCashBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs font-bold text-gray-400">USD</span>
+                      <div className="text-xl sm:text-2xl font-black text-white font-mono">
+                        ${(netWorth - liveCashBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })} <span className="text-xs font-bold text-slate-400">USD</span>
                       </div>
-                      <p className="text-[11px] text-gray-400 mt-0.5 font-medium truncate">
-                        Top Holding: <strong className="text-gray-700">{selectedAssetSymbol}</strong>
+                      <p className="text-[11px] text-slate-400 mt-0.5 font-medium truncate">
+                        Top Holding: <strong className="text-slate-200">{selectedAssetSymbol}</strong>
                       </p>
                     </div>
                     <button
@@ -1932,7 +1941,7 @@ export default function App() {
               </div>
 
               {/* Portfolio Backing Chart & Asset Selectors */}
-              <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-xs relative">
+              <div className="bg-slate-900/80 rounded-[28px] border border-slate-800/80 p-5 shadow-[0_16px_45px_rgba(2,6,23,0.2)] relative">
                 <div>
                   {currentCoin ? (
                     <CoinChart
@@ -1952,7 +1961,7 @@ export default function App() {
                 </div>
 
                 {/* Quick Asset indicators pills */}
-                <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
+                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-800/70">
                   {holdings.map((h) => {
                     const c = coins.find((coin) => coin && coin.symbol === h.symbol);
                     if (!c) return null;
@@ -1976,12 +1985,12 @@ export default function App() {
 
               {/* Your assets breakdown table */}
               <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs">
-                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                  <h3 className="text-sm font-bold text-gray-900 flex items-center space-x-2">
-                    <Wallet className="h-4.5 w-4.5 text-gray-500" />
+                <div className="px-5 py-3.5 border-b border-slate-800/70 flex justify-between items-center bg-slate-950/60">
+                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <Wallet className="h-4.5 w-4.5 text-slate-400" />
                     <span>Your Balances</span>
                   </h3>
-                  <span className="text-[10px] bg-slate-100 font-bold px-2.5 py-0.5 rounded-full text-gray-500">
+                  <span className="text-[10px] bg-slate-800/80 font-bold px-2.5 py-0.5 rounded-full text-slate-300">
                     {holdings.length} Assets
                   </span>
                 </div>
@@ -2112,12 +2121,12 @@ export default function App() {
               </div>
 
               {/* Learning Reward Banner preview */}
-              <div className="bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-500 rounded-2xl p-5 text-gray-900 flex flex-col sm:flex-row items-center justify-between shadow-xs gap-4 border border-yellow-300">
+              <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-amber-600 rounded-[24px] p-4 text-white flex flex-col sm:flex-row items-center justify-between shadow-[0_16px_40px_rgba(15,23,42,0.14)] gap-3 border border-white/10">
                 <div className="flex items-center space-x-3 text-center sm:text-left flex-col sm:flex-row">
                   <Award className="h-10 w-10 text-white shrink-0 mb-2 sm:mb-0" />
                   <div>
                     <h4 className="font-extrabold text-sm sm:text-base">Claim $12 of Free Educational Crypto!</h4>
-                    <p className="text-xs font-medium text-gray-800">Learn about blockchain scaling and oracles to claim free token rewards.</p>
+                    <p className="text-xs font-medium text-slate-200/90">Learn about blockchain scaling and oracles to claim free token rewards.</p>
                   </div>
                 </div>
                 <button
@@ -2154,7 +2163,7 @@ export default function App() {
               </ErrorBoundary>
 
               {/* Coinbase News / Tips widget */}
-              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-xs">
+              <div className="bg-white border border-slate-200/70 rounded-[24px] p-5 shadow-[0_14px_38px_rgba(15,23,42,0.05)]">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center space-x-1.5">
                   <Newspaper className="h-4 w-4 text-gray-400" />
                   <span>Coinbase Insights</span>
@@ -2992,7 +3001,8 @@ export default function App() {
           <WiseCardDashboard
             userName={userName || 'Marcel laframboise'}
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
-            cadBalance={cadBalance}
+            usdBalance={liveCashBalance}
+            cadBalance={liveCashBalanceCad}
             onRefreshGlobalState={() => refreshUnifiedBalances()}
             showToast={showToast}
           />

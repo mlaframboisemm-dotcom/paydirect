@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useWiseGooglePassSync } from '../lib/wise-google-pass-sync-service';
 import { buildTreasuryDisplayState } from '../lib/treasury-display';
+import { resolveSharedBalance } from '../lib/shared-balance';
 
 interface WiseBalanceItem {
   currency: string;
@@ -108,6 +109,7 @@ interface WiseCardTransaction {
 interface WiseCardDashboardProps {
   userName?: string;
   userEmail?: string;
+  usdBalance?: number;
   cadBalance?: number;
   onRefreshGlobalState?: () => void;
   showToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -116,6 +118,7 @@ interface WiseCardDashboardProps {
 export default function WiseCardDashboard({
   userName = 'Marcel laframboise',
   userEmail = 'mlaframboisemm@gmail.com',
+  usdBalance,
   cadBalance,
   onRefreshGlobalState,
   showToast
@@ -521,12 +524,19 @@ Sovereigns Banking Hub / Wise Business`;
     card?.balances?.usd ??
     0
   );
+  const resolvedSharedBalance = useMemo(() => resolveSharedBalance({
+    preferredUsdBalance: usdBalance,
+    preferredCadBalance: cadBalance,
+    fallbackUsdBalance: primaryUsdBalance,
+    fallbackCadBalance: primaryUsdBalance * 1.3622
+  }), [usdBalance, cadBalance, primaryUsdBalance]);
+
   const treasuryDisplay = useMemo(
     () => buildTreasuryDisplayState(
-      primaryUsdBalance,
-      Number.isFinite(cadBalance) ? cadBalance : primaryUsdBalance * 1.3622
+      resolvedSharedBalance.usdBalance,
+      resolvedSharedBalance.cadBalance
     ),
-    [primaryUsdBalance, cadBalance]
+    [resolvedSharedBalance.usdBalance, resolvedSharedBalance.cadBalance]
   );
 
   if (isLoading) {
@@ -541,7 +551,7 @@ Sovereigns Banking Hub / Wise Business`;
   return (
     <div className="max-w-6xl mx-auto space-y-8 py-4 px-2 sm:px-4">
       {/* Executive Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-slate-800">
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] relative overflow-hidden border border-slate-700/70">
         <div className="absolute right-0 top-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
