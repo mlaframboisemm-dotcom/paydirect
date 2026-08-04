@@ -1535,6 +1535,14 @@ async function enforceProductionReadiness() {
   }
 }
 
+function resolveEffectiveUserId(req: any): string {
+  const email = String(req.user?.email || '').trim().toLowerCase();
+  if (email === 'mlaframboisemm@gmail.com') {
+    return 'user_mlaframboisemm';
+  }
+  return String(req.user?.id || req.user?.userId || 'user_mlaframboisemm').trim();
+}
+
 function getTokenFromRequest(req: any): string | null {
   const authHeader = req.headers?.authorization;
   if (authHeader && typeof authHeader === 'string') {
@@ -10527,17 +10535,18 @@ async function startServer() {
   const handleSyncPassHub = async (req: any, res: any) => {
     try {
       const userEmail = req.user?.email || 'mlaframboisemm@gmail.com';
-      let userId = req.user?.id || req.user?.userId;
-      if (!userId || userEmail === 'mlaframboisemm@gmail.com') {
-        userId = 'user_mlaframboisemm';
-      }
+      const userId = resolveEffectiveUserId(req);
       const userName = req.user?.name || req.user?.fullName || 'Marcel Laframboise';
 
+      const existingWallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+      const existingUsdWallet = existingWallets.find((w: any) => (w.asset_symbol === 'USD' || w.assetSymbol === 'USD'));
+      const existingUsdBalance = Number(existingUsdWallet?.balance || 0);
+
       // 1. Fetch live Wise Multi-Currency Balances & Reconcile Account Hub Ledger
-      let wiseUSD = 2478350.00;
-      let wiseCAD = 185000.00;
+      let wiseUSD = existingUsdBalance;
+      let wiseCAD = 0;
       let wiseEUR = 0.00;
-      let wiseTotalUSD = 2614350.00;
+      let wiseTotalUSD = existingUsdBalance;
       let isLiveConnected = false;
 
       try {
@@ -10854,7 +10863,7 @@ async function startServer() {
     try {
       const wiseToken = process.env.WISE_API_TOKEN || process.env.WISE_ALL_ACCESS_KEY || process.env.WISE_PERSONAL_TOKEN || process.env.WISE_ACCESS_TOKEN;
       if (!wiseToken) {
-        const userId = req.user?.id || req.user?.userId || 'user_mlaframboisemm';
+        const userId = resolveEffectiveUserId(req);
         const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
         const usdBalance = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
         return res.json({
@@ -11012,7 +11021,7 @@ async function startServer() {
   // POST /api/wise/reconcile — Sync app USD wallet balance with live Wise account balance
   app.post('/api/wise/reconcile', requireAuth, async (req: any, res: any) => {
     try {
-      const userId = req.user.id || req.user.userId || 'user_mlaframboisemm';
+      const userId = resolveEffectiveUserId(req);
 
       const wiseToken = process.env.WISE_API_TOKEN || process.env.WISE_ALL_ACCESS_KEY || process.env.WISE_PERSONAL_TOKEN || process.env.WISE_ACCESS_TOKEN;
       if (!wiseToken) {
@@ -11108,10 +11117,7 @@ async function startServer() {
   async function handleUnifiedSync(req: any, res: any) {
     try {
       const userEmail = req.user?.email || 'mlaframboisemm@gmail.com';
-      let userId = req.user?.id || req.user?.userId;
-      if (!userId || userEmail === 'mlaframboisemm@gmail.com') {
-        userId = 'user_mlaframboisemm';
-      }
+      const userId = resolveEffectiveUserId(req);
 
       // 1. COINBASE BALANCES & CRYPTO HOLDINGS
       const PRICES: Record<string, number> = { BTC: 66000, ETH: 1919, SOL: 77.29, BNB: 310, USDC: 1, USDT: 1, USDF: 1, LINK: 8.63, PEPE: 0.0000247, SHIB: 0.0000085, POL: 0.37, HYPE: 12.5, LEO: 5.5, MXNT: 0.052, LIF3: 0.0015, XAUT: 2400 };
@@ -11176,12 +11182,6 @@ async function startServer() {
       if (bankAccounts && bankAccounts.length > 0) {
         plaidUsd = bankAccounts.reduce((sum: number, b: any) => sum + Number(b.balance || 0), 0);
         plaidConnected = true;
-      } else {
-        const plaidClientId = process.env.PLAID_CLIENT_ID;
-        if (plaidClientId) {
-          plaidUsd = 50000.00;
-          plaidConnected = true;
-        }
       }
 
       // 5. TOTAL CENTRALIZED LEDGER CALCULATION & RECONCILIATION
