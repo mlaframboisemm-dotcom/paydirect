@@ -56,16 +56,38 @@ export const MonthlyReportModal: React.FC<MonthlyReportModalProps> = ({
     'Q2 2026 Comprehensive'
   ];
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     setIsGenerating(true);
     try {
+      let latestHoldings = holdings;
+      let latestLiveCashBalance = liveCashBalance;
+
+      try {
+        const token = sessionStorage.getItem('cb_auth_jwt_token') || localStorage.getItem('cb_auth_jwt_token');
+        const res = await fetch('/api/coinbase/balances', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          credentials: 'include'
+        });
+        if (res.ok) {
+          const snapshot = await res.json();
+          if (Array.isArray(snapshot?.holdings) && snapshot.holdings.length > 0) {
+            latestHoldings = snapshot.holdings;
+          }
+          if (typeof snapshot?.usdBalance === 'number' && Number.isFinite(snapshot.usdBalance)) {
+            latestLiveCashBalance = snapshot.usdBalance;
+          }
+        }
+      } catch (snapshotErr) {
+        console.warn('Monthly report live snapshot fetch warning:', snapshotErr);
+      }
+
       const doc = generateMonthlyPortfolioPdf({
         userName,
         userEmail,
         citizenship,
         netWorth,
-        liveCashBalance,
-        holdings,
+        liveCashBalance: latestLiveCashBalance,
+        holdings: latestHoldings,
         coins,
         transactions: includeTransactions ? transactions : [],
         selectedMonth

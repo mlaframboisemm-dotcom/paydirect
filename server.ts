@@ -7449,6 +7449,7 @@ app.get('/api/webhooks/events', requireAuth, requireMfa, async (req: any, res: a
 });
 
 app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res) => {
+  const effectiveUserId = resolveEffectiveUserId(req);
   const cbKey = process.env.COINBASE_API_KEY_ID;
   const cbSecret = process.env.COINBASE_API_SECRET_RAW;
   if (!cbKey || !cbSecret) {
@@ -7456,7 +7457,7 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
       const bridgePayload = await buildCoinbase55BridgeBalances();
       if (bridgePayload) return res.json(bridgePayload);
 
-      const ledgerPayload = await buildLedgerCoinbaseBalances(req.user.id);
+      const ledgerPayload = await buildLedgerCoinbaseBalances(effectiveUserId);
       return res.json({
         ...ledgerPayload,
         providerStatus: 'coinbase_credentials_missing'
@@ -7490,7 +7491,7 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
         });
       }
 
-      const ledgerPayload = await buildLedgerCoinbaseBalances(req.user.id);
+      const ledgerPayload = await buildLedgerCoinbaseBalances(effectiveUserId);
       return res.json({
         ...ledgerPayload,
         providerStatus: 'coinbase_upstream_failed',
@@ -7531,7 +7532,7 @@ app.get('/api/coinbase/balances', requireAuth, requireMfa, async (req: any, res)
         });
       }
 
-      const ledgerPayload = await buildLedgerCoinbaseBalances(req.user.id);
+      const ledgerPayload = await buildLedgerCoinbaseBalances(effectiveUserId);
       return res.json({
         ...ledgerPayload,
         providerStatus: 'coinbase_signing_failed'
