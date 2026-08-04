@@ -9196,33 +9196,6 @@ app.post('/api/card/register', requireAuth, async (req: any, res: any) => {
 
 // Plaid Link Endpoints
 app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any) => {
-<<<<<<< HEAD
-  try {
-    if (!plaidClient) {
-      return res.json({
-        success: true,
-        link_token: 'link-sandbox-demo-token-123456',
-        message: 'Running in demo mode (Plaid credentials not set)'
-      });
-    }
-
-    const response = await plaidClient.linkTokenCreate({
-      user: { client_user_id: req.user.id || 'user_mlaframboisemm' },
-      client_name: 'Sovereign Paydirect',
-      products: [Products.Auth],
-      country_codes: [CountryCode.Ca, CountryCode.Us],
-      language: 'en',
-    });
-
-    return res.json({
-      success: true,
-      link_token: response.data.link_token
-    });
-  } catch (err: any) {
-    console.error('Failed to create Plaid link token:', err.message || err);
-    return res.status(500).json({ error: 'PLAID_TOKEN_ERROR', message: err.message });
-=======
-  const plaidClient = createPlaidClient();
   const userId = String(req.user?.id || req.user?.email || 'guest');
 
   if (!plaidClient) {
@@ -9249,17 +9222,10 @@ app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any)
   } catch (error: any) {
     console.error('[PLAID] Token creation failed:', error);
     return res.status(500).json({ error: 'PLAID_LINK_TOKEN_FAILED', message: error?.message || 'Failed to create a Plaid link token.' });
->>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
   }
 });
 
 app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
-<<<<<<< HEAD
-  return res.json({
-    success: true,
-    message: 'Link verified.'
-  });
-=======
   const { public_token, metadata } = req.body || {};
   const userId = req.user?.id;
 
@@ -9267,12 +9233,12 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
     return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'A valid user session is required.' });
   }
 
-  const plaidClient = createPlaidClient();
+  const plaidClientInstance = createPlaidClient();
   let accessToken: string | null = null;
 
-  if (plaidClient && public_token) {
+  if (plaidClientInstance && public_token) {
     try {
-      const exchangeResponse = await plaidClient.itemPublicTokenExchange({ public_token });
+      const exchangeResponse = await plaidClientInstance.itemPublicTokenExchange({ public_token });
       accessToken = exchangeResponse.data.access_token || null;
     } catch (error: any) {
       console.warn('[PLAID] Public token exchange failed; continuing with local fallback.', error?.message || error);
@@ -9303,7 +9269,6 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
   };
 
   return res.json(newBank);
->>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
 });
 
 app.post('/api/stripe/create-checkout-session', requireAuth, async (req: any, res) => {

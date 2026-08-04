@@ -2992,12 +2992,8 @@ export default function App() {
           <WiseCardDashboard
             userName={userName || 'Marcel laframboise'}
             userEmail={userEmail || 'mlaframboisemm@gmail.com'}
-<<<<<<< HEAD
-            onRefreshGlobalState={() => refreshUnifiedBalances()}
-=======
             cadBalance={cadBalance}
-            onRefreshGlobalState={() => fetchStripeBalance(true)}
->>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
+            onRefreshGlobalState={() => refreshUnifiedBalances()}
             showToast={showToast}
           />
         )}

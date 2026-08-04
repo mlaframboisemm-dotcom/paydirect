@@ -516,16 +516,18 @@ Sovereigns Banking Hub / Wise Business`;
     }
   };
 
-<<<<<<< HEAD
   const primaryUsdBalance = Number(
     balances.find(b => b.currency === 'USD')?.amount ??
     card?.balances?.usd ??
     0
   );
-=======
-  const primaryUsdBalance = balances.find(b => b.currency === 'USD')?.amount || 0;
-  const treasuryDisplay = useMemo(() => buildTreasuryDisplayState(primaryUsdBalance, Number.isFinite(cadBalance) ? cadBalance : primaryUsdBalance * 1.3622), [primaryUsdBalance, cadBalance]);
->>>>>>> 02c42c5 (Wire live treasury flow across banking and wallet UIs)
+  const treasuryDisplay = useMemo(
+    () => buildTreasuryDisplayState(
+      primaryUsdBalance,
+      Number.isFinite(cadBalance) ? cadBalance : primaryUsdBalance * 1.3622
+    ),
+    [primaryUsdBalance, cadBalance]
+  );
 
   if (isLoading) {
     return (
