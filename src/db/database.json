@@ -1,11 +1,11 @@
 {
   "users": [
     {
-      "id": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "name": "Secure Admin",
       "email": "admin@secure.local",
-      "passwordHash": "9c1e84ab6b89a2a1a2928dbe0aa14633f02e93f483ee8fc58022c9b667852d00272171bc48e20cf3dc6c0df6642c7248c8c77a3b77f719d1c54c0e93ea68e1c6",
-      "salt": "7af6063d2b82e05387c7ee01a044468a",
+      "passwordHash": "67d9817beab56494b564b96385562d2ce052dd3b05ec062631713b784c920babf282f35388f65385e90d0cc6a90f127b07a80a5a23fb9dc3166cdd51d8ee4cef",
+      "salt": "c942005af52a1e6c64e26aba5f621573",
       "twoFactorSecret": "JBSWY3DPEHPK3PXP",
       "twoFactorEnabled": true,
       "kycLevel": 2,
@@ -14,13 +14,13 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "admin@secure.local",
-      "lockedAt": "2026-08-04T11:20:52.315Z"
+      "lockedAt": "2026-08-04T12:34:33.656Z"
     }
   ],
   "wallets": [
     {
-      "id": "wallet-user_a0162590-b773-4929-a290-1e91c2155a77-usd",
-      "userId": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "wallet-user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47-usd",
+      "userId": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "assetSymbol": "USD",
       "balance": 1791100,
       "publicAddressEthereum": "",
@@ -29,43 +29,43 @@
       "productionMode": "live",
       "blockchainLinked": true,
       "lockedToEmail": "admin@secure.local",
-      "lockedAt": "2026-08-04T11:20:52.315Z"
+      "lockedAt": "2026-08-04T12:34:33.656Z"
     }
   ],
   "transactions": [],
   "auditLogs": [
     {
-      "id": "audit_3fdceb74-7be2-46ae-a027-4b42c9b706af",
-      "userId": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "audit_35a6426c-522e-4bad-a11d-916853abdb4c",
+      "userId": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1785842452676,
+      "timestamp": 1785846873807,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for admin@secure.local in live production mode."
     },
     {
-      "id": "audit_cb8a1631-0600-4a97-9b75-6da21645f861",
-      "userId": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "audit_c5d9f652-1728-4c04-bb3a-ff423b0c59b3",
+      "userId": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "action": "LOGIN",
-      "timestamp": 1785842452677,
+      "timestamp": 1785846873808,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
     },
     {
-      "id": "audit_36e4b3b8-5a56-4c8e-898e-239d05feb555",
-      "userId": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "audit_5a515d28-99db-41d5-b959-b819288d567b",
+      "userId": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "action": "IDENTITY_LOCKED",
-      "timestamp": 1785842452864,
+      "timestamp": 1785846873921,
       "ipAddress": "system",
       "status": "success",
       "details": "Account identity locked for admin@secure.local in live production mode."
     },
     {
-      "id": "audit_a2447750-b317-4b30-8740-1abc1772c43e",
-      "userId": "user_a0162590-b773-4929-a290-1e91c2155a77",
+      "id": "audit_0d4f86c5-9ac0-4353-8979-eb9dcb1b2a35",
+      "userId": "user_4bfaac05-0ec1-4a1f-97dd-a16dcd915f47",
       "action": "LOGIN",
-      "timestamp": 1785842452865,
+      "timestamp": 1785846873921,
       "ipAddress": "127.0.0.1",
       "status": "success",
       "details": "Login successful with MFA verification"
