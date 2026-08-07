@@ -22,9 +22,18 @@ type QuotePayload = {
   payInMethod?: string;
 };
 
-const credentialsPath = path.join(process.cwd(), 'config', '.env.credentials');
-if (fs.existsSync(credentialsPath)) {
-  dotenv.config({ path: credentialsPath, override: true });
+const envPaths = [
+  path.join(process.cwd(), '.env'),
+  path.join(process.cwd(), '.env.local'),
+  path.join(process.cwd(), '.env.production'),
+  path.join(process.cwd(), '.env.production.local'),
+  path.join(process.cwd(), 'config', '.env.credentials')
+];
+
+for (const envPath of envPaths) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: false });
+  }
 }
 
 const token = String(
