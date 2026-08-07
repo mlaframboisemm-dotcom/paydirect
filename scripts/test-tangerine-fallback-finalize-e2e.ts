@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fetch from 'node-fetch';
 import { db } from '../src/db/ledger.js';
 
 function parseCookie(setCookieHeader: string | null): string {
@@ -11,6 +10,18 @@ async function run() {
   process.env.NODE_ENV = 'production';
   process.env.PORT = '4021';
   process.env.BYPASS_EMAIL_VERIFICATION = 'true';
+  if (!process.env.SOVEREIGN_ENCRYPTION_KEY) {
+    process.env.SOVEREIGN_ENCRYPTION_KEY = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  }
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  }
+  if (!process.env.SESSION_SECRET) {
+    process.env.SESSION_SECRET = process.env.JWT_SECRET;
+  }
+  if (!process.env.SOVEREIGN_ADMIN_EMAILS) {
+    process.env.SOVEREIGN_ADMIN_EMAILS = 'admin@secure.local';
+  }
   process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_fallback_proof';
 
   const nativeFetch = globalThis.fetch.bind(globalThis);
