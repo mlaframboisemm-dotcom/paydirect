@@ -12545,7 +12545,6 @@ async function startServer() {
     '/api/ledger/auto-sync-all',
     '/api/reset',
     '/api/plaid/exchange-public-token',
-    '/api/coinbase55/',
     '/api/withdrawal/wise/card/',
     '/api/withdrawal/wise/deposit',
     '/api/withdrawal/wise/transfer-from-sovereign-cash',
@@ -12640,18 +12639,20 @@ async function startServer() {
     try {
       const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const wiseData = await getWiseTotalCashUSD().catch(() => null);
-      const totalUSD = wiseData?.totalUSD || 2478350.00;
+      const totalUSD = Number(wiseData?.totalUSD || 0);
+      const connected = Boolean(wiseData);
       return res.json({
         success: true,
-        connected: true,
+        connected,
         totalBalanceUsd: totalUSD,
-        totalBtc: 12.5,
-        totalEth: 180.2,
-        activeWalletsCount: 4,
+        totalBtc: 0,
+        totalEth: 0,
+        activeWalletsCount: Array.isArray(wiseData?.balances) ? wiseData.balances.length : 0,
         totalTxCount: 28,
-        status: 'CONNECTED',
+        status: connected ? 'CONNECTED' : 'WISE_UNAVAILABLE',
         userEmail: 'mlaframboisemm@gmail.com',
-        kycStatus: 'REGISTERED_TO_KYC_LIVE'
+        kycStatus: 'REGISTERED_TO_KYC_LIVE',
+        source: connected ? 'wise_live' : 'wise_unavailable'
       });
     } catch (e: any) {
       return res.status(500).json({ error: 'COINBASE55_SUMMARY_ERROR', message: e.message });
@@ -12659,15 +12660,47 @@ async function startServer() {
   });
 
   app.get('/api/coinbase55/wallets', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      wallets: [
-        { id: 'cb-usd', symbol: 'USD', balance: 2478350.00, usdValue: 2478350.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' },
-        { id: 'cb-btc', symbol: 'BTC', balance: 12.5, usdValue: 825000.00, address: 'bc1q9v8903marcellaframboise' },
-        { id: 'cb-eth', symbol: 'ETH', balance: 180.2, usdValue: 576640.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' },
-        { id: 'cb-cad', symbol: 'CAD', balance: 185000.00, usdValue: 131996.00, address: process.env.VITE_MARSHALL_ADDRESS || '0x742d35cc6634c0532925a3b844bc454e4438f44e' }
-      ]
-    });
+    try {
+      const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+      const wiseData = await getWiseTotalCashUSD().catch(() => null);
+      if (!wiseData || !Array.isArray(wiseData.balances)) {
+        return res.json({
+          success: true,
+          wallets: [],
+          source: 'wise_unavailable'
+        });
+      }
+
+      const cadRate = Number(wiseData.cadRate || 0);
+      const wallets = wiseData.balances.map((b: any, idx: number) => {
+        const symbol = String(b?.currency || '').toUpperCase();
+        const amount = Number(b?.amount || 0);
+        const usdValue = symbol === 'USD'
+          ? amount
+          : symbol === 'CAD' && cadRate > 0
+            ? amount * cadRate
+            : 0;
+
+        return {
+          id: `wise-${symbol.toLowerCase()}-${idx}`,
+          symbol,
+          balance: amount,
+          usdValue,
+          address: symbol === 'USD'
+            ? (String(wiseData.accountNumber || '').trim() || 'N/A')
+            : 'N/A',
+          source: 'wise_live'
+        };
+      });
+
+      return res.json({
+        success: true,
+        wallets,
+        source: 'wise_live'
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'COINBASE55_WALLETS_ERROR', message: e.message });
+    }
   });
 
   app.get('/api/coinbase55/transactions', async (req: any, res: any) => {
