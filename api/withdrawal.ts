@@ -662,9 +662,13 @@ function requireRouterAuth(req: any, res: any, next: any) {
   const bearer = String(req.header('authorization') || req.header('Authorization') || '').trim();
   const bearerToken = bearer.startsWith('Bearer ') ? bearer.substring('Bearer '.length).trim() : '';
   if (bearerToken) {
-    const jwtSecret = String(process.env.JWT_SECRET || '').trim();
-    if (jwtSecret) {
-      const claims = verifySessionToken(bearerToken, jwtSecret);
+    const candidateSecrets = [
+      String(process.env.JWT_SECRET || '').trim(),
+      String(process.env.SESSION_SECRET || '').trim()
+    ].filter((value, index, arr) => value && arr.indexOf(value) === index);
+
+    for (const secret of candidateSecrets) {
+      const claims = verifySessionToken(bearerToken, secret);
       if (claims?.sub) {
         req.user = {
           id: String(claims.sub),
