@@ -3194,9 +3194,9 @@ export default function SovereignIntelligenceView({
                     <button
                       onClick={() => {
                         const liveWalletBalance = Number(
-                          hubSyncData?.balances?.wiseUsd ??
-                          hubSyncData?.balances?.totalCashUsd ??
-                          usdBalanceSnapshot?.totalUsd ??
+                          unifiedSyncData?.balances?.wiseUsd ??
+                          unifiedSyncData?.balances?.totalCashUsd ??
+                          unifiedSyncData?.totals?.totalUsd ??
                           0
                         );
                         const proofObj = {

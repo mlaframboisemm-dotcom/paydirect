@@ -34,25 +34,6 @@ import { getKilnBridge } from './server/kiln-bridge';
 import { createStructuredLogger } from './src/lib/structured-logger.js';
 import { sanitizeError, sanitizeString } from './src/lib/error-sanitizer.js';
 import { validateRequest, ValidationSchema } from './src/lib/input-validator.js';
-import { Configuration as PlaidConfiguration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
-
-const plaidClientId = process.env.PLAID_CLIENT_ID || '';
-const plaidSecret = process.env.PLAID_SECRET || '';
-const plaidEnv = process.env.PLAID_ENV || 'sandbox';
-
-let plaidClient: PlaidApi | null = null;
-if (plaidClientId && plaidSecret && !plaidClientId.includes('placeholder')) {
-  const configuration = new PlaidConfiguration({
-    basePath: PlaidEnvironments[plaidEnv] || PlaidEnvironments.sandbox,
-    baseOptions: {
-      headers: {
-        'PLAID-CLIENT-ID': plaidClientId,
-        'PLAID-SECRET': plaidSecret,
-      },
-    },
-  });
-  plaidClient = new PlaidApi(configuration);
-}
 import { recordLoginAttempt, isAccountLocked, getAccountLockStatus, clearLoginAttempts, unlockAccount } from './src/lib/login-protection.js';
 import { initializeLogger, getLogger, logSecurityEvent, logTransactionEvent, logSystemEvent, logProviderEvent, logDatabaseEvent } from './src/lib/logger.js';
 import { getCoinbase55Config, refreshCoinbase55RemoteLedger } from './src/lib/coinbase55-bridge.js';
@@ -281,21 +262,19 @@ function getStripeWebhookSecrets(): string[] {
 }
 
 function createPlaidClient(): PlaidApi | null {
-  const clientId = String(process.env.PLAID_CLIENT_ID || '').trim();
-  const secret = String(process.env.PLAID_SECRET || '').trim();
-  if (!clientId || !secret) {
+  const state = getPlaidConfigState();
+  if (!state.configured) {
+    console.warn(`[PLAID] Client initialization skipped: ${state.reason}`);
     return null;
   }
 
   try {
     const configuration = new Configuration({
-      basePath: String(process.env.PLAID_ENVIRONMENT || 'sandbox').toLowerCase() === 'production'
-        ? PlaidEnvironments.production
-        : PlaidEnvironments.sandbox,
+      basePath: state.basePath,
       baseOptions: {
         headers: {
-          'PLAID-CLIENT-ID': clientId,
-          'PLAID-SECRET': secret
+          'PLAID-CLIENT-ID': state.clientId,
+          'PLAID-SECRET': state.secret
         }
       }
     });
@@ -304,6 +283,347 @@ function createPlaidClient(): PlaidApi | null {
     console.warn('[PLAID] Failed to initialize Plaid client.', error?.message || error);
     return null;
   }
+}
+
+function getPlaidConfigState(): {
+  clientId: string;
+  secret: string;
+  env: string;
+  liveOnlyMode: boolean;
+  hasCredentials: boolean;
+  hasPlaceholderCredentials: boolean;
+  configured: boolean;
+  reason: string;
+  basePath: string;
+} {
+  const clientId = String(process.env.PLAID_CLIENT_ID || '').trim();
+  const secret = String(process.env.PLAID_SECRET || '').trim();
+  const env = String(process.env.PLAID_ENVIRONMENT || process.env.PLAID_ENV || 'sandbox').trim().toLowerCase();
+  const liveOnlyMode = String(process.env.PLAID_LIVE_ONLY || 'true').trim().toLowerCase() !== 'false';
+  const looksPlaceholder = (value: string) => {
+    const lower = value.toLowerCase();
+    return lower.includes('placeholder') || lower.includes('your_') || lower.includes('example');
+  };
+  const hasCredentials = Boolean(clientId && secret);
+  const hasPlaceholderCredentials = [clientId, secret].some(looksPlaceholder);
+  const basePath =
+    env === 'production' ? PlaidEnvironments.production
+      : env === 'development' ? PlaidEnvironments.development
+        : PlaidEnvironments.sandbox;
+
+  if (!hasCredentials) {
+    return {
+      clientId,
+      secret,
+      env,
+      liveOnlyMode,
+      hasCredentials,
+      hasPlaceholderCredentials,
+      configured: false,
+      reason: 'missing PLAID_CLIENT_ID or PLAID_SECRET',
+      basePath
+    };
+  }
+
+  if (hasPlaceholderCredentials) {
+    return {
+      clientId,
+      secret,
+      env,
+      liveOnlyMode,
+      hasCredentials,
+      hasPlaceholderCredentials,
+      configured: false,
+      reason: 'placeholder credentials detected',
+      basePath
+    };
+  }
+
+  if (liveOnlyMode && env !== 'production') {
+    return {
+      clientId,
+      secret,
+      env,
+      liveOnlyMode,
+      hasCredentials,
+      hasPlaceholderCredentials,
+      configured: false,
+      reason: 'PLAID_LIVE_ONLY enforced while PLAID_ENV is not production',
+      basePath
+    };
+  }
+
+  return {
+    clientId,
+    secret,
+    env,
+    liveOnlyMode,
+    hasCredentials,
+    hasPlaceholderCredentials,
+    configured: true,
+    reason: 'ok',
+    basePath
+  };
+}
+
+async function getStripeFinancialConnectionsBalanceUSD(): Promise<{
+  totalUsd: number;
+  accountCount: number;
+  accounts: Array<{ accountId: string; displayName: string; currency: string; available: number; usdEquivalent: number }>;
+}> {
+  const stripeKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
+  if (!stripeKey) {
+    throw new Error('STRIPE_NOT_CONFIGURED');
+  }
+
+  const listResponse = await fetch('https://api.stripe.com/v1/financial_connections/accounts?limit=100', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!listResponse.ok) {
+    throw new Error(`STRIPE_FINANCIAL_CONNECTIONS_LIST_FAILED_${listResponse.status}`);
+  }
+
+  const listJson = await listResponse.json() as any;
+  const accounts = Array.isArray(listJson?.data) ? listJson.data : [];
+  if (!accounts.length) {
+    throw new Error('STRIPE_FINANCIAL_CONNECTIONS_EMPTY');
+  }
+
+  let totalUsd = 0;
+  const snapshots: Array<{ accountId: string; displayName: string; currency: string; available: number; usdEquivalent: number }> = [];
+
+  for (const account of accounts) {
+    const accountId = String(account?.id || '').trim();
+    if (!accountId) continue;
+
+    const balanceResponse = await fetch(`https://api.stripe.com/v1/financial_connections/accounts/${accountId}/balance`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${stripeKey}`,
+        Accept: 'application/json'
+      }
+    });
+
+    if (!balanceResponse.ok) {
+      continue;
+    }
+
+    const balanceJson = await balanceResponse.json() as any;
+    const balanceBuckets = Array.isArray(balanceJson?.balance?.current)
+      ? balanceJson.balance.current
+      : Array.isArray(balanceJson?.current)
+        ? balanceJson.current
+        : [];
+
+    for (const bucket of balanceBuckets) {
+      const currency = String(bucket?.currency || 'usd').toUpperCase();
+      const rawAmount = Number(bucket?.amount ?? 0);
+      if (!Number.isFinite(rawAmount)) {
+        continue;
+      }
+      const amount = rawAmount / 100;
+      const usd = currency === 'CAD' ? (amount / DEFAULT_USD_CAD_RATE) : amount;
+      if (!Number.isFinite(usd)) {
+        continue;
+      }
+      totalUsd += usd;
+      snapshots.push({
+        accountId,
+        displayName: String(account?.display_name || account?.institution_name || accountId),
+        currency,
+        available: Number(amount.toFixed(2)),
+        usdEquivalent: Number(usd.toFixed(2))
+      });
+    }
+  }
+
+  if (!snapshots.length) {
+    throw new Error('STRIPE_FINANCIAL_CONNECTIONS_BALANCE_UNAVAILABLE');
+  }
+
+  return {
+    totalUsd: Number(totalUsd.toFixed(2)),
+    accountCount: snapshots.length,
+    accounts: snapshots
+  };
+}
+
+const STRIPE_FC_MAP_PATH = path.join(REPO_ROOT, 'config', 'stripe-financial-connections.json');
+const PLAID_ITEMS_STORE_PATH = path.join(REPO_ROOT, 'config', 'plaid-items.json');
+
+function readStripeFcCustomerMap(): Record<string, string> {
+  try {
+    if (!fs.existsSync(STRIPE_FC_MAP_PATH)) return {};
+    const raw = fs.readFileSync(STRIPE_FC_MAP_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeStripeFcCustomerMap(map: Record<string, string>) {
+  fs.mkdirSync(path.dirname(STRIPE_FC_MAP_PATH), { recursive: true });
+  fs.writeFileSync(STRIPE_FC_MAP_PATH, JSON.stringify(map, null, 2), 'utf8');
+}
+
+async function stripePostForm(stripeKey: string, endpoint: string, form: URLSearchParams): Promise<any> {
+  const response = await fetch(`https://api.stripe.com/v1/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json'
+    },
+    body: form
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(json?.error?.message || `STRIPE_${endpoint.toUpperCase()}_${response.status}`);
+    throw new Error(message);
+  }
+  return json;
+}
+
+async function getOrCreateStripeCustomerForUser(user: any): Promise<string> {
+  const stripeKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
+  if (!stripeKey) {
+    throw new Error('STRIPE_NOT_CONFIGURED');
+  }
+
+  const userId = String(user?.id || '').trim();
+  if (!userId) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  const customerMap = readStripeFcCustomerMap();
+  const existing = String(customerMap[userId] || '').trim();
+  if (existing) {
+    return existing;
+  }
+
+  const form = new URLSearchParams();
+  const email = String(user?.email || '').trim();
+  if (email) form.set('email', email);
+  form.set('metadata[userId]', userId);
+  form.set('name', String(user?.fullName || user?.name || userId));
+
+  const customer = await stripePostForm(stripeKey, 'customers', form);
+  const customerId = String(customer?.id || '').trim();
+  if (!customerId) {
+    throw new Error('STRIPE_CUSTOMER_CREATE_FAILED');
+  }
+
+  customerMap[userId] = customerId;
+  writeStripeFcCustomerMap(customerMap);
+  return customerId;
+}
+
+async function createStripeFinancialConnectionsSession(user: any): Promise<{ sessionId: string; clientSecret: string; customerId: string }> {
+  const stripeKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
+  if (!stripeKey) {
+    throw new Error('STRIPE_NOT_CONFIGURED');
+  }
+
+  const customerId = await getOrCreateStripeCustomerForUser(user);
+  const form = new URLSearchParams();
+  form.set('account_holder[type]', 'customer');
+  form.set('account_holder[customer]', customerId);
+  form.set('permissions[0]', 'balances');
+  form.set('permissions[1]', 'ownership');
+  form.set('permissions[2]', 'payment_method');
+
+  const session = await stripePostForm(stripeKey, 'financial_connections/sessions', form);
+  const sessionId = String(session?.id || '').trim();
+  const clientSecret = String(session?.client_secret || '').trim();
+  if (!sessionId || !clientSecret) {
+    throw new Error('STRIPE_FINANCIAL_CONNECTIONS_SESSION_FAILED');
+  }
+
+  return { sessionId, clientSecret, customerId };
+}
+
+async function getWiseUsdLiquiditySafe(): Promise<{ ok: boolean; totalUsd: number; reason?: string }> {
+  try {
+    const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+    const wiseData = await getWiseTotalCashUSD();
+    return {
+      ok: true,
+      totalUsd: Number(wiseData?.totalUSD || 0)
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      totalUsd: 0,
+      reason: String(err?.message || err)
+    };
+  }
+}
+
+function parseAllowlistEnv(value: string): string[] {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function canAccessFullBalance(user: any): boolean {
+  const userId = String(user?.id || '').trim().toLowerCase();
+  const email = String(user?.email || '').trim().toLowerCase();
+  const defaults = ['user_mlaframboisemm', 'mlaframboisemm@gmail.com'];
+  const allowed = new Set<string>([
+    ...defaults,
+    ...parseAllowlistEnv(process.env.FULL_BALANCE_ALLOWED_USER_IDS || ''),
+    ...parseAllowlistEnv(process.env.FULL_BALANCE_ALLOWED_EMAILS || '')
+  ]);
+  return Boolean((userId && allowed.has(userId)) || (email && allowed.has(email)));
+}
+
+const STABLECOIN_SYMBOLS = new Set(['USD', 'USDC', 'USDT', 'USDT0', 'USDF', 'DAI', 'USDP', 'TUSD', 'USDE']);
+const COINGECKO_SYMBOL_MAP: Record<string, string> = {
+  ETH: 'ethereum',
+  LINK: 'chainlink',
+  SHIB: 'shiba-inu',
+  PEPE: 'pepe',
+  POL: 'matic-network',
+  XAUT: 'tether-gold',
+  LEO: 'leo-token'
+};
+
+async function fetchUsdPricesFromCoinGecko(symbols: string[]): Promise<Record<string, number>> {
+  const prices: Record<string, number> = {};
+  const requestedSymbols = symbols.filter((symbol) => Boolean(COINGECKO_SYMBOL_MAP[symbol]));
+  if (!requestedSymbols.length) {
+    return prices;
+  }
+
+  const ids = requestedSymbols.map((symbol) => COINGECKO_SYMBOL_MAP[symbol]).join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' }
+  });
+
+  if (!response.ok) {
+    throw new Error(`COINGECKO_HTTP_${response.status}`);
+  }
+
+  const json = await response.json() as Record<string, { usd?: number }>;
+  for (const symbol of requestedSymbols) {
+    const id = COINGECKO_SYMBOL_MAP[symbol];
+    const usd = Number(json?.[id]?.usd);
+    if (Number.isFinite(usd) && usd > 0) {
+      prices[symbol] = usd;
+    }
+  }
+
+  return prices;
 }
 
 async function finalizeStripeCheckoutSession(params: {
@@ -884,7 +1204,8 @@ async function loadSecretsFromSecretManager() {
 
   try {
     const version = firstNonEmptyEnv(['SOVEREIGN_SECRET_MANAGER_VERSION']) || 'latest';
-    if (!firstNonEmptyEnv(['GOOGLE_APPLICATION_CREDENTIALS'])) {
+    const credentialsPath = firstNonEmptyEnv(['GOOGLE_APPLICATION_CREDENTIALS']);
+    if (!credentialsPath) {
       secretBootstrapStatus.skippedReason = process.env.NODE_ENV === 'production'
         ? 'GOOGLE_APPLICATION_CREDENTIALS is not set; production secret bootstrap cannot proceed.'
         : 'GOOGLE_APPLICATION_CREDENTIALS is not set in local/dev.';
@@ -896,6 +1217,21 @@ async function loadSecretsFromSecretManager() {
       });
       return;
     }
+
+    const resolvedCredentialsPath = path.isAbsolute(credentialsPath)
+      ? credentialsPath
+      : path.resolve(process.cwd(), credentialsPath);
+    if (!fs.existsSync(resolvedCredentialsPath)) {
+      secretBootstrapStatus.skippedReason = `GOOGLE_APPLICATION_CREDENTIALS path does not exist: ${resolvedCredentialsPath}`;
+      secretBootstrapStatus.completedAt = new Date().toISOString();
+      logSystemEvent('WARNING', {
+        message: 'Secret Manager bootstrap skipped: GOOGLE_APPLICATION_CREDENTIALS file not found',
+        path: resolvedCredentialsPath,
+        status: process.env.NODE_ENV === 'production' ? 'blocked' : 'skipped'
+      });
+      return;
+    }
+
     const { SecretManagerServiceClient } = await import('@google-cloud/secret-manager');
     const client = new SecretManagerServiceClient();
 
@@ -2008,9 +2344,47 @@ function getMarshallAddress(): string {
 // -------------------------------------------------------------
 
 // Mount withdrawal routing gateway
-// TEMPORARILY DISABLED FOR LIVE TRANSACTION TESTING
-// app.use('/api/withdrawal', requireAuth, requireMfa, withdrawalRouter);
-app.use('/api/withdrawal', withdrawalRouter); // Test mode: auth disabled
+app.use('/api/withdrawal', (req: any, _res: any, next: any) => {
+  if (req.user?.id) {
+    return next();
+  }
+
+  try {
+    const authHeader = String(req.header('authorization') || req.header('Authorization') || '').trim();
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.substring('Bearer '.length).trim() : '';
+    const cookieToken = getCookieValue(req, 'cb_session');
+    const token = bearerToken || cookieToken;
+    if (!token) {
+      return next();
+    }
+
+    const decoded = verifySessionToken(token, JWT_SECRET);
+    if (!decoded) {
+      return next();
+    }
+
+    const activeSession = activeSessions.get(decoded.sid);
+    if (!activeSession || activeSession.expiresAt < Date.now()) {
+      if (decoded?.sid) {
+        activeSessions.delete(decoded.sid);
+      }
+      return next();
+    }
+
+    req.user = {
+      id: activeSession.userId,
+      email: activeSession.email,
+      sid: decoded.sid,
+      mfa: activeSession.mfa,
+      kycLevel: 0,
+      role: 'user'
+    };
+  } catch {
+    // Keep router fail-closed via requireRouterAuth checks.
+  }
+
+  return next();
+}, withdrawalRouter);
 
 app.get('/api/wise/balances', async (req, res) => {
   try {
@@ -9195,21 +9569,64 @@ app.post('/api/card/register', requireAuth, async (req: any, res: any) => {
 });
 
 // Plaid Link Endpoints
+app.get('/api/plaid/live-readiness', requireAuth, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authenticated user is required.' });
+  }
+
+  const plaidState = getPlaidConfigState();
+
+  let linkedItems = 0;
+  try {
+    const itemsRaw = fs.existsSync(PLAID_ITEMS_STORE_PATH) ? fs.readFileSync(PLAID_ITEMS_STORE_PATH, 'utf8') : '[]';
+    const allItems = Array.isArray(JSON.parse(itemsRaw)) ? JSON.parse(itemsRaw) : [];
+    linkedItems = allItems.filter((item: any) => String(item?.userId || '') === userId).length;
+  } catch {
+    linkedItems = 0;
+  }
+
+  const stripeBridgeEligible = Boolean(String(process.env.STRIPE_SECRET_KEY || '').trim());
+  return res.json({
+    success: true,
+    userId,
+    plaid: {
+      configured: plaidState.configured,
+      environment: plaidState.env,
+      liveOnlyMode: plaidState.liveOnlyMode,
+      hasCredentials: plaidState.hasCredentials,
+      hasPlaceholderCredentials: plaidState.hasPlaceholderCredentials,
+      reason: plaidState.reason,
+      linkedItems
+    },
+    stripeFinancialConnectionsBridge: {
+      eligible: stripeBridgeEligible,
+      note: stripeBridgeEligible
+        ? 'Can be used as a live fallback for bank balances when Plaid credentials are unavailable.'
+        : 'Stripe secret key is required for fallback bridge mode.'
+    },
+    nextStep: plaidState.configured ? 'Create link token and complete Plaid Link.' : 'Set real PLAID production credentials and ensure PLAID_ENV=production, then restart server.',
+    liveOnly: true,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any) => {
   const userId = String(req.user?.id || req.user?.email || 'guest');
+  const plaidClientInstance = createPlaidClient();
+  const plaidState = getPlaidConfigState();
 
-  if (!plaidClient) {
-    const fallbackToken = `plaid-fallback-${Buffer.from(userId).toString('base64url')}-${Date.now()}`;
-    return res.json({
-      success: true,
-      link_token: fallbackToken,
-      mode: 'fallback',
-      message: 'Plaid credentials are not configured, so the app used a secure local link token for bank-account onboarding.'
+  if (!plaidClientInstance) {
+    return res.status(503).json({
+      success: false,
+      error: 'PLAID_NOT_CONFIGURED',
+      message: 'Plaid is not configured for live bank linking.',
+      reason: plaidState.reason
     });
   }
 
   try {
-    const response = await plaidClient.linkTokenCreate({
+    const response = await plaidClientInstance.linkTokenCreate({
       user: { client_user_id: userId },
       client_name: 'Sovereign PayDirect',
       products: [Products.Auth, Products.Transactions],
@@ -9220,8 +9637,16 @@ app.post('/api/plaid/create-link-token', requireAuth, async (req: any, res: any)
 
     return res.json({ success: true, link_token: response.data.link_token, mode: 'live' });
   } catch (error: any) {
-    console.error('[PLAID] Token creation failed:', error);
-    return res.status(500).json({ error: 'PLAID_LINK_TOKEN_FAILED', message: error?.message || 'Failed to create a Plaid link token.' });
+    const plaidCode = String(error?.response?.data?.error_code || '').trim();
+    const plaidMessage = String(error?.response?.data?.error_message || '').trim();
+    const providerStatus = Number(error?.response?.status || 500);
+    console.error('[PLAID] Token creation failed:', plaidCode || error?.message || error);
+    return res.status(providerStatus >= 400 && providerStatus < 600 ? providerStatus : 500).json({
+      error: 'PLAID_LINK_TOKEN_FAILED',
+      message: plaidMessage || error?.message || 'Failed to create a Plaid link token.',
+      plaidErrorCode: plaidCode || undefined,
+      reason: getPlaidConfigState().reason
+    });
   }
 });
 
@@ -9233,16 +9658,37 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
     return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'A valid user session is required.' });
   }
 
-  const plaidClientInstance = createPlaidClient();
-  let accessToken: string | null = null;
+  if (!public_token || String(public_token).trim().length < 8) {
+    return res.status(400).json({ error: 'PLAID_PUBLIC_TOKEN_REQUIRED', message: 'A valid Plaid public_token is required.' });
+  }
 
-  if (plaidClientInstance && public_token) {
-    try {
-      const exchangeResponse = await plaidClientInstance.itemPublicTokenExchange({ public_token });
-      accessToken = exchangeResponse.data.access_token || null;
-    } catch (error: any) {
-      console.warn('[PLAID] Public token exchange failed; continuing with local fallback.', error?.message || error);
-    }
+  const plaidClientInstance = createPlaidClient();
+  if (!plaidClientInstance) {
+    return res.status(503).json({
+      error: 'PLAID_NOT_CONFIGURED',
+      message: 'Plaid is not configured for live token exchange.',
+      reason: getPlaidConfigState().reason
+    });
+  }
+
+  let accessToken: string | null = null;
+  try {
+    const exchangeResponse = await plaidClientInstance.itemPublicTokenExchange({ public_token });
+    accessToken = exchangeResponse.data.access_token || null;
+  } catch (error: any) {
+    const plaidCode = String(error?.response?.data?.error_code || '').trim();
+    const plaidMessage = String(error?.response?.data?.error_message || '').trim();
+    const providerStatus = Number(error?.response?.status || 502);
+    console.warn('[PLAID] Public token exchange failed.', plaidCode || error?.message || error);
+    return res.status(providerStatus >= 400 && providerStatus < 600 ? providerStatus : 502).json({
+      error: 'PLAID_TOKEN_EXCHANGE_FAILED',
+      message: plaidMessage || error?.message || 'Plaid token exchange failed.',
+      plaidErrorCode: plaidCode || undefined
+    });
+  }
+
+  if (!accessToken) {
+    return res.status(502).json({ error: 'PLAID_TOKEN_EXCHANGE_EMPTY', message: 'Plaid did not return an access token.' });
   }
 
   const institutionName = String(metadata?.institution?.name || metadata?.institutionName || 'Connected Bank').trim();
@@ -9252,6 +9698,22 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
   const accountBalance = Number(metadata?.account?.balance || 0);
   const accountType = accountSubtype === 'savings' ? 'Savings' : 'Checking';
   const bankId = `bank_${crypto.randomUUID()}`;
+
+  try {
+    const existingRaw = fs.existsSync(PLAID_ITEMS_STORE_PATH) ? fs.readFileSync(PLAID_ITEMS_STORE_PATH, 'utf8') : '[]';
+    const existing = Array.isArray(JSON.parse(existingRaw)) ? JSON.parse(existingRaw) : [];
+    existing.push({
+      id: `plaid_item_${crypto.randomUUID()}`,
+      userId,
+      institutionName,
+      accessToken,
+      createdAt: Date.now()
+    });
+    fs.mkdirSync(path.dirname(PLAID_ITEMS_STORE_PATH), { recursive: true });
+    fs.writeFileSync(PLAID_ITEMS_STORE_PATH, JSON.stringify(existing, null, 2), 'utf8');
+  } catch (plaidStoreErr) {
+    console.warn('[PLAID] Failed to persist plaid item token:', plaidStoreErr);
+  }
 
   db.execute(
     'INSERT INTO bank_accounts (id, user_id, account_name, bank_name, account_type, routing_number, account_number, balance) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -9269,6 +9731,185 @@ app.post('/api/plaid/link', requireAuth, async (req: any, res: any) => {
   };
 
   return res.json(newBank);
+});
+
+app.post('/api/stripe/financial-connections/session', requireAuth, async (req: any, res: any) => {
+  try {
+    const result = await createStripeFinancialConnectionsSession(req.user);
+    return res.json({
+      success: true,
+      mode: 'stripe_financial_connections_live',
+      sessionId: result.sessionId,
+      clientSecret: result.clientSecret,
+      customerId: result.customerId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    return res.status(502).json({
+      success: false,
+      error: 'STRIPE_FINANCIAL_CONNECTIONS_SESSION_FAILED',
+      message: String(err?.message || err)
+    });
+  }
+});
+
+app.get('/api/stripe/financial-connections/accounts', requireAuth, async (req: any, res: any) => {
+  try {
+    const summary = await getStripeFinancialConnectionsBalanceUSD();
+    return res.json({
+      success: true,
+      source: 'stripe_financial_connections_live',
+      totalUsd: summary.totalUsd,
+      accountCount: summary.accountCount,
+      accounts: summary.accounts,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    return res.status(404).json({
+      success: false,
+      error: 'STRIPE_FINANCIAL_CONNECTIONS_EMPTY',
+      message: String(err?.message || err)
+    });
+  }
+});
+
+app.get('/api/rails/live-capabilities', requireAuth, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authenticated user is required.' });
+  }
+
+  const plaidState = getPlaidConfigState();
+  const wise = await getWiseUsdLiquiditySafe();
+
+  let stripeFcOk = false;
+  let stripeFcReason = '';
+  let stripeFcUsd = 0;
+  try {
+    const stripeFc = await getStripeFinancialConnectionsBalanceUSD();
+    stripeFcOk = true;
+    stripeFcUsd = Number(stripeFc.totalUsd || 0);
+  } catch (err: any) {
+    stripeFcReason = String(err?.message || err);
+  }
+
+  const recommendedRail = wise.ok ? 'wise_live' : (stripeFcOk ? 'stripe_financial_connections_live' : (plaidState.configured ? 'plaid_live' : 'none'));
+  return res.json({
+    success: true,
+    userId,
+    rails: {
+      wise: {
+        ok: wise.ok,
+        totalUsd: Number(wise.totalUsd.toFixed(2)),
+        reason: wise.reason || undefined
+      },
+      stripeFinancialConnections: {
+        ok: stripeFcOk,
+        totalUsd: Number(stripeFcUsd.toFixed(2)),
+        reason: stripeFcReason || undefined
+      },
+      plaid: {
+        ok: plaidState.configured,
+        reason: plaidState.reason
+      }
+    },
+    recommendedRail,
+    liveOnly: true,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/plaid/live-balance', requireAuth, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authenticated user is required.' });
+  }
+
+  const plaidClientInstance = createPlaidClient();
+  if (!plaidClientInstance) {
+    try {
+      const stripeFallback = await getStripeFinancialConnectionsBalanceUSD();
+      return res.json({
+        success: true,
+        userId,
+        totalUsd: stripeFallback.totalUsd,
+        accountCount: stripeFallback.accountCount,
+        accounts: stripeFallback.accounts,
+        source: 'stripe_financial_connections_live'
+      });
+    } catch (fallbackErr: any) {
+      return res.status(503).json({
+        error: 'PLAID_NOT_CONFIGURED',
+        message: 'Plaid is not configured for live balance checks.',
+        stripeFallback: String(fallbackErr?.message || fallbackErr)
+      });
+    }
+  }
+
+  try {
+    const itemsRaw = fs.existsSync(PLAID_ITEMS_STORE_PATH) ? fs.readFileSync(PLAID_ITEMS_STORE_PATH, 'utf8') : '[]';
+    const allItems = Array.isArray(JSON.parse(itemsRaw)) ? JSON.parse(itemsRaw) : [];
+    const items = allItems.filter((item: any) => String(item?.userId || '') === userId);
+    if (!items.length) {
+      try {
+        const stripeFallback = await getStripeFinancialConnectionsBalanceUSD();
+        return res.json({
+          success: true,
+          userId,
+          totalUsd: stripeFallback.totalUsd,
+          accountCount: stripeFallback.accountCount,
+          accounts: stripeFallback.accounts,
+          source: 'stripe_financial_connections_live'
+        });
+      } catch (fallbackErr: any) {
+        return res.status(404).json({
+          error: 'PLAID_ITEMS_NOT_FOUND',
+          message: 'No linked Plaid items found for this user.',
+          stripeFallback: String(fallbackErr?.message || fallbackErr)
+        });
+      }
+    }
+
+    const accountSnapshots: Array<any> = [];
+    let totalUsd = 0;
+
+    for (const item of items) {
+      const accessToken = String(item.accessToken || '').trim();
+      if (!accessToken) continue;
+
+      const auth = await plaidClientInstance.authGet({ access_token: accessToken });
+      const accounts = auth?.data?.accounts || [];
+      for (const account of accounts) {
+        const balance = Number(account?.balances?.available ?? account?.balances?.current ?? 0);
+        const currency = String(account?.balances?.iso_currency_code || 'USD').toUpperCase();
+        const usd = currency === 'CAD' ? (balance / DEFAULT_USD_CAD_RATE) : balance;
+        totalUsd += Number.isFinite(usd) ? usd : 0;
+        accountSnapshots.push({
+          itemId: item.id,
+          institutionName: item.institutionName,
+          accountId: account?.account_id,
+          name: account?.name,
+          officialName: account?.official_name,
+          subtype: account?.subtype,
+          currency,
+          available: balance,
+          usdEquivalent: Number((usd || 0).toFixed(2))
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      userId,
+      totalUsd: Number(totalUsd.toFixed(2)),
+      accountCount: accountSnapshots.length,
+      accounts: accountSnapshots,
+      source: 'plaid_live'
+    });
+  } catch (err: any) {
+    console.error('[PLAID] Live balance fetch failed:', err);
+    return res.status(502).json({ error: 'PLAID_LIVE_BALANCE_FAILED', message: err?.message || String(err) });
+  }
 });
 
 app.post('/api/stripe/create-checkout-session', requireAuth, async (req: any, res) => {
@@ -9452,6 +10093,240 @@ app.get('/api/stripe/balance', requireAuth, async (req: any, res) => {
   } catch (err: any) {
     console.error('Stripe balance fetch error:', err);
     res.status(500).json({ error: 'STRIPE_BALANCE_FAILED', message: err.message || String(err) });
+  }
+});
+
+app.get('/api/main-balance/live', requireAuth, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authenticated user is required.' });
+  }
+  if (!canAccessFullBalance(req.user)) {
+    return res.status(403).json({
+      error: 'FULL_BALANCE_ACCESS_DENIED',
+      message: 'User is not authorized to access full holdings.'
+    });
+  }
+
+  let wiseUsd = 0;
+  let stripeUsd = 0;
+  let plaidUsd = 0;
+  let ledgerUsdWallet = 0;
+  let stablecoinUsdEstimate = 0;
+  let nonUsdAssetCount = 0;
+  const ledgerHoldings: Array<{ symbol: string; balance: number }> = [];
+  const providerStatus: Record<string, { ok: boolean; reason?: string }> = {
+    wise: { ok: false },
+    stripe: { ok: false },
+    plaid: { ok: false }
+  };
+
+  try {
+    const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
+    const wiseData = await getWiseTotalCashUSD();
+    wiseUsd = Number(wiseData.totalUSD || 0);
+    providerStatus.wise = { ok: true };
+  } catch (err: any) {
+    providerStatus.wise = { ok: false, reason: String(err?.message || err) };
+  }
+
+  try {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      throw new Error('STRIPE_NOT_CONFIGURED');
+    }
+    await syncAllStripeBalances();
+    stripeUsd = Number((GLOBAL_STRIPE_BALANCE.available + GLOBAL_STRIPE_BALANCE.pending) || 0);
+    providerStatus.stripe = { ok: true };
+  } catch (err: any) {
+    providerStatus.stripe = { ok: false, reason: String(err?.message || err) };
+  }
+
+  try {
+    const plaidClientInstance = createPlaidClient();
+    if (!plaidClientInstance) {
+      throw new Error('PLAID_NOT_CONFIGURED');
+    }
+    const itemsRaw = fs.existsSync(PLAID_ITEMS_STORE_PATH) ? fs.readFileSync(PLAID_ITEMS_STORE_PATH, 'utf8') : '[]';
+    const allItems = Array.isArray(JSON.parse(itemsRaw)) ? JSON.parse(itemsRaw) : [];
+    const items = allItems.filter((item: any) => String(item?.userId || '') === userId);
+    if (!items.length) {
+      throw new Error('PLAID_ITEMS_NOT_FOUND');
+    }
+
+    let total = 0;
+    for (const item of items) {
+      const accessToken = String(item.accessToken || '').trim();
+      if (!accessToken) continue;
+      const auth = await plaidClientInstance.authGet({ access_token: accessToken });
+      const accounts = auth?.data?.accounts || [];
+      for (const account of accounts) {
+        const balance = Number(account?.balances?.available ?? account?.balances?.current ?? 0);
+        const currency = String(account?.balances?.iso_currency_code || 'USD').toUpperCase();
+        const usd = currency === 'CAD' ? (balance / DEFAULT_USD_CAD_RATE) : balance;
+        total += Number.isFinite(usd) ? usd : 0;
+      }
+    }
+    plaidUsd = Number(total.toFixed(2));
+    providerStatus.plaid = { ok: true };
+  } catch (err: any) {
+    const plaidReason = String(err?.message || err);
+    try {
+      const stripeFallback = await getStripeFinancialConnectionsBalanceUSD();
+      plaidUsd = Number(stripeFallback.totalUsd || 0);
+      providerStatus.plaid = { ok: true, reason: 'stripe_financial_connections_live_fallback' };
+    } catch (fallbackErr: any) {
+      providerStatus.plaid = { ok: false, reason: `${plaidReason}; stripeFallback=${String(fallbackErr?.message || fallbackErr)}` };
+    }
+  }
+
+  try {
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+    for (const wallet of wallets) {
+      const symbol = String(wallet.assetSymbol || wallet.asset_symbol || '').toUpperCase();
+      const balance = Number(wallet.balance || 0);
+      if (!symbol || !Number.isFinite(balance) || balance <= 0) {
+        continue;
+      }
+      ledgerHoldings.push({ symbol, balance });
+      if (symbol === 'USD') {
+        ledgerUsdWallet += balance;
+      }
+      if (STABLECOIN_SYMBOLS.has(symbol)) {
+        stablecoinUsdEstimate += balance;
+      } else if (symbol !== 'USD') {
+        nonUsdAssetCount += 1;
+      }
+    }
+  } catch {
+    // Keep response available even if ledger holdings query fails.
+  }
+
+  const totalMainUsd = Number((wiseUsd + stripeUsd + plaidUsd).toFixed(2));
+  const fullSpendableUsdEstimate = Number(Math.max(totalMainUsd, ledgerUsdWallet + stablecoinUsdEstimate).toFixed(2));
+  return res.json({
+    success: true,
+    userId,
+    balances: {
+      wiseUsd: Number(wiseUsd.toFixed(2)),
+      stripeUsd: Number(stripeUsd.toFixed(2)),
+      plaidUsd: Number(plaidUsd.toFixed(2)),
+      totalMainUsd,
+      ledgerUsdWallet: Number(ledgerUsdWallet.toFixed(2)),
+      stablecoinUsdEstimate: Number(stablecoinUsdEstimate.toFixed(2)),
+      fullSpendableUsdEstimate
+    },
+    ledger: {
+      holdingsCount: ledgerHoldings.length,
+      nonUsdAssetCount,
+      holdings: ledgerHoldings
+    },
+    providerStatus,
+    liveOnly: true,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/portfolio/live-valuation', requireAuth, async (req: any, res: any) => {
+  const userId = String(req.user?.id || '').trim();
+  if (!userId) {
+    return res.status(401).json({ error: 'AUTH_REQUIRED', message: 'Authenticated user is required.' });
+  }
+  if (!canAccessFullBalance(req.user)) {
+    return res.status(403).json({
+      error: 'FULL_BALANCE_ACCESS_DENIED',
+      message: 'User is not authorized to access portfolio valuation.'
+    });
+  }
+
+  try {
+    const wallets = db.execute('SELECT * FROM wallets WHERE user_id = ?', [userId]) as any[];
+    const holdings = wallets
+      .map((wallet) => ({
+        symbol: String(wallet.assetSymbol || wallet.asset_symbol || '').toUpperCase(),
+        balance: Number(wallet.balance || 0)
+      }))
+      .filter((holding) => holding.symbol && Number.isFinite(holding.balance) && holding.balance > 0);
+
+    const uniqueNonStableSymbols = [...new Set(
+      holdings
+        .map((holding) => holding.symbol)
+        .filter((symbol) => !STABLECOIN_SYMBOLS.has(symbol))
+    )];
+
+    let priceSource = 'coingecko_live';
+    let livePrices: Record<string, number> = {};
+    try {
+      livePrices = await fetchUsdPricesFromCoinGecko(uniqueNonStableSymbols);
+    } catch (err: any) {
+      priceSource = `coingecko_unavailable:${String(err?.message || err)}`;
+    }
+
+    let stablecoinUsd = 0;
+    let nonStableUsd = 0;
+    const unpriced: string[] = [];
+    const pricedHoldings = holdings.map((holding) => {
+      const { symbol, balance } = holding;
+      if (STABLECOIN_SYMBOLS.has(symbol)) {
+        const usdValue = Number(balance.toFixed(2));
+        stablecoinUsd += usdValue;
+        return {
+          symbol,
+          balance,
+          usdPrice: 1,
+          usdValue,
+          priced: true,
+          priceSource: 'stablecoin_parity'
+        };
+      }
+
+      const usdPrice = Number(livePrices[symbol] || 0);
+      if (!Number.isFinite(usdPrice) || usdPrice <= 0) {
+        unpriced.push(symbol);
+        return {
+          symbol,
+          balance,
+          usdPrice: null,
+          usdValue: null,
+          priced: false,
+          priceSource: 'missing_live_price'
+        };
+      }
+
+      const usdValue = Number((balance * usdPrice).toFixed(2));
+      nonStableUsd += usdValue;
+      return {
+        symbol,
+        balance,
+        usdPrice,
+        usdValue,
+        priced: true,
+        priceSource
+      };
+    });
+
+    const totalEstimatedUsd = Number((stablecoinUsd + nonStableUsd).toFixed(2));
+    return res.json({
+      success: true,
+      userId,
+      summary: {
+        stablecoinUsd: Number(stablecoinUsd.toFixed(2)),
+        nonStablePricedUsd: Number(nonStableUsd.toFixed(2)),
+        totalEstimatedUsd,
+        pricedHoldings: pricedHoldings.filter((holding) => holding.priced).length,
+        unpricedHoldings: unpriced.length
+      },
+      priceSource,
+      unpricedSymbols: [...new Set(unpriced)],
+      holdings: pricedHoldings,
+      timestamp: new Date().toISOString(),
+      liveOnly: true
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      error: 'PORTFOLIO_VALUATION_FAILED',
+      message: String(err?.message || err)
+    });
   }
 });
 
@@ -11663,9 +12538,9 @@ async function startServer() {
   // MISSING FRONTEND/BACKEND CONNECTIVITY ENDPOINTS
   // ═══════════════════════════════════════════════════════════════════
 
-  const allowSyntheticConnectivity = String(
-    process.env.ALLOW_SYNTHETIC_CONNECTIVITY || (isProductionEnvironment() ? 'false' : 'true')
-  ).toLowerCase() === 'true';
+  const allowSyntheticConnectivity =
+    String(process.env.ALLOW_SYNTHETIC_CONNECTIVITY || 'false').toLowerCase() === 'true'
+    && String(process.env.NODE_ENV || 'development').toLowerCase() === 'test';
   const syntheticRoutePrefixes = [
     '/api/ledger/auto-sync-all',
     '/api/reset',
@@ -11714,17 +12589,17 @@ async function startServer() {
   // Plaid exchange public token
   app.post('/api/plaid/exchange-public-token', async (req: any, res: any) => {
     const { public_token } = req.body || {};
+    const plaidClientInstance = createPlaidClient();
     try {
-      if (!plaidClient) {
-        return res.json({
-          success: true,
-          access_token: 'access-sandbox-demo-123456',
-          item_id: 'item-sandbox-demo-123456',
-          message: 'Token exchanged successfully (Demo mode)'
+      if (!plaidClientInstance) {
+        return res.status(503).json({
+          success: false,
+          error: 'PLAID_NOT_CONFIGURED',
+          message: 'Plaid is not configured for live token exchange.'
         });
       }
 
-      const response = await plaidClient.itemPublicTokenExchange({
+      const response = await plaidClientInstance.itemPublicTokenExchange({
         public_token
       });
 
@@ -11732,7 +12607,7 @@ async function startServer() {
       const itemId = response.data.item_id;
 
       // Retrieve accounts linked
-      const authResponse = await plaidClient.authGet({
+      const authResponse = await plaidClientInstance.authGet({
         access_token: accessToken
       });
 
@@ -11814,148 +12689,6 @@ async function startServer() {
     } catch (e: any) {
       return res.json({ success: true, transactions: [] });
     }
-  });
-
-  // Wise Withdrawal & Card Details Endpoints
-  app.get('/api/withdrawal/wise/card/details', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      card: {
-        id: 'card_wise_live_01',
-        cardHolderName: 'Marcel Laframboise',
-        last4: '8842',
-        expMonth: '12',
-        expYear: '2028',
-        brand: 'Visa',
-        type: 'BUSINESS_DEBIT',
-        status: 'ACTIVE',
-        frozen: false,
-        profileId: '101924589',
-        limits: { daily: 10000, monthly: 50000, remainingDaily: 10000 },
-        digitalPassLinked: true,
-        googlePayStatus: 'LINKED',
-        userEmail: 'mlaframboisemm@gmail.com',
-        kycStatus: 'REGISTERED_TO_KYC_LIVE'
-      }
-    });
-  });
-
-  app.get('/api/withdrawal/wise/card/transactions', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      transactions: [
-        {
-          id: 'pos_tx_01',
-          merchantName: 'Google Pay POS Terminal',
-          amount: -45.00,
-          currency: 'USD',
-          type: 'CARD_PAYMENT',
-          status: 'COMPLETED',
-          timestamp: new Date().toISOString(),
-          location: 'Google Wallet NFC Tap'
-        },
-        {
-          id: 'pos_tx_02',
-          merchantName: 'Wise Multi-Currency Settlement',
-          amount: 2478350.00,
-          currency: 'USD',
-          type: 'CREDIT',
-          status: 'COMPLETED',
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          location: 'Wise Live API'
-        }
-      ]
-    });
-  });
-
-  app.post('/api/withdrawal/wise/card/freeze', async (req: any, res: any) => {
-    const { freeze } = req.body || {};
-    return res.json({
-      success: true,
-      frozen: !!freeze,
-      cardStatus: freeze ? 'FROZEN' : 'ACTIVE',
-      message: `Wise Business Card ${freeze ? 'frozen' : 'unfrozen'} successfully.`
-    });
-  });
-
-  app.post('/api/withdrawal/wise/card/limits', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      limits: req.body,
-      message: 'Card spending limits updated.'
-    });
-  });
-
-  app.post('/api/withdrawal/wise/card/pos-transaction', async (req: any, res: any) => {
-    const { amount = 10, merchant = 'NFC Tap Terminal' } = req.body || {};
-    return res.json({
-      success: true,
-      status: 'COMPLETED',
-      txId: 'pos_tx_' + Date.now(),
-      amount,
-      merchant,
-      message: `POS Transaction of $${amount} completed via Wise Google Pay Pass.`
-    });
-  });
-
-  app.post('/api/withdrawal/wise/deposit', async (req: any, res: any) => {
-    const { amount = 100, currency = 'USD' } = req.body || {};
-    return res.json({
-      success: true,
-      status: 'COMPLETED',
-      depositId: 'dep_' + Date.now(),
-      amount,
-      currency,
-      message: `Deposit of ${amount} ${currency} received via Wise Live.`
-    });
-  });
-
-  app.post('/api/withdrawal/wise/transfer-from-sovereign-cash', async (req: any, res: any) => {
-    const { amount = 100 } = req.body || {};
-    return res.json({
-      success: true,
-      status: 'COMPLETED',
-      transferId: 'tr_' + Date.now(),
-      amount,
-      message: `Transferred $${amount} from Sovereign Cash to Wise account.`
-    });
-  });
-
-  app.get('/api/withdrawal/wise/hub/config', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      configured: true,
-      profileId: '101924589',
-      status: 'ACTIVE',
-      userEmail: 'mlaframboisemm@gmail.com',
-      kycStatus: 'REGISTERED_TO_KYC_LIVE',
-      oscLicensing: {
-        status: 'REGISTERED_EMD',
-        licenseNo: 'OSC-EMD-784920-ON',
-        jurisdiction: 'Ontario Securities Commission (OSC)',
-        category: 'Exempt Market Dealer & Registered Investment Entity',
-        principal: 'Marcel Laframboise',
-        principalEmail: 'mlaframboisemm@gmail.com',
-        address: '475 Albert St, Oshawa, ON L1H 4S7, CA'
-      },
-      insurances: {
-        cipfProtected: true,
-        cipfLimitCad: 1000000,
-        cdicEligible: true,
-        cdicLimitCad: 100000,
-        custodialSpecieInsuranceUsd: 250000000,
-        status: 'FULL_COVERAGE_ACTIVE'
-      }
-    });
-  });
-
-  app.post('/api/withdrawal/wise/reconcile', async (req: any, res: any) => {
-    return res.json({
-      success: true,
-      reconciled: true,
-      totalUsd: 2478350.00,
-      userEmail: 'mlaframboisemm@gmail.com'
-    });
   });
 
   // Serve APK download directly with correct Android MIME type

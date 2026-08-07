@@ -33,7 +33,7 @@ export function getPrimaryWalletAddress(): string {
     return wallet.publicAddressEthereum.trim();
   }
 
-  return '0x742d35cc6634c0532925a3b844bc454e4438f44e';
+  return '';
 }
 
 export function getLiveWalletSnapshot(): LiveWalletSnapshot {
@@ -59,9 +59,9 @@ export function getLiveWalletSnapshot(): LiveWalletSnapshot {
   }
 
   return {
-    address: '0x742d35cc6634c0532925a3b844bc454e4438f44e',
-    ledgerBalance: 1791100,
-    tokens: [{ symbol: 'USD', balance: 1791100, address: '0x742d35cc6634c0532925a3b844bc454e4438f44e' }],
+    address: '',
+    ledgerBalance: 0,
+    tokens: [],
     source: 'fallback'
   };
 }

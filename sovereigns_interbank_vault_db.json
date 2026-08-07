@@ -258,5 +258,225 @@
     "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
     "params": [],
     "timestamp": "2026-08-04T16:59:01.757Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:43:39.908Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:43:40.063Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:44:57.090Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:44:57.143Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:46:08.925Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:46:09.024Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:47:15.745Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:47:15.823Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:48:25.729Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:48:25.802Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:54:45.233Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:54:45.290Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:55:51.612Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:55:51.733Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:57:36.306Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:57:36.557Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T18:58:35.523Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T18:58:35.662Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:00:01.743Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:00:01.823Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:02:15.448Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:02:15.607Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:06:06.221Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:06:06.272Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:06:58.677Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:06:58.816Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:07:46.180Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:07:46.299Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:11:51.879Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:11:52.209Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:42:26.811Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:42:27.152Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:44:26.172Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:44:26.691Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:44:59.913Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:45:00.348Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T19:45:57.794Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T19:45:58.218Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T20:00:40.997Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T20:00:41.286Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T20:03:35.600Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T20:03:35.862Z"
+  },
+  {
+    "sql": "\n      CREATE TABLE IF NOT EXISTS settled_clearinghouse (\n        tx_id TEXT PRIMARY KEY, timestamp TEXT, execution_desc TEXT, amount_delta TEXT\n      );\n    ",
+    "params": [],
+    "timestamp": "2026-08-04T20:09:03.887Z"
+  },
+  {
+    "sql": "\n          CREATE TABLE IF NOT EXISTS node_bindings (\n            secure_ref TEXT PRIMARY KEY,\n            node_id TEXT NOT NULL,\n            last_verified INTEGER NOT NULL\n          );\n        ",
+    "params": [],
+    "timestamp": "2026-08-04T20:09:04.086Z"
   }
 ]

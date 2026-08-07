@@ -31,7 +31,7 @@ import AppDownloadModal from './components/AppDownloadModal';
 import RealtimeProofModal from './components/RealtimeProofModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { convertUsdToCad, DEFAULT_USD_CAD_RATE } from './lib/financial-hardening';
-import { debounceStorageSetItem } from './lib/sync-to-storage';
+import { debouncedStorageSetItem } from './lib/sync-to-storage';
 import { resolveSharedBalance } from './lib/shared-balance';
 import { db } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';

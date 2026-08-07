@@ -106,16 +106,16 @@ export async function buildLiveIntegrationSnapshot(user: { id: string; email: st
   } catch (error: any) {
     logger.error('Failed to build live integration snapshot', { error: error?.message || error });
     const fallbackWise = await getWiseTotalCashUSD().catch(() => ({
-      totalUSD: 2478350,
-      cadBalance: 185000,
-      usdBalance: 2478350,
-      cadRate: 1.36,
+      totalUSD: 0,
+      cadBalance: 0,
+      usdBalance: 0,
+      cadRate: 0,
       balances: [],
-      accountNumber: '176576596814061',
-      routingNumber: '084009519',
-      bankName: 'Wise US Inc',
-      profileId: 101924589,
-      businessName: 'sovereigns'
+      accountNumber: undefined,
+      routingNumber: undefined,
+      bankName: undefined,
+      profileId: undefined,
+      businessName: undefined
     }));
     return {
       success: false,

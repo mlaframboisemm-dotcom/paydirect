@@ -88,6 +88,11 @@ interface WiseCardDetails {
   };
   channels: WiseCardChannels;
   limits: WiseCardLimits;
+  balances?: {
+    usd?: number;
+    cad?: number;
+    [currency: string]: number | undefined;
+  };
 }
 
 interface WiseCardTransaction {

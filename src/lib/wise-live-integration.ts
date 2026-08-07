@@ -132,15 +132,14 @@ export async function fetchWiseLiveBalances(): Promise<WiseBalance[]> {
  * Get live exchange rate from Wise
  */
 export async function getWiseExchangeRate(source: string, target: string): Promise<number> {
-  try {
-    const rates = await wiseGet(`/v1/rates?source=${source}&target=${target}`);
-    if (Array.isArray(rates) && rates.length > 0) {
-      return Number(rates[0].rate || 1);
+  const rates = await wiseGet(`/v1/rates?source=${source}&target=${target}`);
+  if (Array.isArray(rates) && rates.length > 0) {
+    const rate = Number(rates[0].rate || 0);
+    if (Number.isFinite(rate) && rate > 0) {
+      return rate;
     }
-  } catch (e: any) {
-    console.warn('[WISE] Rate fetch failed:', e.message);
   }
-  return source === 'USD' && target === 'CAD' ? 1.40895 : 1;
+  throw new Error(`No live Wise FX rate available for ${source}/${target}`);
 }
 
 /**
@@ -284,6 +283,9 @@ export async function getWiseTotalCashUSD(): Promise<{
   } catch (e: any) {
     throw new Error(e?.message || 'Failed to fetch Wise live balances');
   }
+  if (!Array.isArray(balances) || balances.length === 0) {
+    throw new Error('No Wise balances returned from live API');
+  }
   const cadRate = await getWiseExchangeRate('CAD', 'USD');
 
   let cadBalance = 0;
@@ -314,4 +316,189 @@ export async function getWiseTotalCashUSD(): Promise<{
     profileId,
     businessName
   };
+}
+
+function resolveTemplate(template: string, vars: Record<string, string | number>): string {
+  let out = template;
+  for (const [key, value] of Object.entries(vars)) {
+    out = out.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value));
+  }
+  return out;
+}
+
+async function wiseRequest(path: string, init: RequestInit = {}): Promise<any> {
+  if (!path.startsWith('/')) {
+    throw new Error(`Wise API path must start with '/': ${path}`);
+  }
+  if (!getToken()) {
+    throw new Error('WISE_API_TOKEN not configured');
+  }
+  if (!init.headers) {
+    init.headers = { 'Content-Type': 'application/json' };
+  }
+  return init.method && init.method.toUpperCase() === 'GET'
+    ? wiseGet(path)
+    : wisePost(path, (init as any).body ? JSON.parse(String((init as any).body)) : {});
+}
+
+async function resolveWiseBusinessProfileId(): Promise<number> {
+  const explicit = Number(process.env.WISE_BUSINESS_PROFILE_ID || process.env.WISE_PROFILE_ID || 0);
+  if (Number.isFinite(explicit) && explicit > 0) {
+    return explicit;
+  }
+  const profiles = await wiseGet('/v1/profiles');
+  const business = Array.isArray(profiles)
+    ? profiles.find((p: any) => String(p?.type || '').toLowerCase() === 'business')
+    : null;
+  const profileId = Number(business?.id || 0);
+  if (!Number.isFinite(profileId) || profileId <= 0) {
+    throw new Error('No Wise business profile found for card operations');
+  }
+  return profileId;
+}
+
+export interface WiseCardRecord {
+  id: string;
+  status?: string;
+  lastFourDigits?: string;
+  cardHolderName?: string;
+  createdAt?: string;
+  [key: string]: any;
+}
+
+export async function listWiseCards(profileIdInput?: number): Promise<WiseCardRecord[]> {
+  const profileId = profileIdInput || await resolveWiseBusinessProfileId();
+  const templates = String(
+    process.env.WISE_CARDS_ENDPOINT_TEMPLATES
+    || '/v3/spend/profiles/{profileId}/cards,/v1/spend/profiles/{profileId}/cards,/v2/cards?profileId={profileId}'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let lastErr: any;
+  for (const t of templates) {
+    const endpoint = resolveTemplate(t, { profileId });
+    try {
+      const data = await wiseGet(endpoint);
+      if (Array.isArray(data)) {
+        return data.map((item: any) => ({ id: String(item?.id || ''), ...item })).filter((c) => c.id);
+      }
+      if (Array.isArray((data as any)?.cards)) {
+        return (data as any).cards.map((item: any) => ({ id: String(item?.id || ''), ...item })).filter((c: any) => c.id);
+      }
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return [];
+}
+
+export async function createWiseVirtualCard(profileIdInput?: number): Promise<WiseCardRecord> {
+  const profileId = profileIdInput || await resolveWiseBusinessProfileId();
+  const templates = String(
+    process.env.WISE_CREATE_CARD_ENDPOINT_TEMPLATES
+    || '/v3/spend/profiles/{profileId}/cards,/v1/spend/profiles/{profileId}/cards,/v2/cards'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const payload = {
+    type: 'VIRTUAL',
+    profileId,
+    currency: String(process.env.WISE_CARD_CURRENCY || 'USD').toUpperCase()
+  };
+
+  let lastErr: any;
+  for (const t of templates) {
+    const endpoint = resolveTemplate(t, { profileId });
+    try {
+      const data = await wiseRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      return { id: String(data?.id || ''), ...data };
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  throw new Error(lastErr?.message || 'Failed to create Wise virtual card');
+}
+
+export async function getWiseCardTransactions(cardId: string, profileIdInput?: number): Promise<any[]> {
+  const profileId = profileIdInput || await resolveWiseBusinessProfileId();
+  const templates = String(
+    process.env.WISE_CARD_TRANSACTIONS_ENDPOINT_TEMPLATES
+    || '/v3/spend/profiles/{profileId}/cards/{cardId}/transactions,/v1/spend/profiles/{profileId}/cards/{cardId}/transactions'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let lastErr: any;
+  for (const t of templates) {
+    const endpoint = resolveTemplate(t, { profileId, cardId });
+    try {
+      const data = await wiseGet(endpoint);
+      if (Array.isArray(data)) return data;
+      if (Array.isArray((data as any)?.transactions)) return (data as any).transactions;
+      return [];
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return [];
+}
+
+export async function setWiseCardFrozen(cardId: string, freeze: boolean, profileIdInput?: number): Promise<any> {
+  const profileId = profileIdInput || await resolveWiseBusinessProfileId();
+  const templates = String(
+    process.env.WISE_CARD_FREEZE_ENDPOINT_TEMPLATES
+    || '/v3/spend/profiles/{profileId}/cards/{cardId}/freeze,/v1/spend/profiles/{profileId}/cards/{cardId}/freeze'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let lastErr: any;
+  for (const t of templates) {
+    const endpoint = resolveTemplate(t, { profileId, cardId });
+    try {
+      return await wiseRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({ freeze })
+      });
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  throw new Error(lastErr?.message || 'Failed to update Wise card freeze state');
+}
+
+export async function updateWiseCardLimits(cardId: string, limits: Record<string, any>, profileIdInput?: number): Promise<any> {
+  const profileId = profileIdInput || await resolveWiseBusinessProfileId();
+  const templates = String(
+    process.env.WISE_CARD_LIMITS_ENDPOINT_TEMPLATES
+    || '/v3/spend/profiles/{profileId}/cards/{cardId}/limits,/v1/spend/profiles/{profileId}/cards/{cardId}/limits'
+  )
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let lastErr: any;
+  for (const t of templates) {
+    const endpoint = resolveTemplate(t, { profileId, cardId });
+    try {
+      return await wiseRequest(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(limits || {})
+      });
+    } catch (err: any) {
+      lastErr = err;
+    }
+  }
+  throw new Error(lastErr?.message || 'Failed to update Wise card limits');
 }
