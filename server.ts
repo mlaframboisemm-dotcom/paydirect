@@ -2390,7 +2390,23 @@ app.get('/api/wise/balances', async (req, res) => {
   try {
     const user = (req as any).user || { id: 'system', email: 'mlaframboisemm@gmail.com', name: 'Marcel Laframboise' };
     const snapshot = await buildLiveIntegrationSnapshot(user);
-    res.json({ success: true, ...snapshot, totalUSD: snapshot.wise.totalUSD, cadBalance: snapshot.wise.cadBalance, usdBalance: snapshot.wise.usdBalance });
+    const wiseAvailableBalanceUsd = Number(snapshot?.wise?.usdBalance || 0);
+    const reconciledLedgerUsd = Number(
+      snapshot?.treasury?.ledgerBalanceUsd
+      ?? snapshot?.treasury?.totalBalanceUsd
+      ?? 0
+    );
+    const deltaUsd = Number((reconciledLedgerUsd - wiseAvailableBalanceUsd).toFixed(2));
+    res.json({
+      success: true,
+      ...snapshot,
+      totalUSD: snapshot.wise.totalUSD,
+      cadBalance: snapshot.wise.cadBalance,
+      usdBalance: snapshot.wise.usdBalance,
+      wiseAvailableBalanceUsd,
+      reconciledLedgerUsd,
+      deltaUsd
+    });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error?.message || 'failed to load Wise balances' });
   }
@@ -11941,11 +11957,13 @@ async function startServer() {
   // GET /api/wise/balances — Fetch live CAD + USD balances from Marcel's real Wise account
   app.get('/api/wise/balances', requireAuth, async (req: any, res: any) => {
     try {
+      const userId = resolveEffectiveUserId(req);
       const wiseToken = process.env.WISE_API_TOKEN || process.env.WISE_ALL_ACCESS_KEY || process.env.WISE_PERSONAL_TOKEN || process.env.WISE_ACCESS_TOKEN;
       if (!wiseToken) {
-        const userId = resolveEffectiveUserId(req);
         const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
-        const usdBalance = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
+        const reconciledLedgerUsd = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
+        const wiseAvailableBalanceUsd = reconciledLedgerUsd;
+        const deltaUsd = Number((reconciledLedgerUsd - wiseAvailableBalanceUsd).toFixed(2));
         return res.json({
           success: true,
           source: 'wise_ledger_fallback',
@@ -11953,16 +11971,23 @@ async function startServer() {
           businessName: 'sovereigns',
           profileId: Number(process.env.WISE_PROFILE_ID || 101924589),
           cadBalance: 0,
-          usdBalance,
-          totalUSD: usdBalance,
+          usdBalance: wiseAvailableBalanceUsd,
+          totalUSD: wiseAvailableBalanceUsd,
+          wiseAvailableBalanceUsd,
+          reconciledLedgerUsd,
+          deltaUsd,
           cadToUsdRate: DEFAULT_USD_CAD_RATE,
-          balances: [{ currency: 'USD', amount: usdBalance }],
+          balances: [{ currency: 'USD', amount: wiseAvailableBalanceUsd }],
           fetchedAt: new Date().toISOString(),
           providerStatus: 'missing_wise_token'
         });
       }
       const { fetchWiseLiveBalances, getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const result = await getWiseTotalCashUSD();
+      const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
+      const reconciledLedgerUsd = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
+      const wiseAvailableBalanceUsd = Number(result.usdBalance || 0);
+      const deltaUsd = Number((reconciledLedgerUsd - wiseAvailableBalanceUsd).toFixed(2));
       return res.json({
         success: true,
         source: 'wise_live',
@@ -11975,6 +12000,9 @@ async function startServer() {
         cadBalance: result.cadBalance,
         usdBalance: result.usdBalance,
         totalUSD: result.totalUSD,
+        wiseAvailableBalanceUsd,
+        reconciledLedgerUsd,
+        deltaUsd,
         cadToUsdRate: result.cadRate,
         balances: result.balances,
         fetchedAt: new Date().toISOString()
@@ -12637,14 +12665,22 @@ async function startServer() {
   // Coinbase55 Endpoints
   app.get('/api/coinbase55/summary', async (req: any, res: any) => {
     try {
+      const userId = resolveEffectiveUserId(req);
+      const usdWallets = db.execute('SELECT * FROM wallets WHERE user_id = ? AND asset_symbol = ?', [userId, 'USD']) as any[];
+      const reconciledLedgerUsd = usdWallets.length > 0 ? Number(usdWallets[0].balance || 0) : 0;
       const { getWiseTotalCashUSD } = await import('./src/lib/wise-live-integration.js');
       const wiseData = await getWiseTotalCashUSD().catch(() => null);
       const totalUSD = Number(wiseData?.totalUSD || 0);
+      const wiseAvailableBalanceUsd = Number(wiseData?.usdBalance || 0);
+      const deltaUsd = Number((reconciledLedgerUsd - wiseAvailableBalanceUsd).toFixed(2));
       const connected = Boolean(wiseData);
       return res.json({
         success: true,
         connected,
         totalBalanceUsd: totalUSD,
+        wiseAvailableBalanceUsd,
+        reconciledLedgerUsd,
+        deltaUsd,
         totalBtc: 0,
         totalEth: 0,
         activeWalletsCount: Array.isArray(wiseData?.balances) ? wiseData.balances.length : 0,
