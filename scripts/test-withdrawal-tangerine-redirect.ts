@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 function parseCookie(setCookieHeader: string | null): string {
   if (!setCookieHeader) return '';
   return setCookieHeader.split(';')[0] || '';
@@ -14,6 +12,9 @@ async function run() {
   }
   if (!process.env.JWT_SECRET) {
     process.env.JWT_SECRET = 'abcdefghijklmnopqrstuvwxyzABCDEF';
+  }
+  if (!process.env.SESSION_SECRET) {
+    process.env.SESSION_SECRET = process.env.JWT_SECRET;
   }
   if (!process.env.SOVEREIGN_ADMIN_EMAILS) {
     process.env.SOVEREIGN_ADMIN_EMAILS = 'admin@secure.local';

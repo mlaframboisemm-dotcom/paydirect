@@ -92,10 +92,7 @@ export default function CashTransferModal({
   // Bank Account States
   const [linkedBanks, setLinkedBanks] = useState<LinkedBank[]>(() => {
     const saved = localStorage.getItem('cb_linked_banks');
-    return saved ? JSON.parse(saved) : [
-      { id: 'bank-1', bankName: 'Chase Bank', accountType: 'Checking', lastFour: '8329' },
-      { id: 'bank-2', bankName: 'Wells Fargo', accountType: 'Savings', lastFour: '4012' }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   // e-Transfer and Canadian network states
@@ -124,6 +121,53 @@ export default function CashTransferModal({
   useEffect(() => {
     localStorage.setItem('cb_linked_banks', JSON.stringify(linkedBanks));
   }, [linkedBanks]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    let active = true;
+    const loadLinkedBanks = async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/plaid/accounts'), {
+          headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          return;
+        }
+
+        const data = await res.json();
+        const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+        if (!active) {
+          return;
+        }
+
+        if (accounts.length > 0) {
+          const mapped = accounts.map((account: any) => ({
+            id: account.id,
+            bankName: account.bank_name || 'Connected Bank',
+            accountType: account.account_type || 'Checking',
+            lastFour: String(account.account_number || '').slice(-4) || '0000'
+          }));
+          setLinkedBanks(mapped);
+          if (mapped[0]) {
+            setDepositBankId(mapped[0].id);
+            setWithdrawBankId(mapped[0].id);
+          }
+        }
+      } catch {
+        // Keep the existing local bank list if the live account fetch fails.
+      }
+    };
+
+    loadLinkedBanks();
+    return () => {
+      active = false;
+    };
+  }, [isOpen]);
 
   // Load Plaid Link CDN script
   useEffect(() => {

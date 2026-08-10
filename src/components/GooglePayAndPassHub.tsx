@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { CreditCard, QrCode, Smartphone, ExternalLink, CheckCircle2, ShieldCheck, Zap, ArrowRight, RefreshCw, Copy, Check, Lock, DollarSign, Store, Download, DownloadCloud, Wifi, CheckCircle, Radio, Signal, Wallet, Nfc, Activity, Sparkles, AlertCircle, Volume2, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GooglePayButton } from './GooglePayButton';
 import { auth } from '../lib/firebase';
 import { useWiseGooglePassSync } from '../lib/wise-google-pass-sync-service';
+import { buildTreasuryDisplayState } from '../lib/treasury-display';
 
 export async function getFirebaseAuthHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -218,6 +219,7 @@ interface GooglePayAndPassHubProps {
   userName: string;
   userEmail: string;
   usdBalance: number;
+  cadBalance?: number;
   portfolioValue: number;
   onRefreshBalance?: (preferredUsdBalance?: number) => void;
   showToast?: (message: string, type: 'success' | 'error' | 'info') => void;
@@ -227,6 +229,7 @@ export default function GooglePayAndPassHub({
   userName,
   userEmail,
   usdBalance,
+  cadBalance,
   portfolioValue,
   onRefreshBalance,
   showToast
@@ -238,6 +241,8 @@ export default function GooglePayAndPassHub({
   const [isSyncingWise, setIsSyncingWise] = useState<boolean>(false);
   const [liveWiseUsdBalance, setLiveWiseUsdBalance] = useState<number>(usdBalance);
   const [liveWiseCadBalance, setLiveWiseCadBalance] = useState<number>(0);
+  const [liveAvailableUsdBalance, setLiveAvailableUsdBalance] = useState<number>(Number.isFinite(usdBalance) ? usdBalance : 0);
+  const [liveAvailableCadBalance, setLiveAvailableCadBalance] = useState<number>(Number.isFinite(cadBalance) ? cadBalance : 0);
   
   // Custom Hook: Active Wise Wallets & Payment Mapping
   const {
@@ -262,6 +267,15 @@ export default function GooglePayAndPassHub({
     syncNow: triggerHubSync,
     syncNowDebounced: triggerHubSyncDebounced
   } = useWiseGooglePassSync(60000);
+
+  useEffect(() => {
+    if (Number.isFinite(usdBalance) && usdBalance >= 0) {
+      setLiveAvailableUsdBalance(usdBalance);
+    }
+    if (Number.isFinite(cadBalance) && cadBalance >= 0) {
+      setLiveAvailableCadBalance(cadBalance);
+    }
+  }, [usdBalance, cadBalance]);
 
   useEffect(() => {
     const usd = wiseWallets
@@ -302,6 +316,18 @@ export default function GooglePayAndPassHub({
       ? liveWiseCadBalance
       : Number(hubSyncState?.wiseCard?.balances?.cad ?? passData?.passData?.wiseCADBalance ?? 0);
 
+  const effectiveUsdBalanceForPass = Number.isFinite(liveAvailableUsdBalance) && liveAvailableUsdBalance > 0
+    ? liveAvailableUsdBalance
+    : Number.isFinite(displayedWiseUsdBalance) && displayedWiseUsdBalance > 0
+      ? displayedWiseUsdBalance
+      : Number.isFinite(usdBalance) ? usdBalance : 0;
+
+  const effectiveCadBalanceForPass = Number.isFinite(liveAvailableCadBalance) && liveAvailableCadBalance > 0
+    ? liveAvailableCadBalance
+    : Number.isFinite(displayedWiseCadBalance) && displayedWiseCadBalance > 0
+      ? displayedWiseCadBalance
+      : Number.isFinite(cadBalance) ? cadBalance : (effectiveUsdBalanceForPass * 1.3602);
+
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(false);
@@ -325,6 +351,11 @@ export default function GooglePayAndPassHub({
 
   // Quick Top-up amount for Google Pay
   const [topUpAmount, setTopUpAmount] = useState<string>('25.00');
+
+  const treasuryDisplay = useMemo(
+    () => buildTreasuryDisplayState(effectiveUsdBalanceForPass, effectiveCadBalanceForPass),
+    [effectiveUsdBalanceForPass, effectiveCadBalanceForPass]
+  );
 
   // Active Hub Tab View Mode ('terminal' | 'wallet' | 'topup' | 'history')
   const [activeTab, setActiveTab] = useState<'terminal' | 'wallet' | 'topup' | 'history'>('terminal');
@@ -442,12 +473,12 @@ export default function GooglePayAndPassHub({
     const generateLiveQrCode = async () => {
       try {
         const QRCode = await import('qrcode');
-        const cadEquivalentBalance = usdBalance * FX_USD_TO_CAD;
+        const cadEquivalentBalance = effectiveUsdBalanceForPass * FX_USD_TO_CAD;
         const qrPayload = JSON.stringify({
           type: 'sovereign_pay',
           userId: passData?.passData?.userId || passData?.userId || 'user_mlaframboisemm',
           email: userEmail,
-          usdBalance: usdBalance,
+          usdBalance: effectiveUsdBalanceForPass,
           cadBalanceEquivalent: parseFloat(cadEquivalentBalance.toFixed(2)),
           portfolioValue: portfolioValue,
           walletAddress: passData?.passData?.walletAddress || '0x740aF45d81835B368E9Df03e8D37B8ee89bA2Da4',
@@ -484,9 +515,33 @@ export default function GooglePayAndPassHub({
     return () => {
       isMounted = false;
     };
-  }, [usdBalance, portfolioValue, userEmail, activeWallet, passData]);
+  }, [effectiveUsdBalanceForPass, portfolioValue, userEmail, activeWallet, passData]);
+
+  const refreshAvailableTreasuryBalance = async () => {
+    try {
+      const authHeaders = await getFirebaseAuthHeaders();
+      const res = await fetch('/api/treasury/summary', { headers: authHeaders, credentials: 'include' });
+      if (!res.ok) {
+        return;
+      }
+      const payload = await res.json();
+      if (payload?.success) {
+        const nextUsd = Number(payload.usdBalance ?? payload.treasury?.availableBalanceUsd ?? payload.totalUsd ?? 0);
+        const nextCad = Number(payload.cadBalance ?? payload.treasury?.availableBalanceCad ?? 0);
+        if (Number.isFinite(nextUsd) && nextUsd >= 0) {
+          setLiveAvailableUsdBalance(nextUsd);
+        }
+        if (Number.isFinite(nextCad) && nextCad >= 0) {
+          setLiveAvailableCadBalance(nextCad);
+        }
+      }
+    } catch (error) {
+      console.warn('[GooglePayAndPassHub] Unable to refresh treasury summary balance:', error);
+    }
+  };
 
   useEffect(() => {
+    void refreshAvailableTreasuryBalance();
     fetchWalletPass();
 
     if ('NDEFReader' in window) {
@@ -768,8 +823,17 @@ export default function GooglePayAndPassHub({
         if (typeof data.wiseCADBalance === 'number') {
           setLiveWiseCadBalance(data.wiseCADBalance);
         }
+        if (typeof data.reconciledAppUSDBalance === 'number' && data.reconciledAppUSDBalance >= 0) {
+          setLiveAvailableUsdBalance(data.reconciledAppUSDBalance);
+        }
+        if (typeof data.cadBalance === 'number' && data.cadBalance >= 0) {
+          setLiveAvailableCadBalance(data.cadBalance);
+        } else if (typeof data.wiseCADBalance === 'number' && data.wiseCADBalance >= 0) {
+          setLiveAvailableCadBalance(data.wiseCADBalance);
+        }
         await refreshWallets();
         await triggerHubSync();
+        await refreshAvailableTreasuryBalance();
         showToast?.(`Wise balance synced! Total: $${data.wiseTotalUSD.toFixed(2)} USD (CAD ${data.wiseCADBalance.toFixed(2)} + USD ${data.wiseUSDBalance.toFixed(2)})`, 'success');
         onRefreshBalance?.(typeof data.reconciledAppUSDBalance === 'number' ? data.reconciledAppUSDBalance : data.wiseTotalUSD);
         fetchWalletPass();
@@ -876,7 +940,7 @@ export default function GooglePayAndPassHub({
   return (
     <div className="max-w-5xl mx-auto space-y-6 py-2">
       {/* Sleek Executive Header */}
-      <div className="bg-slate-900 rounded-3xl p-6 sm:p-7 text-white shadow-lg border border-slate-800 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 rounded-3xl p-6 sm:p-7 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] border border-slate-700/70 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
           <div className="space-y-1.5">
             <div className="flex items-center space-x-2">
@@ -901,14 +965,14 @@ export default function GooglePayAndPassHub({
                 Wise Live USD Balance
               </span>
               <span className="text-lg font-black font-mono text-emerald-300 block">
-                ${displayedWiseUsdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                {treasuryDisplay.usdEquivalentLabel}
               </span>
             </div>
 
             <div className="bg-slate-800/90 border border-slate-700/80 px-3.5 py-2 rounded-2xl">
               <span className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider block">Wise CAD Balance</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
-                CA${displayedWiseCadBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {treasuryDisplay.cadEquivalentLabel}
               </span>
             </div>
 
@@ -1325,7 +1389,7 @@ export default function GooglePayAndPassHub({
                     <div className="space-y-2 bg-slate-900/90 rounded-2xl p-4 border border-slate-800 relative z-10">
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Reconciled Cash Balance</span>
                       <span className="text-2xl font-black text-emerald-400 font-mono block">
-                        ${usdBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                        {treasuryDisplay.usdEquivalentLabel}
                       </span>
                       <p className="text-[10px] text-slate-400 pt-1 font-mono">
                         Wise Synced Account: 176576596814061
@@ -1381,11 +1445,11 @@ export default function GooglePayAndPassHub({
                     <div className="space-y-2 bg-slate-900/80 rounded-2xl p-4 border border-emerald-800/40 relative z-10">
                       <span className="text-[9px] text-emerald-300/80 font-bold uppercase tracking-wider block">Live Wise Multi-Currency Liquidity</span>
                       <span className="text-2xl font-black text-emerald-300 font-mono block">
-                        $2,614,350.00 USD
+                        {treasuryDisplay.usdEquivalentLabel}
                       </span>
                       <div className="flex items-center justify-between text-[10px] font-mono text-slate-300 pt-1">
-                        <span>USD: $2,478,350.00</span>
-                        <span>CAD: $185,000.00</span>
+                        <span>USD: {treasuryDisplay.usdEquivalentLabel}</span>
+                        <span>CAD: {treasuryDisplay.cadEquivalentLabel}</span>
                       </div>
                     </div>
 
@@ -1610,7 +1674,7 @@ export default function GooglePayAndPassHub({
                   <div className="inline-block p-3 bg-slate-50 rounded-2xl border border-slate-200">
                     <img src={qrCodeUrl} alt="Sovereign Pass QR" className="w-44 h-44 mx-auto rounded-lg" />
                     <div className="mt-2 text-[10px] font-mono font-bold text-slate-600">
-                      ENC: ${usdBalance.toFixed(2)} USD • Wise Synced
+                      ENC: {treasuryDisplay.summaryLabel} • Wise Synced
                     </div>
                   </div>
                 ) : (

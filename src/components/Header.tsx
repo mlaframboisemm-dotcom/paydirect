@@ -104,8 +104,8 @@ export default function Header({
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-all duration-200 bg-white ${
-        scrolled ? 'border-b border-gray-200/80 shadow-xs' : 'border-b border-gray-100'
+      className={`sticky top-0 z-50 w-full transition-all duration-200 bg-slate-950/95 text-slate-50 backdrop-blur ${
+        scrolled ? 'border-b border-slate-800/80 shadow-[0_10px_35px_rgba(2,6,23,0.35)]' : 'border-b border-slate-900'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -113,7 +113,7 @@ export default function Header({
         <div className="flex items-center space-x-8">
           <button
             onClick={() => setCurrentTab('dashboard')}
-            className="flex items-center space-x-2 cursor-pointer focus:outline-none"
+            className="flex items-center space-x-2.5 cursor-pointer focus:outline-none rounded-full px-2 py-1 transition-colors hover:bg-slate-50"
             id="coinbase-logo-btn"
           >
             {/* High fidelity Coinbase logo */}
@@ -125,7 +125,7 @@ export default function Header({
             >
               <circle cx="12" cy="12" r="10" />
             </svg>
-            <span className="text-xl font-bold text-[#0052FF] tracking-tight font-sans select-none">
+            <span className="text-xl font-bold text-white tracking-tight font-sans select-none">
               coinbase
             </span>
           </button>
@@ -158,10 +158,10 @@ export default function Header({
               <button
                 key={item.id}
                 onClick={() => setCurrentTab(item.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-full cursor-pointer transition-colors relative ${
+                className={`px-4 py-2 text-sm font-semibold rounded-full cursor-pointer transition-all relative ${
                   currentTab === item.id
-                    ? 'text-[#0052FF] bg-[#0052FF]/5'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'text-white bg-white/10 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-white/10'
                 }`}
                 id={`nav-${item.id}`}
               >
@@ -189,7 +189,7 @@ export default function Header({
                 setShowSearchResults(true);
               }}
               onFocus={() => setShowSearchResults(true)}
-              className="w-full bg-gray-50 hover:bg-gray-100/70 focus:bg-white text-gray-800 text-sm pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-[#0052FF] focus:outline-none focus:ring-2 focus:ring-[#0052FF]/15 transition-all"
+              className="w-full bg-slate-900/70 hover:bg-slate-900/90 focus:bg-slate-900 text-slate-100 text-sm pl-10 pr-4 py-2 rounded-lg border border-slate-800 focus:border-[#5da8ff] focus:outline-none focus:ring-2 focus:ring-[#5da8ff]/20 transition-all"
             />
             {searchQuery && (
               <button
@@ -323,9 +323,9 @@ export default function Header({
           </div>
 
           {/* Quick Pay / Balance Display */}
-          <div className="hidden md:flex flex-col items-end px-3 py-1 bg-gray-50 rounded-lg border border-gray-100 select-none">
-            <span className="text-[10px] text-gray-400 font-medium">PORTFOLIO</span>
-            <span className="text-sm font-bold text-gray-900">
+          <div className="hidden md:flex flex-col items-end px-3.5 py-2 bg-slate-50 rounded-xl border border-slate-200/70 select-none shadow-sm">
+            <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-[0.2em]">Portfolio</span>
+            <span className="text-sm font-black text-slate-900">
               {citizenship === 'Canada' || citizenship === 'CA'
                 ? `CA$${(portfolioValue * 1.36).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                 : `$${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}

@@ -3196,6 +3196,7 @@ export default function SovereignIntelligenceView({
                         const liveWalletBalance = Number(
                           unifiedSyncData?.balances?.wiseUsd ??
                           unifiedSyncData?.balances?.totalCashUsd ??
+                          unifiedSyncData?.totals?.totalUsd ??
                           sovereignTokens.find((t: any) => t.symbol === 'USD')?.balance ??
                           2478350.00
                         );

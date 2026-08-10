@@ -30,7 +30,7 @@ function normalizeTransferReference(reference: string | undefined, fallback: str
     .replace(/[^A-Za-z0-9 ._\-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 60);
+    .slice(0, 35);
 }
 
 export interface WiseRecipientPayload {
@@ -397,15 +397,25 @@ export class WiseApiEngine {
           quoteUuid: quote.id,
           customerTransactionId: crypto.randomUUID(), // Enforces idempotency
           details: {
-            reference: transferReference
+            reference: transferReference,
+            transferPurpose: 'verification.transfers.purpose.pay.bills',
+            sourceOfFunds: 'verification.source.of.funds.other'
           }
         })
       });
 
       if (!transferResponse.ok) {
         const error = await transferResponse.json();
+        const validationMessages = Array.isArray(error?.errors)
+          ? error.errors
+              .map((item: any) => String(item?.message || item?.code || '').trim())
+              .filter((msg: string) => msg.length > 0)
+          : [];
+        const detail = validationMessages.length > 0
+          ? validationMessages.join('; ')
+          : String(error?.message || transferResponse.statusText || 'Unprocessable Entity');
         logger.error('Transfer creation failed', { error });
-        throw new Error(`Transfer creation failed: ${error.message || transferResponse.statusText}`);
+        throw new Error(`Transfer creation failed: ${detail}`);
       }
 
       const transfer = await transferResponse.json();
@@ -664,15 +674,25 @@ export class WiseApiEngine {
           quoteUuid: quote.id,
           customerTransactionId: crypto.randomUUID(),
           details: {
-            reference: resolvedReference
+            reference: resolvedReference,
+            transferPurpose: 'verification.transfers.purpose.pay.bills',
+            sourceOfFunds: 'verification.source.of.funds.other'
           }
         })
       });
 
       if (!transferResponse.ok) {
         const error = await transferResponse.json();
+        const validationMessages = Array.isArray(error?.errors)
+          ? error.errors
+              .map((item: any) => String(item?.message || item?.code || '').trim())
+              .filter((msg: string) => msg.length > 0)
+          : [];
+        const detail = validationMessages.length > 0
+          ? validationMessages.join('; ')
+          : String(error?.message || transferResponse.statusText || 'Unprocessable Entity');
         logger.error('Outbound transfer creation failed', { error });
-        throw new Error(`Transfer creation failed: ${error.message || transferResponse.statusText}`);
+        throw new Error(`Transfer creation failed: ${detail}`);
       }
 
       const transfer = await transferResponse.json();
