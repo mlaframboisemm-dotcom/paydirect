@@ -515,7 +515,7 @@ Sovereigns Banking Hub / Wise Business`;
 
   const primaryUsdBalance = Number(
     balances.find(b => b.currency === 'USD')?.amount ??
-    card?.balances?.usd ??
+    (card as any)?.balances?.usd ??
     0
   );
 
